@@ -2,17 +2,17 @@
 // Browser recipe driver for evidence_capture.py: drives a headless Chromium-family browser over the Chrome DevTools Protocol with
 // Node's built-in WebSocket (Node 22+), dispatches real input events, and writes a screenshot plus screencast frames.
 // It is launched by evidence_capture.py with one JSON job on stdin and prints one JSON result on stdout; nothing else is written
-// to stdout. Every browser log line goes to the job's diagnostics file. Never drives a user's profile: a fresh temporary
+// to stdout. Every browser log line is returned for the Python wrapper to redact before it persists the diagnostics file. Never drives a user's profile: a fresh temporary
 // user-data-dir is created per job and removed afterwards.
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile, appendFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 const job = JSON.parse(await readFile("/dev/stdin", "utf8"));
-const out = { ok: false, steps: [], frames: [], observations: {}, errors: [], console: [] };
+const out = { ok: false, steps: [], frames: [], observations: {}, errors: [], console: [], diagnostics: [] };
 const diag = job.diagnostics;
-const log = async (line) => { await appendFile(diag, `${new Date().toISOString()} ${line}\n`); };
+const log = async (line) => { out.diagnostics.push(`${new Date().toISOString()} ${line}`); };
 
 if (typeof WebSocket !== "function") {
   out.errors.push(`node ${process.version} has no global WebSocket; Node 22 or newer is required`);

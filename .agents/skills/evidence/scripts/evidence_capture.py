@@ -390,6 +390,9 @@ def capture_browser(args, capture_dir: Path, record, redact: Redactor):
         result = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.stdout.strip() else {}
     except ValueError:
         result = {}
+    driver_diagnostics = result.get("diagnostics") or []
+    if driver_diagnostics:
+        diagnostics.write_text(redact("\n".join(str(line) for line in driver_diagnostics)) + "\n", encoding="utf-8")
     if proc.stderr.strip():
         with diagnostics.open("a", encoding="utf-8") as handle:
             handle.write(redact(proc.stderr[-4000:]))
