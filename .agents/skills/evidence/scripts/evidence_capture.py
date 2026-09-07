@@ -305,6 +305,16 @@ class Redactor:
         return text
 
 
+def redact_record(value, redact):
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [redact_record(item, redact) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_record(item, redact) for key, item in value.items()}
+    return value
+
+
 def clip(text):
     return text if len(text) <= TEXT_LIMIT else text[:TEXT_LIMIT] + f"\n... [{len(text) - TEXT_LIMIT} more characters not recorded]"
 
@@ -382,7 +392,7 @@ def capture_browser(args, capture_dir: Path, record, redact: Redactor):
         result = {}
     if proc.stderr.strip():
         with diagnostics.open("a", encoding="utf-8") as handle:
-            handle.write(proc.stderr[-4000:])
+            handle.write(redact(proc.stderr[-4000:]))
     record["driver"] = {"script": BROWSER_DRIVER.name, "exit": proc.returncode, "browser_version": result.get("observations", {}).get("browser_version"),
                         "protocol": result.get("observations", {}).get("protocol_version")}
     record["environment"]["browser_version"] = record["driver"]["browser_version"]
@@ -552,6 +562,7 @@ def cmd_capture(args):
                     record["media"].append({**inspect_media(path), "role": "diagnostic", "derived": False})
                 except ValueError:
                     record["media"].append({"file": path.name, "bytes": path.stat().st_size, "role": "diagnostic", "derived": False, "sha256": sha256_file(path)})
+    record = redact_record(record, redact)
     if build["dirty"]:
         record["limitations"].append("the driven checkout had uncommitted changes; the capture is bound to its HEAD but the running code may differ")
     if redact.count:

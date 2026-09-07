@@ -337,13 +337,16 @@ def render_block(plan, url_for, final: bool):
             if not after:
                 continue
             noun = "screenshot" if kind == "image" else "screencast"
+            before_label = "before " + noun + " " + before["sha256"][:12] if before else None
+            after_label = "after " + noun + " " + after["sha256"][:12]
+            preview_label = "preview " + noun + " " + after["sha256"][:12]
             marks = " ".join(f"{m['role']}={m['sha256']}" for m in (before, after) if m)
             if kind == "image":
                 if before:
                     lines += [f"<!-- sum-media: {marks} -->", "| Before | After |", "|:---:|:---:|",
-                              f"| {media_ref(before, url_for(before['sha256']), f'before {noun} {before['sha256'][:12]}')} | {media_ref(after, url_for(after['sha256']), f'after {noun} {after['sha256'][:12]}')} |", ""]
+                              f"| {media_ref(before, url_for(before['sha256']), before_label)} | {media_ref(after, url_for(after['sha256']), after_label)} |", ""]
                 else:
-                    lines += [f"<!-- sum-media: {marks} -->", "| Preview (after only) |", "|:---:|", f"| {media_ref(after, url_for(after['sha256']), f'preview {noun} {after['sha256'][:12]}')} |", ""]
+                    lines += [f"<!-- sum-media: {marks} -->", "| Preview (after only) |", "|:---:|", f"| {media_ref(after, url_for(after['sha256']), preview_label)} |", ""]
                 continue
             urls = [url_for(m["sha256"]) if m else None for m in (before, after)]
             if final and urls[1] and (not before or urls[0]):
