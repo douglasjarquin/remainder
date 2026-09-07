@@ -21,6 +21,9 @@ func (o Observation) ForRequest(request Request) (Observation, error) {
 	if request.Profile != "" && o.Profile != request.Profile {
 		return Observation{}, ErrNoMatch
 	}
+	if request.Account != "" && (o.Account.LastObserved != request.Account || o.Account.Binding == IdentityMismatch) {
+		return Observation{}, ErrWrongAccount
+	}
 	if request.All || (request.Window == "" && request.Scope == "") {
 		return o, nil
 	}

@@ -86,6 +86,37 @@ func TestExecuteWithAdapter_RendersJSONAndValueThroughFreshCobraTrees(t *testing
 	}
 }
 
+func TestExecuteWithAdapter_RejectsWrongAccountAcrossOutputFormats(t *testing.T) {
+	amount := evidence.JSONNumber("42")
+	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		Account:       evidence.AccountIdentity{LastObserved: "other-account", Binding: evidence.IdentityHistorical},
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows:       []evidence.Window{{ID: "weekly", Scope: evidence.ScopeModel, Unit: "tokens", Limits: []evidence.Limit{{ID: "weekly-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}}}},
+	}}
+
+	for _, test := range []struct {
+		name string
+		args []string
+	}{
+		{name: "compact", args: []string{"--account", "wanted-account"}},
+		{name: "json", args: []string{"--format", "json", "--account", "wanted-account"}},
+		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining", "--account", "wanted-account"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := executeWithAdapter(context.Background(), test.args, &stdout, &stderr, "v0.1.0", adapter)
+			if code != 2 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "account") {
+				t.Fatalf("wrong-account %s result: code=%d stdout=%q stderr=%q", test.name, code, stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestExecuteWithAdapter_HelpAndInvalidFlagsDoNotObserve(t *testing.T) {
 	adapter := &issue3FixtureAdapter{}
 	var helpOut, helpErr bytes.Buffer
