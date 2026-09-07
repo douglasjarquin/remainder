@@ -18,6 +18,9 @@ Build directly with:
 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o bin/remainder ./cmd/remainder
 ```
 
+Before offline verification in a fresh checkout, prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`.
+The setup uses the Go 1.27.1 toolchain pinned in `mise.toml` and CI; verification itself keeps module lookup disabled.
+
 Run the portable verification with `./scripts/verify.sh` or `mise run verify`.
 
 Run the direct test command with `go test -race -shuffle=on -count=1 ./...`.

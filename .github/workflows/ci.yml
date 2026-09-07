@@ -19,6 +19,8 @@ jobs:
         with:
           go-version: '1.27.1'
           cache: false
+      - name: Set up pinned Go modules
+        run: GOTOOLCHAIN=local go mod download all
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
       - name: Check dependencies

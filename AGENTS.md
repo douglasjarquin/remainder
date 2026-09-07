@@ -11,6 +11,7 @@ The project is positioned for personal use by its maintainer.
 - `mise run verify` runs `scripts/verify.sh`.
 - `mise run benchmark` records full-process startup samples for the compiled binary.
 - Direct equivalents are `go build ./cmd/remainder`, `go test -race -shuffle=on -count=1 ./...`, and `./scripts/verify.sh`.
+- Prime the pinned module cache once before offline verification with `GOTOOLCHAIN=local go mod download all`.
 
 ## Architecture
 
