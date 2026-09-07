@@ -3,6 +3,7 @@ package evidence
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -189,6 +190,12 @@ func (v Value) validate() error {
 		if v.Amount == nil {
 			return ErrInvalidObservation
 		}
+		if err := validateNumber(v.Amount); err != nil {
+			return err
+		}
+		if v.State == ValueZero && !isZeroNumber(*v.Amount) {
+			return ErrInvalidObservation
+		}
 	case ValueUnknown, ValueUnlimited, ValueNotApplicable:
 		if v.Amount != nil {
 			return ErrInvalidObservation
@@ -197,6 +204,27 @@ func (v Value) validate() error {
 		return ErrInvalidObservation
 	}
 	return nil
+}
+
+func validateNumber(number *json.Number) error {
+	raw := number.String()
+	var parsed json.Number
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil || parsed.String() != raw {
+		return ErrInvalidObservation
+	}
+	return nil
+}
+
+func isZeroNumber(number json.Number) bool {
+	raw := number.String()
+	if strings.HasPrefix(raw, "-") {
+		raw = raw[1:]
+	}
+	if exponent := strings.IndexAny(raw, "eE"); exponent >= 0 {
+		raw = raw[:exponent]
+	}
+	raw = strings.ReplaceAll(raw, ".", "")
+	return strings.Trim(raw, "0") == ""
 }
 
 type JSONNumber = json.Number

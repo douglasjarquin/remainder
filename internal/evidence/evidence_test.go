@@ -85,6 +85,96 @@ func TestObservation_RenderCompactEscapesControlCharactersInStructuralFields(t *
 	}
 }
 
+func TestObservation_RejectsNonzeroAmountForZeroState(t *testing.T) {
+	amount := json.Number("42")
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{{ID: "weekly", Limits: []evidence.Limit{{
+			ID: "remaining", Field: evidence.FieldRemaining,
+			Value: evidence.Value{State: evidence.ValueZero, Amount: &amount},
+		}}}},
+	}
+	if err := obs.Validate(); !errors.Is(err, evidence.ErrInvalidObservation) {
+		t.Fatalf("Validate() error = %v, want ErrInvalidObservation for nonzero zero-state amount", err)
+	}
+}
+
+func TestObservation_ForRequestHonorsExplicitWindowWithAll(t *testing.T) {
+	amount := json.Number("42")
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{
+			{ID: "daily", Limits: []evidence.Limit{{ID: "daily-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}}},
+			{ID: "weekly", Limits: []evidence.Limit{{ID: "weekly-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}}},
+		},
+	}
+	filtered, err := obs.ForRequest(evidence.Request{Window: "weekly", All: true})
+	if err != nil {
+		t.Fatalf("ForRequest() error = %v", err)
+	}
+	if len(filtered.Windows) != 1 || filtered.Windows[0].ID != "weekly" {
+		t.Fatalf("ForRequest() windows = %#v, want only weekly", filtered.Windows)
+	}
+}
+
+func TestObservation_RenderCompactQuotesStructuralTokens(t *testing.T) {
+	amount := json.Number("42")
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		Account:       evidence.AccountIdentity{LastObserved: "acct-1", Binding: evidence.IdentityBinding("historical\ninjected")},
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{{
+			ID: "weekly;injected=1\n", Scope: evidence.Scope("model,scope"), Unit: "tokens,unit",
+			Limits: []evidence.Limit{{ID: "remaining", Field: evidence.Field("remaining:field"), Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}},
+		}},
+	}
+	compact, err := evidence.RenderCompact(obs, obs.ObservedAt)
+	if err != nil {
+		t.Fatalf("RenderCompact() error = %v", err)
+	}
+	if strings.ContainsAny(compact, "\r\n\t") {
+		t.Fatalf("RenderCompact() contains raw control characters: %q", compact)
+	}
+	for _, token := range []string{`identity="historical\ninjected"`, `"weekly;injected=1\n"`, `"model,scope"`, `"remaining:field"`, `"tokens,unit"`} {
+		if !strings.Contains(compact, token) {
+			t.Fatalf("RenderCompact() = %q, want quoted structural token %q", compact, token)
+		}
+	}
+}
+
+func TestObservation_RejectsInvalidNumericPayload(t *testing.T) {
+	amount := json.Number("42;injected")
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{{ID: "weekly", Limits: []evidence.Limit{{
+			ID: "remaining", Field: evidence.FieldRemaining,
+			Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount},
+		}}}},
+	}
+	if err := obs.Validate(); !errors.Is(err, evidence.ErrInvalidObservation) {
+		t.Fatalf("Validate() error = %v, want ErrInvalidObservation for injected numeric payload", err)
+	}
+}
+
 func TestObservation_SelectValueRequiresExactEligibleSelection(t *testing.T) {
 	amount := json.Number("42")
 	obs := evidence.Observation{

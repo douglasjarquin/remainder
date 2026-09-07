@@ -117,6 +117,27 @@ func TestExecuteWithAdapter_RejectsWrongAccountAcrossOutputFormats(t *testing.T)
 	}
 }
 
+func TestExecuteWithAdapter_AllHonorsExplicitWindow(t *testing.T) {
+	amount := evidence.JSONNumber("42")
+	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{
+			{ID: "daily", Scope: evidence.ScopeAccount, Unit: "tokens", Limits: []evidence.Limit{{ID: "daily-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}}},
+			{ID: "weekly", Scope: evidence.ScopeModel, Unit: "tokens", Limits: []evidence.Limit{{ID: "weekly-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}}},
+		},
+	}}
+	var stdout, stderr bytes.Buffer
+	code := executeWithAdapter(context.Background(), []string{"--all", "--window", "weekly"}, &stdout, &stderr, "v0.1.0", adapter)
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "weekly/model") || strings.Contains(stdout.String(), "daily/account") {
+		t.Fatalf("--all --window weekly result: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestExecuteWithAdapter_HelpAndInvalidFlagsDoNotObserve(t *testing.T) {
 	adapter := &issue3FixtureAdapter{}
 	var helpOut, helpErr bytes.Buffer

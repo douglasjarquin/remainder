@@ -23,7 +23,7 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 		"age_seconds=" + strconv.FormatInt(int64(age/time.Second), 10),
 		"freshness=" + string(observation.Freshness),
 		"outcome=" + string(observation.Outcome),
-		"identity=" + string(observation.Account.Binding),
+		"identity=" + safeToken(string(observation.Account.Binding)),
 		"account=" + strconv.Quote(observation.Account.LastObserved),
 		"source=" + strconv.Quote(observation.Source.Kind+"/"+observation.Source.Name),
 	}
@@ -58,7 +58,9 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 }
 
 func safeToken(value string) string {
-	if strings.IndexFunc(value, unicode.IsControl) >= 0 {
+	if value == "" || strings.IndexFunc(value, func(r rune) bool {
+		return unicode.IsControl(r) || strings.ContainsRune(" \t\r\n;:=/,\\\"", r)
+	}) >= 0 {
 		return strconv.Quote(value)
 	}
 	return value
