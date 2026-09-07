@@ -2,6 +2,8 @@
 
 Remainder is a small, one-shot quota CLI written in Go with Cobra for its command layer.
 
+It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
+
 This first slice provides honest help, version, and unavailable-provider behavior.
 
 It does not access credentials, the network, a cache, or any provider.

@@ -2,6 +2,8 @@
 
 Remainder is a Go quota CLI with a standard-library core and Cobra command layer.
 
+The project is positioned for personal use by its maintainer.
+
 ## Commands
 
 - `mise run build` builds `bin/remainder` with `CGO_ENABLED=0`.
