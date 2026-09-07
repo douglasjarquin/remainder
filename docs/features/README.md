@@ -1,5 +1,9 @@
 # Feature map
 
+Inventory: incomplete
+
+The issue #3 contract is tracked in [quota evidence](quota-evidence.md).
+
 | Feature | Status | Evidence or next issue |
 | --- | --- | --- |
 | `--help` and `--version` | Implemented | CLI tests and empty-home manual transcript in issue #2 evidence |

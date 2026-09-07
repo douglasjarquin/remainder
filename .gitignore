@@ -2,3 +2,6 @@ bin/
 artifacts/
 *.test
 *.prof
+
+# Verification run records written by .agents/skills/verify (see VERIFY.md).
+.artifacts/
