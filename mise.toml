@@ -1,0 +1,23 @@
+[tools]
+go = "1.27.1"
+
+[tasks.build]
+description = "Build the CGO-free release-like binary"
+run = "CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o bin/remainder ./cmd/remainder"
+
+[tasks.test]
+description = "Run race-enabled Go tests"
+run = "go test -race -shuffle=on -count=1 ./..."
+
+[tasks.verify]
+description = "Run the portable project verification"
+run = "./scripts/verify.sh"
+
+[tasks.benchmark]
+description = "Record full-process startup samples"
+depends = ["build"]
+run = [
+  "mkdir -p artifacts",
+  "go test -bench 'Benchmark' -benchmem -count=10 ./internal/cli > artifacts/in-process.txt",
+  "./scripts/benchmark.sh ./bin/remainder > artifacts/startup.jsonl",
+]
