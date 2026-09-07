@@ -19,6 +19,7 @@ fi
 GOPROXY=off go vet ./...
 GOPROXY=off go test -race -shuffle=on -count=1 ./...
 GOPROXY=off ./scripts/check-dependencies.sh
+PYTHONDONTWRITEBYTECODE=1 python3 .agents/skills/evidence/scripts/test_redaction.py
 
 build_dir=$(mktemp -d)
 trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
