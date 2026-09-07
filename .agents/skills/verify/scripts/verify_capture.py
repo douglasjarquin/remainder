@@ -31,6 +31,41 @@ LIMIT = 20000
 FENCE = re.compile(r"^```verify[ \t]*\n(.*?)^```[ \t]*$", re.S | re.M)
 
 
+REDACT_DEFAULT = [r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", r"(?i)\b((?:api[_-]?key|token|secret|password|passwd|authorization)\b[\"']?\s*[:=]\s*[\"']?)[^\s\"',;]+",
+                  r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", r"\b(?:gh[pousr]|sk|xox[abp])[_-][A-Za-z0-9_-]{10,}\b"]
+
+
+class Redactor:
+    def __init__(self):
+        self.patterns = [re.compile(pattern) for pattern in REDACT_DEFAULT]
+        self.spans = set()
+
+    @property
+    def count(self):
+        return len(self.spans)
+
+    def __call__(self, text):
+        if not text:
+            return text
+        for pattern in self.patterns:
+            def replace(match):
+                self.spans.add(match.group(0))
+                keep = match.group(1) if match.re.groups else ""
+                return f"{keep}[REDACTED]"
+            text = pattern.sub(replace, text)
+        return text
+
+
+def redact_record(value, redact):
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [redact_record(item, redact) for item in value]
+    if isinstance(value, dict):
+        return {key: redact_record(item, redact) for key, item in value.items()}
+    return value
+
+
 def utc_now():
     return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -94,6 +129,7 @@ def main(argv=None):
     run_dir = choose_run_dir(root, artifacts, args.run_dir)
     evidence_dir = run_dir / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
+    redact = Redactor()
     started = utc_now()
     clock = time.monotonic()
     record = {"schema": 1, "feature": args.feature, "scenario": args.scenario or args.feature, "note": args.note, "recipe": args.recipe, "started_at": started, "cwd": str(Path.cwd()),
@@ -137,6 +173,8 @@ def main(argv=None):
         if args.expect_status is not None and status != args.expect_status:
             record["unmet"].append(f"status was {status}, expected {args.expect_status}")
         record["unmet"] += [f"body lacks {t!r}" for t in args.expect_text if t not in text]
+    record = redact_record(record, redact)
+    record["redaction"] = {"patterns": len(redact.patterns), "count": redact.count, "labelled": redact.count > 0}
     record.update(ended_at=utc_now(), seconds=round(time.monotonic() - clock, 3), met=not record["unmet"])
     index = len(list(evidence_dir.glob("*.json"))) + 1
     safe = re.sub(r"[^A-Za-z0-9._-]+", "-", record["scenario"])[:60]

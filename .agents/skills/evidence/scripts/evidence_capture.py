@@ -594,12 +594,15 @@ def cmd_unavailable(args):
     if capture_dir.exists():
         raise SystemExit(f"{capture_dir} already exists")
     capture_dir.mkdir(parents=True)
+    redact = Redactor([])
     record = {"schema": SCHEMA, "run": run_id, "scenario": args.scenario, "feature": args.scenario.split(".")[0], "role": args.role, "kind": args.kind, "recipe": None,
               "started_at": utc_now(), "ended_at": utc_now(), "checkout": {"sha": None}, "outcome": "unavailable", "blocked_reason": None, "reason": args.reason,
               "assertions": [], "media": [], "limitations": [f"{args.role} state not captured: {args.reason}"], "content_hashes": {},
               "evidence_root": {"path": str(root_dir), "declared_by": source}}
+    record = redact_record(record, redact)
+    record["redaction"] = {"patterns": len(redact.patterns), "count": redact.count, "labelled": redact.count > 0}
     (capture_dir / "capture.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    print(f"evidence: {capture_dir}/capture.json run={run_id} outcome=unavailable ({args.reason})")
+    print(f"evidence: {capture_dir}/capture.json run={run_id} outcome=unavailable ({record['reason']})")
     return 0
 
 
