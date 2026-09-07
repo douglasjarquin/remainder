@@ -32,6 +32,10 @@ func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, versi
 		}
 		return 2
 	}
+	if ctx.Err() != nil {
+		fmt.Fprintln(stderr, "remainder: interrupted")
+		return 130
+	}
 	return 0
 }
 

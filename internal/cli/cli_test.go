@@ -6,6 +6,17 @@ import (
 	"testing"
 )
 
+type cancelWriter struct {
+	buffer bytes.Buffer
+	cancel context.CancelFunc
+}
+
+func (w *cancelWriter) Write(data []byte) (int, error) {
+	n, err := w.buffer.Write(data)
+	w.cancel()
+	return n, err
+}
+
 func TestExecuteHelpAndVersionUseStdout(t *testing.T) {
 	tests := []struct {
 		name string
@@ -78,6 +89,20 @@ func TestExecuteReturnsInterruptCodeWhenContextIsCanceled(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	code := Execute(ctx, []string{"--help"}, &stdout, &stderr, "v0.1.0")
+	if code != 130 {
+		t.Fatalf("Execute() exit code = %d, want 130", code)
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte("interrupted")) {
+		t.Fatalf("stderr = %q, want interrupt message", stderr.String())
+	}
+}
+
+func TestExecuteReturnsInterruptCodeWhenContextIsCanceledDuringHelp(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	stdout := &cancelWriter{cancel: cancel}
+	var stderr bytes.Buffer
+
+	code := Execute(ctx, []string{"--help"}, stdout, &stderr, "v0.1.0")
 	if code != 130 {
 		t.Fatalf("Execute() exit code = %d, want 130", code)
 	}
