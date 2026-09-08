@@ -250,6 +250,16 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertEqual(list(Path(outside).rglob("*")), [])
 
+    def test_evidence_capture_rejects_parent_relative_configured_evidence(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            outside = root_path.parent / "round6-evidence-outside"
+            (root_path / "VERIFY.md").write_text("```verify\nevidence = \"../round6-evidence-outside\"\n```\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota", "--role", "after", "--kind", "nonvisual", "--run", "parent-evidence", "cli", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertFalse(outside.exists())
+
     def test_verify_audit_rejects_parent_relative_configured_artifacts(self):
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)

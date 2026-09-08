@@ -104,7 +104,9 @@ def evidence_root(root: Path):
         if match:
             try:
                 value = tomllib.loads(match.group(1)).get("evidence")
-                if isinstance(value, str) and value and not Path(value).is_absolute() and ".." not in Path(value).parts:
+                if value is not None:
+                    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+                        raise Blocked(f"VERIFY.md `evidence` must be a relative path inside the repository, found {value!r}")
                     declared = value
             except tomllib.TOMLDecodeError:
                 pass
