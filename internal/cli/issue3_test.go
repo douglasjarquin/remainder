@@ -10,14 +10,9 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-type issue3FixtureAdapter struct {
-	observation evidence.Observation
-	calls       int
-}
-
 func TestExecuteWithAdapter_CompactFiltersRequestedScopeAndReportsAge(t *testing.T) {
 	amount := evidence.JSONNumber("42")
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
@@ -42,14 +37,9 @@ func TestExecuteWithAdapter_CompactFiltersRequestedScopeAndReportsAge(t *testing
 	}
 }
 
-func (a *issue3FixtureAdapter) Observe(context.Context, evidence.Request) (evidence.Observation, error) {
-	a.calls++
-	return a.observation, nil
-}
-
 func TestExecuteWithAdapter_RendersJSONAndValueThroughFreshCobraTrees(t *testing.T) {
 	amount := evidence.JSONNumber("42")
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
@@ -84,11 +74,18 @@ func TestExecuteWithAdapter_RendersJSONAndValueThroughFreshCobraTrees(t *testing
 	if valueOut.String() != "42\n" || valueErr.Len() != 0 {
 		t.Fatalf("value stdout = %q, stderr = %q, want exact scalar and empty stderr", valueOut.String(), valueErr.String())
 	}
+	if len(adapter.requests) != 3 {
+		t.Fatalf("adapter requests = %d, want one request per observation", len(adapter.requests))
+	}
+	request := adapter.requests[2]
+	if request.Provider != "codex" || request.Profile != "main" || request.Window != "weekly" || request.Field != "remaining" || request.Account != "acct-1" {
+		t.Fatalf("value request = %+v, want the selected provider, profile, window, field, and account", request)
+	}
 }
 
 func TestExecuteWithAdapter_RejectsWrongAccountAcrossOutputFormats(t *testing.T) {
 	amount := evidence.JSONNumber("42")
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
@@ -119,7 +116,7 @@ func TestExecuteWithAdapter_RejectsWrongAccountAcrossOutputFormats(t *testing.T)
 
 func TestExecuteWithAdapter_AllHonorsExplicitWindow(t *testing.T) {
 	amount := evidence.JSONNumber("42")
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
@@ -139,7 +136,7 @@ func TestExecuteWithAdapter_AllHonorsExplicitWindow(t *testing.T) {
 }
 
 func TestExecuteWithAdapter_HelpAndInvalidFlagsDoNotObserve(t *testing.T) {
-	adapter := &issue3FixtureAdapter{}
+	adapter := &fixtureAdapter{}
 	var helpOut, helpErr bytes.Buffer
 	if code := executeWithAdapter(context.Background(), []string{"--help"}, &helpOut, &helpErr, "v0.1.0", adapter); code != 0 {
 		t.Fatalf("help exit code = %d, want 0", code)
@@ -160,7 +157,7 @@ func TestExecuteWithAdapter_HelpAndInvalidFlagsDoNotObserve(t *testing.T) {
 
 func TestExecuteWithAdapter_PartialResultHasDataAndDistinctExit(t *testing.T) {
 	amount := evidence.JSONNumber("0")
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
@@ -185,7 +182,7 @@ func TestExecuteWithAdapter_PartialResultHasDataAndDistinctExit(t *testing.T) {
 }
 
 func TestExecuteWithAdapter_FreshnessPolicyRejectsStaleReport(t *testing.T) {
-	adapter := &issue3FixtureAdapter{observation: evidence.Observation{
+	adapter := &fixtureAdapter{observation: evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
 		Provider:      "codex",
 		Profile:       "main",
