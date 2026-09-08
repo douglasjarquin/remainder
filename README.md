@@ -4,7 +4,7 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-This first slice provides honest help, version, and unavailable-provider behavior.
+This slice provides honest help, version, unavailable-provider behavior, and the typed evidence output contract.
 
 It does not access credentials, the network, a cache, or any provider.
 
@@ -38,6 +38,22 @@ An invocation without a provider writes an honest unavailable message to stderr 
 Unknown flags and positional commands write an actionable error to stderr and exit nonzero.
 
 The process handles SIGINT through a context-owned interrupt path and returns the conventional 130 exit code when cancellation reaches the CLI.
+
+The default report is deterministic one-line compact output.
+
+Use `--format json` for the versioned JSON observation or `value --provider PROVIDER --profile PROFILE --window WINDOW --field remaining` for one scalar value.
+
+Use `--freshness any` to allow stale evidence or `--freshness fresh` to reject stale and unknown freshness.
+
+Exit 0 means the selected evidence is usable, including zero, exhausted, and unlimited values.
+
+Exit 1 means the observation is unavailable, exit 2 means invocation or selection is invalid, exit 3 means a partial observation was rendered, and exit 130 means interruption.
+
+The observation records last-observed account identity separately from freshness and credential binding.
+
+This release does not prove current login, revocation, or credential binding, and it does not access credentials, a provider, or a cache.
+
+Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 
 ## Ownership
 
