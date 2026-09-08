@@ -213,6 +213,14 @@ class CaptureRedactionTests(unittest.TestCase):
             with self.assertRaises(VERIFY_RUN_MODULE.Blocked):
                 VERIFY_RUN_MODULE.load_contract(Path(root))
 
+    def test_verify_run_rejects_symlinked_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            root_path = Path(root)
+            (root_path / "VERIFY.md").write_text("""# Fixture\n\n## Setup\n## Readiness\n## Teardown\n## Automated checks\n## Scenarios\n## Isolation\n## Artifacts\n\n```verify\nentrypoint = \"mise run verify\"\nfeature_maps = \"docs/features/README.md\"\nartifacts = \".artifacts/verification\"\n```\n""", encoding="utf-8")
+            (root_path / ".artifacts").symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(VERIFY_RUN_MODULE.Blocked):
+                VERIFY_RUN_MODULE.load_contract(root_path)
+
     def test_verify_capture_rejects_parent_relative_configured_artifacts(self):
         with tempfile.TemporaryDirectory() as root:
             outside = Path(root).parent / "round6-capture-outside"
@@ -222,6 +230,16 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stderr)
             self.assertFalse(outside.exists())
 
+    def test_verify_capture_rejects_symlinked_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            root_path = Path(root)
+            (root_path / "VERIFY.md").write_text("```verify\nartifacts = \".artifacts/verification\"\n```\n", encoding="utf-8")
+            (root_path / ".artifacts").symlink_to(outside, target_is_directory=True)
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(list(Path(outside).rglob("*")), [])
+
     def test_verify_audit_rejects_parent_relative_configured_artifacts(self):
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)
@@ -230,6 +248,18 @@ class CaptureRedactionTests(unittest.TestCase):
             (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
             (root_path / "VERIFY.md").write_text("```verify\nfeature_maps = \"docs/features/README.md\"\nartifacts = \"../outside\"\n```\n", encoding="utf-8")
             self.run_command(["git", "init", "-q"], cwd=Path(root))
+            result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--no-record"], cwd=ROOT)
+            self.assertEqual(result.returncode, 2)
+
+    def test_verify_audit_rejects_symlinked_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            root_path = Path(root)
+            (root_path / "docs/features").mkdir(parents=True)
+            (root_path / "docs/features/README.md").write_text("[quota](quota.md)\n", encoding="utf-8")
+            (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
+            (root_path / "VERIFY.md").write_text("```verify\nfeature_maps = \"docs/features/README.md\"\nartifacts = \".artifacts/verification\"\n```\n", encoding="utf-8")
+            (root_path / ".artifacts").symlink_to(outside, target_is_directory=True)
+            self.run_command(["git", "init", "-q"], cwd=root_path)
             result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--no-record"], cwd=ROOT)
             self.assertEqual(result.returncode, 2)
 

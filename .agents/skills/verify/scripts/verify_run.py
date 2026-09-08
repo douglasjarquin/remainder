@@ -70,6 +70,16 @@ def resolve_root(start: Path):
     return Path(result.stdout.strip()).resolve()
 
 
+def validate_relative_path(root: Path, value, name):
+    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+        raise Blocked(f"{CONTRACT_FILE} `{name}` must be a relative path inside the repository, found {value!r}.")
+    try:
+        (root / value).resolve().relative_to(root)
+    except ValueError:
+        raise Blocked(f"{CONTRACT_FILE} `{name}` must resolve inside the repository, found {value!r}.")
+    return value
+
+
 def load_contract(root: Path):
     path = root / CONTRACT_FILE
     if not path.is_file():
@@ -89,16 +99,11 @@ def load_contract(root: Path):
     entrypoint = config.get("entrypoint")
     if entrypoint != "mise run verify":
         raise Blocked(f"{CONTRACT_FILE} entrypoint must be the literal `mise run verify`, found {entrypoint!r}.")
-    for key in ("feature_maps", "artifacts"):
-        value = config.get(key)
-        if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
-            raise Blocked(f"{CONTRACT_FILE} `{key}` must be a relative path inside the repository, found {value!r}.")
-    evidence = config.get("evidence", ".artifacts/evidence")
-    if not isinstance(evidence, str) or not evidence or Path(evidence).is_absolute() or ".." in Path(evidence).parts:
-        raise Blocked(f"{CONTRACT_FILE} `evidence` must be a relative path inside the repository, found {evidence!r}.")
+    feature_maps = validate_relative_path(root, config.get("feature_maps"), "feature_maps")
+    artifacts = validate_relative_path(root, config.get("artifacts"), "artifacts")
+    evidence = validate_relative_path(root, config.get("evidence", ".artifacts/evidence"), "evidence")
     owner = config.get("task_owner", ".")
-    if not isinstance(owner, str) or Path(owner).is_absolute() or ".." in Path(owner).parts:
-        raise Blocked(f"{CONTRACT_FILE} `task_owner` must be a relative directory inside the repository, found {owner!r}.")
+    validate_relative_path(root, owner, "task_owner")
     requires = config.get("requires", {})
     freshness = config.get("freshness", {})
     for name, value in (("requires", requires), ("freshness", freshness)):
@@ -108,12 +113,15 @@ def load_contract(root: Path):
         if not all(isinstance(v, str) for v in requires.get(key, [])):
             raise Blocked(f"{CONTRACT_FILE} `requires.{key}` must be a list of strings.")
     for key in ("inputs", "outputs"):
-        if not all(isinstance(v, str) and not Path(v).is_absolute() and ".." not in Path(v).parts for v in freshness.get(key, [])):
+        values = freshness.get(key, [])
+        if not isinstance(values, list):
             raise Blocked(f"{CONTRACT_FILE} `freshness.{key}` must be a list of relative paths.")
+        for value in values:
+            validate_relative_path(root, value, f"freshness.{key}")
     timeout = config.get("timeout_seconds", 3600)
     if not isinstance(timeout, int) or timeout <= 0:
         raise Blocked(f"{CONTRACT_FILE} `timeout_seconds` must be a positive integer.")
-    return {"path": path, "sha256": sha256_file(path), "entrypoint": entrypoint, "feature_maps": config["feature_maps"], "artifacts": config["artifacts"], "evidence": evidence,
+    return {"path": path, "sha256": sha256_file(path), "entrypoint": entrypoint, "feature_maps": feature_maps, "artifacts": artifacts, "evidence": evidence,
             "task_owner": owner, "requires": requires, "freshness": freshness, "timeout": timeout,
             "policy_files": policy_file_set(config.get("policy_files", []))}
 

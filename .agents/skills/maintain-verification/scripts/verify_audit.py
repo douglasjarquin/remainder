@@ -71,9 +71,13 @@ def resolve_root(start: Path):
     return Path(result.stdout.strip()).resolve()
 
 
-def validate_relative_path(value, name):
+def validate_relative_path(root, value, name):
     if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
         raise Blocked(f"VERIFY.md `{name}` must be a relative path inside the repository, found {value!r}")
+    try:
+        (root / value).resolve().relative_to(root)
+    except ValueError:
+        raise Blocked(f"VERIFY.md `{name}` must resolve inside the repository, found {value!r}")
     return value
 
 
@@ -246,15 +250,18 @@ def main(argv=None):
                 raise Blocked(f"VERIFY.md ```verify block is not valid TOML: {exc}")
         else:
             raise Blocked("VERIFY.md has no ```verify block")
-        maps_index = validate_relative_path(config.get("feature_maps") or "docs/features/README.md", "feature_maps")
-        artifacts = validate_relative_path(config.get("artifacts") or ".artifacts/verification", "artifacts")
-        validate_relative_path(config.get("evidence") or ".artifacts/evidence", "evidence")
+        maps_index = validate_relative_path(root, config.get("feature_maps") or "docs/features/README.md", "feature_maps")
+        artifacts = validate_relative_path(root, config.get("artifacts") or ".artifacts/verification", "artifacts")
+        validate_relative_path(root, config.get("evidence") or ".artifacts/evidence", "evidence")
         freshness = config.get("freshness", {})
         if not isinstance(freshness, dict):
             raise Blocked("VERIFY.md `freshness` must be a table.")
         for key in ("inputs", "outputs"):
-            if not all(isinstance(value, str) and not Path(value).is_absolute() and ".." not in Path(value).parts for value in freshness.get(key, [])):
+            values = freshness.get(key, [])
+            if not isinstance(values, list):
                 raise Blocked(f"VERIFY.md `freshness.{key}` must be a list of relative paths.")
+            for value in values:
+                validate_relative_path(root, value, f"freshness.{key}")
         tasks = own_tasks(root)
         if tasks is not None and "verify" not in tasks:
             findings.append({"kind": "stale-task", "file": "VERIFY.md", "detail": "this repository defines no `verify` task; the entrypoint `mise run verify` does not exist"})

@@ -84,6 +84,10 @@ def root_and_artifacts():
                 configured = tomllib.loads(match.group(1)).get("artifacts") or artifacts
                 if not isinstance(configured, str) or not configured or Path(configured).is_absolute() or ".." in Path(configured).parts:
                     raise SystemExit(f"VERIFY.md `artifacts` must be a relative path inside the repository, found {configured!r}")
+                try:
+                    (root / configured).resolve().relative_to(root)
+                except ValueError:
+                    raise SystemExit(f"VERIFY.md `artifacts` must resolve inside the repository, found {configured!r}")
                 artifacts = configured
             except tomllib.TOMLDecodeError:
                 pass
