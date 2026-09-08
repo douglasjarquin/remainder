@@ -91,7 +91,12 @@ def root_and_artifacts():
                 artifacts = configured
             except tomllib.TOMLDecodeError:
                 pass
-    return root, root / artifacts
+    resolved = (root / artifacts).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise SystemExit(f"verification artifacts must resolve inside the repository, found {artifacts!r}")
+    return root, resolved
 
 
 def choose_run_dir(root: Path, artifacts: Path, explicit):
@@ -101,7 +106,7 @@ def choose_run_dir(root: Path, artifacts: Path, explicit):
     if latest.is_file():
         try:
             run_dir = json.loads(latest.read_text(encoding="utf-8")).get("artifacts", {}).get("run_dir")
-            if run_dir:
+            if isinstance(run_dir, str) and run_dir:
                 candidate = (root / run_dir).resolve()
                 try:
                     candidate.relative_to(artifacts.resolve())

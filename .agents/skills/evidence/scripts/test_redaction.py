@@ -240,6 +240,15 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stderr)
             self.assertEqual(list(Path(outside).rglob("*")), [])
 
+    def test_verify_capture_rejects_symlinked_default_artifacts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            root_path = Path(root)
+            (root_path / ".artifacts").symlink_to(outside, target_is_directory=True)
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(list(Path(outside).rglob("*")), [])
+
     def test_verify_capture_ignores_latest_run_dir_outside_artifacts(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
             root_path = Path(root)
@@ -252,6 +261,17 @@ class CaptureRedactionTests(unittest.TestCase):
             result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(list(Path(outside).rglob("*.json")), [])
+            self.assertEqual(len(list(artifacts.glob("manual-*/evidence/*.json"))), 1)
+
+    def test_verify_capture_ignores_malformed_latest_run_dir(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            artifacts = root_path / ".artifacts/verification"
+            artifacts.mkdir(parents=True)
+            (artifacts / "latest.json").write_text(json.dumps({"artifacts": {"run_dir": 42}}), encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(len(list(artifacts.glob("manual-*/evidence/*.json"))), 1)
 
     def test_evidence_capture_rejects_symlinked_configured_evidence(self):
