@@ -31,7 +31,7 @@ LIMIT = 20000
 FENCE = re.compile(r"^```verify[ \t]*\n(.*?)^```[ \t]*$", re.S | re.M)
 
 
-REDACT_DEFAULT = [r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", r"(?i)\b((?:(?:api[_-]?key|oauth(?:[_-]?(?:access|refresh))?[_-]?token|id[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|secret|password|passwd|authorization))\b[\"']?\s*[:=]\s*[\"']?)[^\s\"',;]+",
+REDACT_DEFAULT = [r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", r"(?i)\b((?:(?:api[_-]?key|oauth(?:[_-]?(?:access|refresh))?[_-]?token|id[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|secret|password|passwd|authorization))\b[\"']?\s*[:=]\s*[\"']?)(?:[^\s\"',;]|\u2028|\u2029)+",
                   r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", r"\b(?:gh[pousr]|sk|xox[abp])[_-][A-Za-z0-9_-]{10,}\b"]
 
 

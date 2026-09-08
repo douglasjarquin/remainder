@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import http.server
 import importlib.util
 import json
@@ -175,6 +176,22 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             path, _ = self.read_capture(Path(root) / "evidence")
             self.assert_redacted([path], values)
+
+    def test_both_capture_entrypoints_redact_unicode_separator_suffixes(self):
+        values = ["SYNTHETIC_OAUTH_UNICODE_2028", "SYNTHETIC_ID_UNICODE_2029"]
+        payload = ("oauth_token=%s" % values[0]).encode() + b"\xe2\x80\xa8ROUND6_SUFFIX_2028 id_token=" + values[1].encode() + b"\xe2\x80\xa9ROUND6_SUFFIX_2029"
+        encoded = base64.b64encode(payload).decode()
+        script = "import base64,sys; sys.stdout.write(base64.b64decode(%r).decode())" % encoded
+        with tempfile.TemporaryDirectory() as root:
+            evidence = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.oauth-unicode", "--role", "after", "--kind", "nonvisual", "--run", "oauth-unicode-evidence", "cli", "--expect-exit", "0", "--", sys.executable, "-c", script], env={"VERIFY_EVIDENCE_ROOT": root})
+            verify = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "--scenario", "quota.oauth-unicode", "--run-dir", str(Path(root) / "verify"), "run", "--expect-exit", "0", "--", sys.executable, "-c", script])
+            self.assertEqual(evidence.returncode, 0, evidence.stderr)
+            self.assertEqual(verify.returncode, 0, verify.stderr)
+            evidence_path, _ = self.read_capture(Path(root))
+            verify_path, _ = self.read_capture(Path(root) / "verify" / "evidence")
+            paths = [evidence_path, *evidence_path.parent.glob("*.redacted.txt"), verify_path]
+            self.assert_redacted(paths, values)
+            self.assert_redacted(paths, ["ROUND6_SUFFIX_2028", "ROUND6_SUFFIX_2029"])
 
     def test_both_capture_entrypoints_redact_oauth_labels_in_malformed_urls(self):
         with tempfile.TemporaryDirectory() as root:

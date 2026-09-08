@@ -63,7 +63,7 @@ DEFAULT_MAX_BYTES = 25 * 1024 * 1024
 BROWSER_NAMES = ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome", "microsoft-edge", "brave-browser")
 BROWSER_MAC = ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium",
                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser")
-REDACT_DEFAULT = [r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", r"(?i)\b((?:(?:api[_-]?key|oauth(?:[_-]?(?:access|refresh))?[_-]?token|id[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|secret|password|passwd|authorization))\b[\"']?\s*[:=]\s*[\"']?)[^\s\"',;]+",
+REDACT_DEFAULT = [r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]{8,}", r"(?i)\b((?:(?:api[_-]?key|oauth(?:[_-]?(?:access|refresh))?[_-]?token|id[_-]?token|access[_-]?token|refresh[_-]?token|client[_-]?secret|token|secret|password|passwd|authorization))\b[\"']?\s*[:=]\s*[\"']?)(?:[^\s\"',;]|\u2028|\u2029)+",
                   r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", r"\b(?:gh[pousr]|sk|xox[abp])[_-][A-Za-z0-9_-]{10,}\b"]
 ENV_COMPARED = ("recipe", "kind", "viewport", "theme", "locale", "timezone")
 
