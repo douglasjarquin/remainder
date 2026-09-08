@@ -81,7 +81,7 @@ def root_and_artifacts():
         match = FENCE.search(contract.read_text(encoding="utf-8"))
         if match:
             try:
-                configured = tomllib.loads(match.group(1)).get("artifacts") or artifacts
+                configured = tomllib.loads(match.group(1)).get("artifacts", artifacts)
                 if not isinstance(configured, str) or not configured or Path(configured).is_absolute() or ".." in Path(configured).parts:
                     raise SystemExit(f"VERIFY.md `artifacts` must be a relative path inside the repository, found {configured!r}")
                 try:

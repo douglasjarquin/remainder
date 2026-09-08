@@ -230,6 +230,15 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stderr)
             self.assertFalse(outside.exists())
 
+    def test_verify_capture_rejects_empty_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            (root_path / "VERIFY.md").write_text("```verify\nartifacts = \"\"\n```\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertFalse((root_path / ".artifacts").exists())
+
     def test_verify_capture_rejects_symlinked_configured_artifacts(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
             root_path = Path(root)
