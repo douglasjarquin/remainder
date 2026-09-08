@@ -93,6 +93,32 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	}
 }
 
+func TestBenchmarkFixtureAllocationBudgets(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		max  float64
+	}{
+		{name: "compact", args: []string{"--format", "compact"}, max: 130},
+		{name: "json", args: []string{"--format", "json"}, max: 120},
+		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, max: 125},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			adapter := benchmarkAdapter{observation: benchmarkObservation()}
+			var stdout, stderr bytes.Buffer
+			allocs := testing.AllocsPerRun(100, func() {
+				stdout.Reset()
+				stderr.Reset()
+				executeWithAdapter(context.Background(), test.args, &stdout, &stderr, "v0.1.0", adapter)
+			})
+			if allocs > test.max {
+				t.Fatalf("allocations = %.0f, want at most %.0f", allocs, test.max)
+			}
+		})
+	}
+}
+
 func BenchmarkExecuteFixtureCompact(b *testing.B) {
 	benchmarkExecute(b, []string{"--format", "compact"})
 }

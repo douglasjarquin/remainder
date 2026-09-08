@@ -24,6 +24,7 @@ No cache is purged and no provider, credential, network, telemetry, or live load
 | bench-tokenizer | The declared offline-word-v1 tokenizer produces deterministic equivalent-output counts without claiming model-token parity. | automated `internal/benchmark/benchmark_test.go` | `go test ./internal/benchmark` |
 | bench-cli | The compiled Cobra entrypoint measures help, version, unavailable, and invalid-freshness output with expected exit codes and zero provider requests. | automated `scripts/benchmark.sh` and `cmd/remainder-benchmark/main.go` | `artifacts/benchmark-cli.jsonl` |
 | bench-renderers | Compact, JSON, and scalar fixture output stays deterministic while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` | `artifacts/benchmark-in-process.txt` |
+| bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | Eligible-cache reads are unimplemented pending issue #6. | manual not-applicable: cache is not implemented in this release | issue #6 |
 | bench-refresh | Controlled loopback refresh is unimplemented pending issue #5. | manual not-applicable: provider refresh is not implemented in this release | issue #5 |
 
@@ -38,5 +39,7 @@ Another model's tokenizer is unmeasured, so this baseline makes no cross-model t
 The `go test -bench -benchmem` artifact is the source for in-process allocations and bytes per operation.
 
 Hosted CI timings are trends and are not a certification of the Apple Silicon full-process p95 objective.
+
+On the declared Apple Silicon host, the driver fails when any measured full-process workload exceeds the 10 ms p95 objective.
 
 The cache-read p95 objective remains unmeasured until issue #6 provides an eligible cache.

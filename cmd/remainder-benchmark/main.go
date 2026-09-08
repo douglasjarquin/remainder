@@ -18,6 +18,8 @@ import (
 
 const buildFlags = "CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.version=v0.1.0'"
 
+const appleSiliconP95ObjectiveNS int64 = 10_000_000
+
 type workload struct {
 	Name     string
 	Args     []string
@@ -68,6 +70,8 @@ type metadata struct {
 	ObservedSubprocesses   int      `json:"observed_subprocesses"`
 	ObservedRequests       int      `json:"observed_requests"`
 	AllocationsMeasurement string   `json:"allocations_measurement"`
+	P95ObjectiveNS         int64    `json:"p95_objective_ns"`
+	P95ObjectiveScope      string   `json:"p95_objective_scope"`
 }
 
 type summary struct {
@@ -126,6 +130,8 @@ func main() {
 		ObservedSubprocesses:   len(workloads) * *samples,
 		ObservedRequests:       0,
 		AllocationsMeasurement: "go test -bench -benchmem output in artifacts/benchmark-in-process.txt",
+		P95ObjectiveNS:         appleSiliconP95ObjectiveNS,
+		P95ObjectiveScope:      "darwin/arm64 full-process workloads; hosted timings are trends",
 	})
 
 	byWorkload := make(map[string][]int64, len(workloads))
@@ -156,6 +162,13 @@ func main() {
 			fatalf("summarize %s: %v", name, err)
 		}
 		summaries[name] = value
+	}
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		for name, value := range summaries {
+			if value.P95NS > appleSiliconP95ObjectiveNS {
+				fatalf("%s p95 %d ns exceeds Apple Silicon objective %d ns", name, value.P95NS, appleSiliconP95ObjectiveNS)
+			}
+		}
 	}
 	writeJSON(summary{Kind: "summary", Source: "full-process-cobra-entrypoint", Workloads: summaries})
 }
