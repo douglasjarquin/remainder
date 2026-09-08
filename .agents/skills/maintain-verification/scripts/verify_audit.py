@@ -71,6 +71,12 @@ def resolve_root(start: Path):
     return Path(result.stdout.strip()).resolve()
 
 
+def validate_relative_path(value, name):
+    if not isinstance(value, str) or not value or Path(value).is_absolute() or ".." in Path(value).parts:
+        raise Blocked(f"VERIFY.md `{name}` must be a relative path inside the repository, found {value!r}")
+    return value
+
+
 def own_tasks(root: Path):
     binary = shutil.which("mise")
     if binary is None:
@@ -240,8 +246,15 @@ def main(argv=None):
                 raise Blocked(f"VERIFY.md ```verify block is not valid TOML: {exc}")
         else:
             raise Blocked("VERIFY.md has no ```verify block")
-        maps_index = config.get("feature_maps") or "docs/features/README.md"
-        artifacts = config.get("artifacts") or ".artifacts/verification"
+        maps_index = validate_relative_path(config.get("feature_maps") or "docs/features/README.md", "feature_maps")
+        artifacts = validate_relative_path(config.get("artifacts") or ".artifacts/verification", "artifacts")
+        validate_relative_path(config.get("evidence") or ".artifacts/evidence", "evidence")
+        freshness = config.get("freshness", {})
+        if not isinstance(freshness, dict):
+            raise Blocked("VERIFY.md `freshness` must be a table.")
+        for key in ("inputs", "outputs"):
+            if not all(isinstance(value, str) and not Path(value).is_absolute() and ".." not in Path(value).parts for value in freshness.get(key, [])):
+                raise Blocked(f"VERIFY.md `freshness.{key}` must be a list of relative paths.")
         tasks = own_tasks(root)
         if tasks is not None and "verify" not in tasks:
             findings.append({"kind": "stale-task", "file": "VERIFY.md", "detail": "this repository defines no `verify` task; the entrypoint `mise run verify` does not exist"})
@@ -262,6 +275,10 @@ def main(argv=None):
                 if not target.is_file():
                     findings.append({"kind": "missing-link", "file": maps_index, "detail": f"links `{link}`, which does not exist"})
                     continue
+                try:
+                    target.relative_to(root)
+                except ValueError:
+                    raise Blocked(f"Feature map link {link} in {maps_index} leaves the repository")
                 linked.add(target)
                 map_files.append(target)
             for sibling in sorted(index.parent.glob("*.md")):
@@ -284,7 +301,7 @@ def main(argv=None):
         record["notes"].append({"kind": "proof", **record["runs"]})
         if args.base:
             changed = changed_since(root, args.base)
-            policy_prefixes = ("VERIFY.md", "mise.toml", ".mise.toml", "mise-tasks/", ".agents/skills/verify/", ".agents/skills/evidence/", *map_shas)
+            policy_prefixes = ("VERIFY.md", "mise.toml", ".mise.toml", "mise-tasks/", ".agents/skills/verify/", ".agents/skills/evidence/", ".agents/skills/maintain-verification/", *map_shas)
             policy = [c for c in changed if c.startswith(policy_prefixes)]
             affected, unmapped = {}, []
             for change in changed:

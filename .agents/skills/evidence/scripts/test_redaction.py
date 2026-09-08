@@ -17,10 +17,16 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[4]
 EVIDENCE_CAPTURE = ROOT / ".agents/skills/evidence/scripts/evidence_capture.py"
 VERIFY_CAPTURE = ROOT / ".agents/skills/verify/scripts/verify_capture.py"
+VERIFY_RUN = ROOT / ".agents/skills/verify/scripts/verify_run.py"
+VERIFY_AUDIT = ROOT / ".agents/skills/maintain-verification/scripts/verify_audit.py"
 CAPTURE_SPEC = importlib.util.spec_from_file_location("evidence_capture", EVIDENCE_CAPTURE)
 assert CAPTURE_SPEC is not None and CAPTURE_SPEC.loader is not None
 CAPTURE_MODULE = importlib.util.module_from_spec(CAPTURE_SPEC)
 CAPTURE_SPEC.loader.exec_module(CAPTURE_MODULE)
+RUN_SPEC = importlib.util.spec_from_file_location("verify_run", VERIFY_RUN)
+assert RUN_SPEC is not None and RUN_SPEC.loader is not None
+VERIFY_RUN_MODULE = importlib.util.module_from_spec(RUN_SPEC)
+RUN_SPEC.loader.exec_module(VERIFY_RUN_MODULE)
 
 
 class TokenHandler(http.server.BaseHTTPRequestHandler):
@@ -37,8 +43,8 @@ class TokenHandler(http.server.BaseHTTPRequestHandler):
 
 
 class CaptureRedactionTests(unittest.TestCase):
-    def run_command(self, command, *, env=None):
-        return subprocess.run(command, cwd=ROOT, env={**os.environ, **(env or {})}, text=True, capture_output=True)
+    def run_command(self, command, *, env=None, cwd=ROOT):
+        return subprocess.run(command, cwd=cwd, env={**os.environ, **(env or {})}, text=True, capture_output=True)
 
     def read_capture(self, directory):
         captures = sorted(Path(directory).rglob("capture.json"))
@@ -133,7 +139,7 @@ class CaptureRedactionTests(unittest.TestCase):
             secret = "SYNTHETIC_MALFORMED_URL_SECRET_5a7c"
             url = f"not-http://example.invalid/?access_token={secret}"
             result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.malformed-url", "--role", "after", "--kind", "nonvisual", "--run", "malformed", "http", "GET", url], env={"VERIFY_EVIDENCE_ROOT": root})
-            self.assertEqual(result.returncode, 3)
+            self.assertEqual(result.returncode, 3, result.stderr)
             self.assertNotIn(secret, result.stderr)
             self.assertIn("[REDACTED]", result.stderr)
 
@@ -151,6 +157,83 @@ class CaptureRedactionTests(unittest.TestCase):
         text = "access_token=SYNTHETIC_OAUTH_ACCESS_5a7c refresh_token=SYNTHETIC_OAUTH_REFRESH_5a7c Authorization: Bearer SYNTHETIC_OAUTH_BEARER_5a7c"
         redacted = redact(text)
         self.assert_redacted_text(redacted, ["SYNTHETIC_OAUTH_ACCESS_5a7c", "SYNTHETIC_OAUTH_REFRESH_5a7c", "SYNTHETIC_OAUTH_BEARER_5a7c"])
+
+    def test_evidence_capture_redacts_oauth_oidc_labels_in_persisted_cli(self):
+        with tempfile.TemporaryDirectory() as root:
+            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_7f3a", "SYNTHETIC_ID_TOKEN_ROUND6_7f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_7f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_7f3a"]
+            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s" % tuple(values)
+            result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.oauth-label", "--role", "after", "--kind", "nonvisual", "--run", "oauth-evidence", "cli", "--expect-exit", "0", "--", sys.executable, "-c", "print(%r)" % text], env={"VERIFY_EVIDENCE_ROOT": root})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            path, _ = self.read_capture(root)
+            self.assert_redacted([path, *path.parent.glob("*.redacted.txt")], values)
+
+    def test_verify_capture_redacts_oauth_oidc_labels_in_persisted_cli(self):
+        with tempfile.TemporaryDirectory() as root:
+            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_8f3a", "SYNTHETIC_ID_TOKEN_ROUND6_8f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_8f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_8f3a"]
+            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s" % tuple(values)
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "--scenario", "quota.oauth-label", "--run-dir", root, "run", "--expect-exit", "0", "--", sys.executable, "-c", "print(%r)" % text])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            path, _ = self.read_capture(Path(root) / "evidence")
+            self.assert_redacted([path], values)
+
+    def test_both_capture_entrypoints_redact_oauth_labels_in_malformed_urls(self):
+        with tempfile.TemporaryDirectory() as root:
+            secret = "SYNTHETIC_OAUTH_MALFORMED_ROUND6_9f3a"
+            url = f"not-http://example.invalid/?oauth_token={secret}&id_token={secret}"
+            evidence = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.oauth-label", "--role", "after", "--kind", "nonvisual", "--run", "oauth-malformed-evidence", "http", "GET", url], env={"VERIFY_EVIDENCE_ROOT": root})
+            verify = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "--scenario", "quota.oauth-label", "--run-dir", str(Path(root) / "verify"), "http", "GET", url])
+            self.assertEqual(evidence.returncode, 3)
+            self.assertEqual(verify.returncode, 2)
+            self.assertNotIn(secret, evidence.stderr)
+            self.assertNotIn(secret, verify.stderr)
+            self.assertIn("[REDACTED]", evidence.stderr)
+            self.assertIn("[REDACTED]", verify.stderr)
+
+    def test_verify_run_rejects_parent_relative_freshness_paths(self):
+        with tempfile.TemporaryDirectory() as root:
+            contract = """# Fixture\n\n## Setup\n## Readiness\n## Teardown\n## Automated checks\n## Scenarios\n## Isolation\n## Artifacts\n\n```verify\nentrypoint = \"mise run verify\"\nfeature_maps = \"docs/features/README.md\"\nartifacts = \".artifacts/verification\"\n[freshness]\ninputs = [\"../outside\"]\noutputs = []\n```\n"""
+            Path(root, "VERIFY.md").write_text(contract, encoding="utf-8")
+            with self.assertRaises(VERIFY_RUN_MODULE.Blocked):
+                VERIFY_RUN_MODULE.load_contract(Path(root))
+
+    def test_verify_capture_rejects_parent_relative_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root:
+            outside = Path(root).parent / "round6-capture-outside"
+            Path(root, "VERIFY.md").write_text("```verify\nartifacts = \"../round6-capture-outside\"\n```\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=Path(root))
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=Path(root))
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertFalse(outside.exists())
+
+    def test_verify_audit_rejects_parent_relative_configured_artifacts(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            (root_path / "docs/features").mkdir(parents=True)
+            (root_path / "docs/features/README.md").write_text("[quota](quota.md)\n", encoding="utf-8")
+            (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
+            (root_path / "VERIFY.md").write_text("```verify\nfeature_maps = \"docs/features/README.md\"\nartifacts = \"../outside\"\n```\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=Path(root))
+            result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--no-record"], cwd=ROOT)
+            self.assertEqual(result.returncode, 2)
+
+    def test_verify_audit_reports_maintenance_policy_changes(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            (root_path / "docs/features").mkdir(parents=True)
+            (root_path / "docs/features/README.md").write_text("[quota](quota.md)\n", encoding="utf-8")
+            (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
+            (root_path / "VERIFY.md").write_text("```verify\nfeature_maps = \"docs/features/README.md\"\nartifacts = \".artifacts/verification\"\n```\n", encoding="utf-8")
+            (root_path / "mise.toml").write_text("[tasks.verify]\nrun = \"true\"\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=Path(root))
+            self.run_command(["git", "add", "."], cwd=Path(root))
+            self.run_command(["git", "-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "base"], cwd=Path(root))
+            policy_file = root_path / ".agents/skills/maintain-verification/changed.md"
+            policy_file.parent.mkdir(parents=True)
+            policy_file.write_text("synthetic\n", encoding="utf-8")
+            result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--base", "HEAD", "--no-record", "--json"], cwd=ROOT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            record = json.loads(result.stdout)
+            self.assertIn(".agents/skills/maintain-verification/changed.md", record["changes"]["policy"])
 
 
 if __name__ == "__main__":
