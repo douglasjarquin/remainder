@@ -250,9 +250,9 @@ def main(argv=None):
                 raise Blocked(f"VERIFY.md ```verify block is not valid TOML: {exc}")
         else:
             raise Blocked("VERIFY.md has no ```verify block")
-        maps_index = validate_relative_path(root, config.get("feature_maps") or "docs/features/README.md", "feature_maps")
-        artifacts = validate_relative_path(root, config.get("artifacts") or ".artifacts/verification", "artifacts")
-        validate_relative_path(root, config.get("evidence") or ".artifacts/evidence", "evidence")
+        maps_index = validate_relative_path(root, config.get("feature_maps", "docs/features/README.md"), "feature_maps")
+        artifacts = validate_relative_path(root, config.get("artifacts", ".artifacts/verification"), "artifacts")
+        validate_relative_path(root, config.get("evidence", ".artifacts/evidence"), "evidence")
         freshness = config.get("freshness", {})
         if not isinstance(freshness, dict):
             raise Blocked("VERIFY.md `freshness` must be a table.")

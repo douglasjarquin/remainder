@@ -327,6 +327,43 @@ class CaptureRedactionTests(unittest.TestCase):
             result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--no-record"], cwd=ROOT)
             self.assertEqual(result.returncode, 2)
 
+    def test_verify_audit_rejects_explicit_empty_configured_paths(self):
+        for key in ("feature_maps", "artifacts", "evidence"):
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as root:
+                root_path = Path(root)
+                (root_path / "docs/features").mkdir(parents=True)
+                (root_path / "docs/features/README.md").write_text("[quota](quota.md)\n", encoding="utf-8")
+                (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
+                paths = {
+                    "feature_maps": "docs/features/README.md",
+                    "artifacts": ".artifacts/verification",
+                    "evidence": ".artifacts/evidence",
+                }
+                paths[key] = ""
+                config = "\n".join(f'{name} = "{value}"' for name, value in paths.items())
+                (root_path / "VERIFY.md").write_text(f"```verify\n{config}\n```\n", encoding="utf-8")
+                (root_path / "mise.toml").write_text("[tasks.verify]\nrun = \"true\"\n", encoding="utf-8")
+                self.run_command(["git", "init", "-q"], cwd=root_path)
+                self.run_command(["git", "add", "."], cwd=root_path)
+                self.run_command(["git", "-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "base"], cwd=root_path)
+                result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--base", "HEAD", "--no-record", "--json"], cwd=ROOT)
+                self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_verify_audit_defaults_missing_configured_paths(self):
+        with tempfile.TemporaryDirectory() as root:
+            root_path = Path(root)
+            (root_path / "docs/features").mkdir(parents=True)
+            (root_path / "docs/features/README.md").write_text("[quota](quota.md)\n", encoding="utf-8")
+            (root_path / "docs/features/quota.md").write_text("# quota\n", encoding="utf-8")
+            (root_path / "VERIFY.md").write_text("```verify\nfeature_maps = \"docs/features/README.md\"\n```\n", encoding="utf-8")
+            (root_path / "mise.toml").write_text("[tasks.verify]\nrun = \"true\"\n", encoding="utf-8")
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            self.run_command(["git", "add", "."], cwd=root_path)
+            self.run_command(["git", "-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "base"], cwd=root_path)
+            result = self.run_command([sys.executable, str(VERIFY_AUDIT), "--root", root, "--base", "HEAD", "--no-record", "--json"], cwd=ROOT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["outcome"], "clean")
+
     def test_verify_audit_reports_maintenance_policy_changes(self):
         with tempfile.TemporaryDirectory() as root:
             root_path = Path(root)
