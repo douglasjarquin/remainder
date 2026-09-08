@@ -14,10 +14,10 @@ description = "Run the portable project verification"
 run = "./scripts/verify.sh"
 
 [tasks.benchmark]
-description = "Record full-process startup samples"
+description = "Record the reproducible latency and output baseline"
 depends = ["build"]
 run = [
   "mkdir -p artifacts",
-  "go test -bench 'Benchmark' -benchmem -count=10 ./internal/cli > artifacts/in-process.txt",
-  "./scripts/benchmark.sh ./bin/remainder > artifacts/startup.jsonl",
+  "GOTOOLCHAIN=local GOPROXY=off go test -bench 'BenchmarkExecute' -benchmem -count=10 ./internal/cli > artifacts/benchmark-in-process.txt",
+  "./scripts/benchmark.sh ./bin/remainder > artifacts/benchmark-cli.jsonl",
 ]

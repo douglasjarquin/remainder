@@ -25,7 +25,17 @@ Run the portable verification with `./scripts/verify.sh` or `mise run verify`.
 
 Run the direct test command with `go test -race -shuffle=on -count=1 ./...`.
 
-Run `./scripts/benchmark.sh ./bin/remainder` after building to emit JSON Lines startup samples.
+Run `mise run benchmark` after building to emit preserved JSON Lines full-process samples and in-process allocation benchmarks.
+
+The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint.
+
+It records raw output, output bytes, declared offline-word-v1 structural token counts, process/request counts, environment/build metadata, p50/p95, mean, and dispersion.
+
+Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
+
+The structural tokenizer is only an equivalent-output comparison aid.
+
+It does not measure or claim a model-token advantage.
 
 ## CLI contract
 
