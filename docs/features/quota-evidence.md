@@ -55,4 +55,4 @@ This release does not prove current login, revocation, or credential binding.
 
 Provider collection remains planned for issue #5 and credential feasibility remains governed by issue #15.
 
-The full product inventory and any live provider route remain manual work for later issues.
+The full product inventory and any live provider route remain manual work for later issues; see the [provider source matrix](../provider-sources.md).
