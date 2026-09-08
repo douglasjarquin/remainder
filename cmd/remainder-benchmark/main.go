@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		fatalf("stat binary: %v", err)
 	}
-	if info.Mode().Perm()&0111 == 0 {
+	if info.Mode().Perm()&0o111 == 0 {
 		fatalf("benchmark binary is not executable: %s", *binary)
 	}
 
