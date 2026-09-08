@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/benchmark"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -63,6 +64,9 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	if compact != wantCompact || compactErr.Len() != 0 {
 		t.Fatalf("compact output = %q, stderr = %q, want %q", compact, compactErr.String(), wantCompact)
 	}
+	if got := benchmark.TokenCount(compactOut.String()); got != 11 {
+		t.Fatalf("compact token count = %d, want 11", got)
+	}
 
 	var jsonOut, jsonErr bytes.Buffer
 	if code := executeWithAdapter(context.Background(), []string{"--format", "json"}, &jsonOut, &jsonErr, "v0.1.0", adapter); code != 0 {
@@ -72,6 +76,9 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	if jsonOut.String() != wantJSON || jsonErr.Len() != 0 {
 		t.Fatalf("JSON output = %q, stderr = %q, want %q", jsonOut.String(), jsonErr.String(), wantJSON)
 	}
+	if got := benchmark.TokenCount(jsonOut.String()); got != 1 {
+		t.Fatalf("JSON token count = %d, want 1", got)
+	}
 
 	var valueOut, valueErr bytes.Buffer
 	args := []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}
@@ -80,6 +87,9 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	}
 	if valueOut.String() != "42\n" || valueErr.Len() != 0 {
 		t.Fatalf("scalar output = %q, stderr = %q", valueOut.String(), valueErr.String())
+	}
+	if got := benchmark.TokenCount(valueOut.String()); got != 1 {
+		t.Fatalf("scalar token count = %d, want 1", got)
 	}
 }
 
