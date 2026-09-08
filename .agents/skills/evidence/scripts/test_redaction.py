@@ -178,8 +178,8 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assert_redacted([path], values)
 
     def test_both_capture_entrypoints_redact_unicode_separator_suffixes(self):
-        values = ["SYNTHETIC_OAUTH_UNICODE_2028", "SYNTHETIC_ID_UNICODE_2029"]
-        payload = ("oauth_token=%s" % values[0]).encode() + b"\xe2\x80\xa8ROUND6_SUFFIX_2028 id_token=" + values[1].encode() + b"\xe2\x80\xa9ROUND6_SUFFIX_2029"
+        values = ["SYNTHETIC_OAUTH_UNICODE_2028", "SYNTHETIC_ID_UNICODE_2029", "SYNTHETIC_BEARER_UNICODE_2028", "SYNTHETIC_BEARER_UNICODE_2029"]
+        payload = ("oauth_token=%s" % values[0]).encode() + b"\xe2\x80\xa8ROUND6_SUFFIX_2028 id_token=" + values[1].encode() + b"\xe2\x80\xa9ROUND6_SUFFIX_2029 Authorization: Bearer " + values[2].encode() + b"\xe2\x80\xa8ROUND6_BEARER_SUFFIX_2028 authorization: Bearer " + values[3].encode() + b"\xe2\x80\xa9ROUND6_BEARER_SUFFIX_2029"
         encoded = base64.b64encode(payload).decode()
         script = "import base64,sys; sys.stdout.write(base64.b64decode(%r).decode())" % encoded
         with tempfile.TemporaryDirectory() as root:
@@ -191,7 +191,7 @@ class CaptureRedactionTests(unittest.TestCase):
             verify_path, _ = self.read_capture(Path(root) / "verify" / "evidence")
             paths = [evidence_path, *evidence_path.parent.glob("*.redacted.txt"), verify_path]
             self.assert_redacted(paths, values)
-            self.assert_redacted(paths, ["ROUND6_SUFFIX_2028", "ROUND6_SUFFIX_2029"])
+            self.assert_redacted(paths, ["ROUND6_SUFFIX_2028", "ROUND6_SUFFIX_2029", "ROUND6_BEARER_SUFFIX_2028", "ROUND6_BEARER_SUFFIX_2029"])
 
     def test_both_capture_entrypoints_redact_oauth_labels_in_malformed_urls(self):
         with tempfile.TemporaryDirectory() as root:
@@ -238,6 +238,16 @@ class CaptureRedactionTests(unittest.TestCase):
             self.run_command(["git", "init", "-q"], cwd=root_path)
             result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
             self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(list(Path(outside).rglob("*")), [])
+
+    def test_evidence_capture_rejects_symlinked_configured_evidence(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
+            root_path = Path(root)
+            (root_path / "VERIFY.md").write_text("```verify\nevidence = \".artifacts/evidence\"\n```\n", encoding="utf-8")
+            (root_path / ".artifacts").symlink_to(outside, target_is_directory=True)
+            self.run_command(["git", "init", "-q"], cwd=root_path)
+            result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota", "--role", "after", "--kind", "nonvisual", "--run", "symlinked-evidence", "cli", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+            self.assertEqual(result.returncode, 2, result.stderr)
             self.assertEqual(list(Path(outside).rglob("*")), [])
 
     def test_verify_audit_rejects_parent_relative_configured_artifacts(self):
