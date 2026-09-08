@@ -105,7 +105,9 @@ def choose_run_dir(root: Path, artifacts: Path, explicit):
     latest = artifacts / "latest.json"
     if latest.is_file():
         try:
-            run_dir = json.loads(latest.read_text(encoding="utf-8")).get("artifacts", {}).get("run_dir")
+            latest_record = json.loads(latest.read_text(encoding="utf-8"))
+            metadata = latest_record.get("artifacts") if isinstance(latest_record, dict) else None
+            run_dir = metadata.get("run_dir") if isinstance(metadata, dict) else None
             if isinstance(run_dir, str) and run_dir:
                 candidate = (root / run_dir).resolve()
                 try:
@@ -115,7 +117,7 @@ def choose_run_dir(root: Path, artifacts: Path, explicit):
                 else:
                     if candidate.is_dir():
                         return candidate
-        except ValueError:
+        except (AttributeError, TypeError, ValueError):
             pass
     return artifacts / f"manual-{_dt.datetime.now(_dt.timezone.utc):%Y%m%dT%H%M%SZ}-{secrets.token_hex(3)}"
 

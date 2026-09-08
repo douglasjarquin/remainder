@@ -273,15 +273,16 @@ class CaptureRedactionTests(unittest.TestCase):
             self.assertEqual(len(list(artifacts.glob("manual-*/evidence/*.json"))), 1)
 
     def test_verify_capture_ignores_malformed_latest_run_dir(self):
-        with tempfile.TemporaryDirectory() as root:
-            root_path = Path(root)
-            artifacts = root_path / ".artifacts/verification"
-            artifacts.mkdir(parents=True)
-            (artifacts / "latest.json").write_text(json.dumps({"artifacts": {"run_dir": 42}}), encoding="utf-8")
-            self.run_command(["git", "init", "-q"], cwd=root_path)
-            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(len(list(artifacts.glob("manual-*/evidence/*.json"))), 1)
+        for latest_record in ([], {"artifacts": []}, {"artifacts": {"run_dir": 42}}):
+            with self.subTest(latest_record=latest_record), tempfile.TemporaryDirectory() as root:
+                root_path = Path(root)
+                artifacts = root_path / ".artifacts/verification"
+                artifacts.mkdir(parents=True)
+                (artifacts / "latest.json").write_text(json.dumps(latest_record), encoding="utf-8")
+                self.run_command(["git", "init", "-q"], cwd=root_path)
+                result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "run", "--", sys.executable, "-c", "print('ok')"], cwd=root_path)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(len(list(artifacts.glob("manual-*/evidence/*.json"))), 1)
 
     def test_evidence_capture_rejects_symlinked_configured_evidence(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as outside:
