@@ -128,6 +128,30 @@ class CaptureRedactionTests(unittest.TestCase):
             server.server_close()
             thread.join()
 
+    def test_evidence_capture_malformed_url_redacts_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            secret = "SYNTHETIC_MALFORMED_URL_SECRET_5a7c"
+            url = f"not-http://example.invalid/?access_token={secret}"
+            result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.malformed-url", "--role", "after", "--kind", "nonvisual", "--run", "malformed", "http", "GET", url], env={"VERIFY_EVIDENCE_ROOT": root})
+            self.assertEqual(result.returncode, 3)
+            self.assertNotIn(secret, result.stderr)
+            self.assertIn("[REDACTED]", result.stderr)
+
+    def test_verify_capture_malformed_url_redacts_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            secret = "SYNTHETIC_MALFORMED_VERIFY_URL_SECRET_5a7c"
+            url = f"not-http://example.invalid/?access_token={secret}"
+            result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "--scenario", "quota.malformed-url", "--run-dir", root, "http", "GET", url])
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(secret, result.stderr)
+            self.assertIn("[REDACTED]", result.stderr)
+
+    def test_redactor_covers_labeled_oauth_shapes(self):
+        redact = CAPTURE_MODULE.Redactor([])
+        text = "access_token=SYNTHETIC_OAUTH_ACCESS_5a7c refresh_token=SYNTHETIC_OAUTH_REFRESH_5a7c Authorization: Bearer SYNTHETIC_OAUTH_BEARER_5a7c"
+        redacted = redact(text)
+        self.assert_redacted_text(redacted, ["SYNTHETIC_OAUTH_ACCESS_5a7c", "SYNTHETIC_OAUTH_REFRESH_5a7c", "SYNTHETIC_OAUTH_BEARER_5a7c"])
+
 
 if __name__ == "__main__":
     unittest.main()

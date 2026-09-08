@@ -156,6 +156,35 @@ func TestObservation_RenderCompactQuotesStructuralTokens(t *testing.T) {
 	}
 }
 
+func TestObservation_RenderCompactQuotesUnicodeLineSeparators(t *testing.T) {
+	amount := json.Number("42")
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		Account:       evidence.AccountIdentity{Binding: evidence.IdentityBinding("historical\u2028injected\u2029")},
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomeComplete,
+		Windows: []evidence.Window{{
+			ID: "weekly\u2028injected\u2029", Scope: evidence.ScopeModel, Unit: "tokens",
+			Limits: []evidence.Limit{{ID: "remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}},
+		}},
+	}
+	compact, err := evidence.RenderCompact(obs, obs.ObservedAt)
+	if err != nil {
+		t.Fatalf("RenderCompact() error = %v", err)
+	}
+	if strings.ContainsRune(compact, '\u2028') || strings.ContainsRune(compact, '\u2029') {
+		t.Fatalf("RenderCompact() contains raw Unicode line separator: %q", compact)
+	}
+	for _, token := range []string{`identity="historical\u2028injected\u2029"`, `"weekly\u2028injected\u2029"`} {
+		if !strings.Contains(compact, token) {
+			t.Fatalf("RenderCompact() = %q, want quoted token %q", compact, token)
+		}
+	}
+}
+
 func TestObservation_RejectsInvalidNumericPayload(t *testing.T) {
 	amount := json.Number("42;injected")
 	obs := evidence.Observation{

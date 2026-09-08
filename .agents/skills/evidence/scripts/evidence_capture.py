@@ -423,7 +423,7 @@ def capture_browser(args, capture_dir: Path, record, redact: Redactor):
                                      "observed": redact(observed) if observed is not None else "(selector not observed; pass the same selector to --observe)"})
     if args.side_effect:
         method, url = args.side_effect
-        status, body, error = http_request(method, url, None, 10)
+        status, body, error = http_request(method, url, None, 10, redact)
         record["side_effect"] = {"method": method.upper(), "url": url, "status": status, "body": redact(clip(body)), "error": error}
         for expected in args.side_effect_text:
             record["assertions"].append({"expectation": f"side effect {method.upper()} {url} body contains {expected!r}", "met": expected in body})
@@ -466,9 +466,9 @@ def capture_browser(args, capture_dir: Path, record, redact: Redactor):
     return media
 
 
-def http_request(method, url, data, timeout):
+def http_request(method, url, data, timeout, redact):
     if not re.match(r"^https?://", url):
-        raise SystemExit(f"http needs an http(s):// URL, got {url!r}")
+        raise SystemExit(f"http needs an http(s):// URL, got {redact(url)!r}")
     body = data.encode() if data is not None else None
     request = urllib.request.Request(url, data=body, method=method.upper(), headers={"Content-Type": "application/json"} if body else {})
     try:
@@ -513,7 +513,7 @@ def capture_cli(args, capture_dir: Path, record, redact: Redactor):
 def capture_http(args, capture_dir: Path, record, redact: Redactor):
     record["steps"] = [{"action": "http", "method": args.method.upper(), "url": args.url, "data": args.data}]
     record["visual_proof"] = "not-applicable" if args.kind == "nonvisual" else "not-captured (http recipe)"
-    status, body, error = http_request(args.method, args.url, args.data, args.timeout)
+    status, body, error = http_request(args.method, args.url, args.data, args.timeout, redact)
     before = redact.count
     path = write_text(capture_dir, "response", redact(f"{args.method.upper()} {args.url}\nstatus: {status}\n{'error: ' + error if error else ''}\n--- body ---\n{clip(body)}\n"), redact, before)
     record["observations"] = {"status": status, "body": redact(clip(body)), "error": error}

@@ -59,7 +59,7 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 
 func safeToken(value string) string {
 	if value == "" || strings.IndexFunc(value, func(r rune) bool {
-		return unicode.IsControl(r) || strings.ContainsRune(" \t\r\n;:=/,\\\"", r)
+		return unicode.IsControl(r) || r == '\u2028' || r == '\u2029' || strings.ContainsRune(" \t\r\n;:=/,\\\"", r)
 	}) >= 0 {
 		return strconv.Quote(value)
 	}

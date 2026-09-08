@@ -154,7 +154,7 @@ def main(argv=None):
             record["unmet"].append(f"timed out after {args.timeout}s")
     else:
         if not re.match(r"^https?://", args.url):
-            parser.error(f"http needs an http(s):// URL, got {args.url!r}; read the URL the service printed, not the runner's echo line")
+            parser.error(f"http needs an http(s):// URL, got {redact(args.url)!r}; read the URL the service printed, not the runner's echo line")
         body = args.data.encode() if args.data is not None else None
         request = urllib.request.Request(args.url, data=body, method=args.method.upper(), headers={"Content-Type": "application/json"} if body else {})
         record["request"] = {"method": args.method.upper(), "url": args.url, "data": args.data}
