@@ -161,8 +161,8 @@ class CaptureRedactionTests(unittest.TestCase):
 
     def test_evidence_capture_redacts_oauth_oidc_labels_in_persisted_cli(self):
         with tempfile.TemporaryDirectory() as root:
-            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_7f3a", "SYNTHETIC_ID_TOKEN_ROUND6_7f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_7f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_7f3a"]
-            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s" % tuple(values)
+            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_7f3a", "SYNTHETIC_ID_TOKEN_ROUND6_7f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_7f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_7f3a", "SYNTHETIC_OIDC_TOKEN_ROUND6_7f3a"]
+            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s oidc_token=%s" % tuple(values)
             result = self.run_command([sys.executable, str(EVIDENCE_CAPTURE), "capture", "--scenario", "quota.oauth-label", "--role", "after", "--kind", "nonvisual", "--run", "oauth-evidence", "cli", "--expect-exit", "0", "--", sys.executable, "-c", "print(%r)" % text], env={"VERIFY_EVIDENCE_ROOT": root})
             self.assertEqual(result.returncode, 0, result.stderr)
             path, _ = self.read_capture(root)
@@ -170,8 +170,8 @@ class CaptureRedactionTests(unittest.TestCase):
 
     def test_verify_capture_redacts_oauth_oidc_labels_in_persisted_cli(self):
         with tempfile.TemporaryDirectory() as root:
-            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_8f3a", "SYNTHETIC_ID_TOKEN_ROUND6_8f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_8f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_8f3a"]
-            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s" % tuple(values)
+            values = ["SYNTHETIC_OAUTH_TOKEN_ROUND6_8f3a", "SYNTHETIC_ID_TOKEN_ROUND6_8f3a", "SYNTHETIC_OAUTH_ACCESS_ROUND6_8f3a", "SYNTHETIC_OAUTH_REFRESH_ROUND6_8f3a", "SYNTHETIC_OIDC_TOKEN_ROUND6_8f3a"]
+            text = "oauth_token=%s id_token=%s oauth_access_token=%s oauth_refresh_token=%s oidc_token=%s" % tuple(values)
             result = self.run_command([sys.executable, str(VERIFY_CAPTURE), "--feature", "quota", "--scenario", "quota.oauth-label", "--run-dir", root, "run", "--expect-exit", "0", "--", sys.executable, "-c", "print(%r)" % text])
             self.assertEqual(result.returncode, 0, result.stderr)
             path, _ = self.read_capture(Path(root) / "evidence")
