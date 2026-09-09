@@ -5,8 +5,10 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
 The source implements read-only Codex, Claude, Grok, and Cursor CLI providers, plus help, version, unavailable-provider behavior, and typed evidence output.
-The released v0.1.0 artifact supports Codex.
-Later source increments have separate platform and native-verification requirements described in the [source matrix](docs/provider-sources.md).
+The v0.1.0 artifacts support Codex.
+The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route.
+Claude, Grok, and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
+Use the published release verification record and the [source matrix](docs/provider-sources.md) to distinguish native certification from controlled fixtures.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
 It does not log in, refresh credentials, switch accounts, invoke another CLI, or make a generative request.
@@ -117,9 +119,10 @@ Selecting an unknown or non-applicable pace exits 2 with an explicit undefined-v
 
 The observation records last-observed account identity separately from freshness and credential binding.
 
-The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
+The selected native Codex macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
 Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, and the [release-readiness record](docs/release-readiness.md) consolidates the completed cross-process, correctness, and performance gates.
-The [v0.1.0 release](https://github.com/douglasjarquin/remainder/releases/tag/v0.1.0) has verified downloaded Codex executables; this does not certify later provider source changes.
+The [published releases](https://github.com/douglasjarquin/remainder/releases) carry version-specific executable checksums and verification records.
+A native source canary does not by itself certify a packaged or downloaded executable.
 
 Use `--all` to read the fixed default Codex, Claude, and Grok contexts concurrently, followed by Cursor on Linux and macOS.
 The platform controls this fixed list; it does not inspect credentials to choose providers.
