@@ -116,8 +116,7 @@ cat >"$bundle/ASSET_MANIFEST.json" <<EOF
   "go_version": "$go_version",
   "cgo_enabled": false,
   "license": "MIT",
-  "readiness_document": "$readiness_status",
-  "publication_status": "pending_final_release_verification"
+  "readiness_document": "$readiness_status"
 }
 EOF
 
