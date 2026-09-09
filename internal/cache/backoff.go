@@ -19,8 +19,11 @@ func (s *Store) retryDeadline(now, providerRetryAt time.Time) time.Time {
 }
 
 func (s *Store) backoffResult(loaded loadedRecord, expectedAccount string, policy Policy) (Result, error, bool) {
-	if loaded.state != recordSupported || loaded.record.Revoked || loaded.record.LastFailure != FailureTransient || loaded.record.RetryAt == nil || !s.options.Now().Before(*loaded.record.RetryAt) {
+	if loaded.state != recordSupported || loaded.record.LastFailure != FailureTransient || loaded.record.RetryAt == nil || !s.options.Now().Before(*loaded.record.RetryAt) {
 		return Result{}, nil, false
+	}
+	if loaded.record.Revoked {
+		return Result{}, &BackoffError{RetryAt: *loaded.record.RetryAt}, true
 	}
 	if policy.StaleOnError && loaded.record.Observation != nil && (expectedAccount == "" || loaded.record.Observation.Account.LastObserved == expectedAccount) {
 		observation := *loaded.record.Observation

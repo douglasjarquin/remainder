@@ -128,8 +128,9 @@ func runCoalescingAcceptance(ctx context.Context, binary string) (result coalesc
 	result.ForcedOverlap.Requests = fixture.requests.Load() - before
 	laterArgs := []string{"value", "--provider", "codex", "--profile", "default", "--window", "weekly", "--field", "remaining", "--refresh"}
 	later := runCoalescedProcess(ctx, binary, slices.Clone(laterArgs), environment)
-	if later.ExitCode != 0 || later.Stdout != "80\n" || later.Stderr != "" || fixture.requests.Load()-before != 2 {
-		return result, fmt.Errorf("later forced process failed: requests=%d process=%+v", fixture.requests.Load()-before, later)
+	laterRequests := fixture.requests.Load() - before - result.ForcedOverlap.Requests
+	if later.ExitCode != 0 || later.Stdout != "80\n" || later.Stderr != "" || !forcedRequestCountsValid(result.ForcedOverlap.Requests, laterRequests) {
+		return result, fmt.Errorf("later forced process failed: overlap_requests=%d later_requests=%d process=%+v", result.ForcedOverlap.Requests, laterRequests, later)
 	}
 	result.ForcedOverlap.ProofCalls = 1
 
@@ -155,30 +156,30 @@ func runCoalescingAcceptance(ctx context.Context, binary string) (result coalesc
 	return result, nil
 }
 
+func forcedRequestCountsValid(overlap, later int64) bool {
+	return overlap == 1 && later == 1
+}
+
 func runCoalescedBurst(ctx context.Context, binary string, environment []string, force, rateLimited bool) (coalescingScenario, error) {
 	result := coalescingScenario{Status: "passed", Processes: coalescingProcessCount, Samples: make([]coalescedSample, coalescingProcessCount)}
 	start := make(chan struct{})
 	var group sync.WaitGroup
 	for index := range coalescingProcessCount {
 		group.Go(func() {
-			args, expected := coalescedArgs(index, force)
+			args, _ := coalescedArgs(index, force)
 			<-start
 			result.Samples[index] = runCoalescedProcess(ctx, binary, args, environment)
-			value := result.Samples[index]
-			if !rateLimited {
-				if value.ExitCode != 0 || value.Stdout != expected || value.Stderr != "" {
-					result.Samples[index].ExitCode = -abs(value.ExitCode) - 1
-				}
-			} else if value.ExitCode != 1 || value.Stdout != "" || value.Stderr == "" {
-				result.Samples[index].ExitCode = -abs(value.ExitCode) - 1
-			}
 		})
 	}
 	close(start)
 	group.Wait()
 	elapsed := make([]int64, 0, coalescingProcessCount)
-	for _, value := range result.Samples {
-		if value.ExitCode < 0 {
+	for index, value := range result.Samples {
+		_, expected := coalescedArgs(index, force)
+		if !rateLimited && (value.ExitCode != 0 || value.Stdout != expected || value.Stderr != "") {
+			return result, fmt.Errorf("coalesced process failed validation: %+v", value)
+		}
+		if rateLimited && (value.ExitCode != 1 || value.Stdout != "" || value.Stderr == "") {
 			return result, fmt.Errorf("coalesced process failed validation: %+v", value)
 		}
 		elapsed = append(elapsed, value.ElapsedNS)
@@ -238,11 +239,4 @@ func runCoalescedProcess(ctx context.Context, binary string, args, environment [
 		}
 	}
 	return result
-}
-
-func abs(value int) int {
-	if value < 0 {
-		return -value
-	}
-	return value
 }
