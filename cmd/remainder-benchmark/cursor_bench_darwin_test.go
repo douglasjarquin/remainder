@@ -16,7 +16,6 @@ func TestCursorBenchmark_runsControlledKeychainRefreshAndConfigCacheHitOnDarwin(
 
 	// When
 	controlled, err := runControlledRefresh(helper, "cursor", 1, nil)
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +36,6 @@ func TestCursorBenchmark_runsControlledKeychainRefreshAndConfigCacheHitOnDarwin(
 
 	// When
 	cached, err := runCacheHit(t.Context(), binary, "cursor", 1, time.Second, time.Minute, nil)
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
