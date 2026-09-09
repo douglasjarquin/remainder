@@ -83,7 +83,7 @@ func readRecord(path, wantBinding string) loadedRecord {
 	validGeneration := hasObservation && generationErr == nil && len(generation) == 16 || !hasObservation && value.Generation == ""
 	validObservation := !hasObservation || value.Observation.Validate() == nil
 	validFailure := value.LastFailure == FailureNone || value.LastFailure == FailureTransient || value.LastFailure == FailurePermanent || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
-	validRevocation := !value.Revoked || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
+	validRevocation := !value.Revoked || value.LastFailure != FailureNone
 	validAttempt := value.LastFailure == FailureNone && value.LastAttemptAt == nil && value.RetryAt == nil && !value.Revoked || value.LastFailure != FailureNone && value.LastAttemptAt != nil
 	validRetry := value.RetryAt == nil || value.LastFailure == FailureTransient
 	if value.BindingHash != wantBinding || !validGeneration || !validObservation || !validFailure || !validRevocation || !validAttempt || !validRetry {

@@ -220,7 +220,7 @@ func (s *Store) handleFailure(binding Binding, current loadedRecord, expectedAcc
 	}
 	value.LastAttemptAt = &now
 	value.LastFailure = fetched.Failure
-	value.Revoked = fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
+	value.Revoked = value.Revoked || fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
 	value.RetryAt = nil
 	if fetched.Failure == FailureTransient {
 		retryAt := s.retryDeadline(now, fetched.RetryAt)
