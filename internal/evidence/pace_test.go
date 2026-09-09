@@ -206,7 +206,6 @@ func TestParseJSON_acceptsEquivalentKnownPaceNumberSpellings(t *testing.T) {
 
 	// When
 	_, err = evidence.ParseJSON([]byte(equivalent))
-
 	// Then
 	if err != nil {
 		t.Fatalf("ParseJSON() error = %v", err)
