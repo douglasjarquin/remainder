@@ -5,9 +5,9 @@ The archive carries the executable, the MIT license, the standalone Codex skill,
 `SHA256SUMS` verifies archive integrity when it is obtained from a trusted approved release source.
 
 Remainder is licensed under the [MIT License](../LICENSE).
-This local candidate is not a public release.
 The issue 13 Codex readiness result is integrated.
-Publication remains pending independent final release verification against that readiness result.
+Publishing a release requires independent final verification against that readiness result.
+Use [GitHub Releases](https://github.com/douglasjarquin/remainder/releases) to find approved assets and their verification records.
 
 ## Candidate construction
 
@@ -24,13 +24,21 @@ The report records the actual source revision, archive digest, runtime-path excl
 
 ## Approved standalone installation
 
-Download an approved release archive and its `SHA256SUMS` file from that release's immutable asset URLs into a temporary directory.
-Verify the checksum there before extracting:
+From a new temporary directory, download the macOS ARM64 archive and checksum file for the approved `v0.1.0` release.
+Select exactly one checksum entry because the checksum file also lists other platforms.
+Extraction runs only after download and verification succeed:
 
 ```sh
-shasum -a 256 -c SHA256SUMS
-tar -xzf remainder_v0.1.0_darwin_arm64.tar.gz
+asset=remainder_v0.1.0_darwin_arm64.tar.gz
+release=https://github.com/douglasjarquin/remainder/releases/download/v0.1.0
+curl --fail --location --output "$asset" "$release/$asset" &&
+curl --fail --location --output SHA256SUMS "$release/SHA256SUMS" &&
+awk -v name="$asset" '$2 == name { print; count++ } END { if (count != 1) exit 1 }' SHA256SUMS > "$asset.sha256" &&
+shasum -a 256 -c "$asset.sha256" &&
+tar -xzf "$asset"
 ```
+
+On Linux ARM64, select `remainder_v0.1.0_linux_arm64.tar.gz` and use `sha256sum -c "$asset.sha256"` for the checksum command.
 
 Run the extracted binary in place first.
 Copy it to a user-selected versioned directory only after it passes `--version` and `--help`.
@@ -43,9 +51,19 @@ No earlier Remainder version exists for first-release rollback; retain the exist
 
 ## Approved mise configuration
 
-The installed mise 2026.9.3 has no `remainder` registry shorthand.
-For an approved GitHub release, mise's GitHub backend can use the explicit `github:douglasjarquin/remainder` tool identifier pinned to `v0.1.0`, with an asset pattern selecting the current operating-system and architecture archive and checksum verification configured against the published `SHA256SUMS` asset.
-Create that configuration only after substituting the approved release asset names and immutable release URLs.
-This local candidate does not claim a mise GitHub installation.
+Use mise's explicit `github:douglasjarquin/remainder` backend.
+The release's `mise.toml` pins version `0.1.0`, the exact platform archive names, and each archive's SHA-256 digest.
+It strips the archive's single outer directory so the executable is available at the installation root.
+From a separate new temporary directory, download and use that configuration:
+
+```sh
+curl --fail --location --output mise.toml https://github.com/douglasjarquin/remainder/releases/download/v0.1.0/mise.toml &&
+mise trust mise.toml &&
+mise install &&
+mise exec -- remainder --version
+```
+
+Mise performs installation and verification once; ordinary `remainder` invocations do not invoke mise or check for updates.
+The release verification record identifies the mise version and platforms actually tested.
 
 The GitHub backend behavior and options are documented in the official [mise GitHub backend documentation](https://mise.jdx.dev/dev-tools/backends/github.html).
