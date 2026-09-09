@@ -32,7 +32,7 @@ func periodAt(config []wireField) (period, bool, error) {
 		return period{}, false, err
 	}
 	reset, err := decodeTimestamp(resetRaw, 3)
-	if err != nil || !reset.After(start) {
+	if err != nil || !reset.After(start) || !start.Add(reset.Sub(start)).Equal(reset) {
 		return period{}, false, errors.New("Grok quota period timestamps are invalid")
 	}
 	return period{start: start, reset: reset}, true, nil
