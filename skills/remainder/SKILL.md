@@ -12,11 +12,12 @@ If the executable is absent, give one actionable diagnostic: `remainder is not i
 Stop after that diagnostic unless the user asks to install or build it.
 
 The v0.1.0 release supports provider `codex` with profile `default`.
-The current source also implements `claude` with profile `default`, using only its selected credentials file; its native canary remains unverified.
+The current source also implements `claude` and `grok` with profile `default`, using only their selected credential files; their native canaries remain unverified.
 Check the installed executable before assuming a source increment is available.
 It reads quota evidence without logging in, refreshing credentials, switching accounts, or making a generative request.
-Grok and Cursor are not supported by this increment.
-Missing Claude credentials are unavailable; do not use Keychain, refresh, or another credential route as a fallback.
+Cursor is not supported by this increment.
+Use `--all` for the fixed provider default contexts only when the installed executable supports it; retain separate observations and provider failures.
+Missing or expired credentials are unavailable; do not use Keychain, refresh, or another credential route as a fallback.
 
 Use exact provider, profile, window, scope, field, and optional last-observed account IDs from the user's request or a prior Remainder observation.
 Do not guess an identifier or combine unlike windows.

@@ -45,8 +45,8 @@ It runs formatting, `GOPROXY=off go vet ./...`, `GOPROXY=off go test -race -shuf
 The direct checks are `GOPROXY=off go vet ./...`, `GOPROXY=off go test -race -shuffle=on -count=1 ./...`, `GOPROXY=off ./scripts/check-dependencies.sh`, and `CGO_ENABLED=0 GOPROXY=off go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o /tmp/remainder ./cmd/remainder`.
 
 Run `mise run benchmark` for the retained process JSONL and in-process allocation evidence.
-Controlled refresh uses a compiled test helper with synthetic auth and loopback TLS, independently counts one request for Codex or two for Claude per sample, and separates helper-process timing from summed request timing to response headers.
-Use `scripts/benchmark.sh bin/remainder --provider claude` to select Claude refresh and cache measurements.
+Controlled refresh uses a compiled test helper with synthetic auth and loopback TLS, independently counts one request per Codex or Grok sample and two per Claude sample, and separates helper-process timing from summed request timing to response headers.
+Use `scripts/benchmark.sh bin/remainder --provider claude` or `scripts/benchmark.sh bin/remainder --provider grok` to select provider refresh and cache measurements.
 Neither timing certifies release-binary refresh or live provider latency.
 Eligible cache-hit timing uses the actual release-like binary with a seeded synthetic observation, zero provider requests, and a separately counted JSON provenance check.
 
@@ -62,7 +62,7 @@ The linked [feature map](docs/features/README.md) contains the automated Cobra a
 The final CLI checks drive `bin/remainder --help`, `bin/remainder --version`, `bin/remainder --freshness ignored`, `bin/remainder`, and the `value` command through isolated process invocations.
 
 Canonical scenarios use only synthetic credentials, temporary cache roots, and local test servers; they do not access real credentials, user caches, or the external network.
-Codex and Claude integration tests use synthetic temporary auth files and loopback `httptest` servers only.
+Codex, Claude, and Grok integration tests use synthetic temporary auth files and loopback `httptest` servers only.
 
 ## Isolation
 
@@ -92,7 +92,7 @@ Do not remove the verification run directory or its evidence during teardown.
 
 Changes to this contract, `mise.toml`, `.agents/skills/verify/`, `.agents/skills/evidence/`, `.agents/skills/maintain-verification/`, or the feature maps require independent root review.
 
-This policy covers Codex and Claude collection and cache behavior with synthetic local sources and temporary cache roots.
+This policy covers Codex, Claude, and Grok collection and cache behavior with synthetic local sources and temporary cache roots.
 It does not authorize a live provider canary or any runtime dependency beyond the standard library and pinned Cobra graph.
 
 It checks formatting, `go vet`, race-enabled shuffled tests, the reviewed Cobra dependency/import contract, and a CGO-free release-like build.

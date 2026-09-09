@@ -19,6 +19,7 @@ func TestControlledRefreshRun_recordsProviderSamplesAndSummaries(t *testing.T) {
 	}{
 		{provider: "codex", requests: 1},
 		{provider: "claude", requests: 2},
+		{provider: "grok", requests: 1},
 	} {
 		t.Run(test.provider, func(t *testing.T) {
 			// Given
@@ -37,6 +38,10 @@ func TestControlledRefreshRun_recordsProviderSamplesAndSummaries(t *testing.T) {
 				if value.Source != controlledRefreshSource || value.ExitCode != 0 || value.Stdout != "60\n" || value.Stderr != "" || value.SubprocessCount != 1 || value.RequestCount != test.requests || value.ElapsedNS <= value.ControlledTLSRoundTripNS || value.ControlledTLSRoundTripNS <= 0 {
 					t.Fatalf("controlled sample = %+v", value)
 				}
+			}
+			if test.provider == "grok" {
+				value := result.Samples[0]
+				t.Logf("compiled Grok helper: samples=%d requests=%d scalar=%q process_ns=%d tls_round_trip_ns=%d", len(result.Samples), result.RequestCount, value.Stdout, value.ElapsedNS, value.ControlledTLSRoundTripNS)
 			}
 		})
 	}

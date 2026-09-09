@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -56,6 +57,36 @@ func TestCacheHitRun_rejectsExpiredSeedWithoutReadingOAuth(t *testing.T) {
 	}
 	if len(result.Samples) != 1 || result.Samples[0].ExitCode == 0 || result.Samples[0].Stdout != "" || result.Samples[0].RequestCount != 0 || !strings.Contains(result.Samples[0].Stderr, "authentication file is malformed") || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
 		t.Fatalf("cache-hit result = %+v, error = %v", result, err)
+	}
+}
+
+func TestCacheHitSeed_grokPreservesCreditsAndUnknownIdentityOnReuse(t *testing.T) {
+	// Given
+	authName, authBody := cacheHitAuth("grok")
+	authPath := filepath.Join(t.TempDir(), authName)
+	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.September, 9, 16, 0, 0, 0, time.UTC)
+	binding, observation, window, err := cacheHitSeed(t.Context(), "grok", authPath, now.Add(-time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := cache.New(filepath.Join(t.TempDir(), "cache"), cache.Options{Now: func() time.Time { return now }})
+	if _, err := store.Put(t.Context(), binding, observation); err != nil {
+		t.Fatal(err)
+	}
+
+	// When
+	result, err := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeOnly, MaxAge: time.Minute}, nil)
+
+	// Then
+	if err != nil || !result.FromCache || binding.Provider != "grok" || binding.SourceKind != "native_file_http" || binding.SourceName != "grok_auth_json" || window != "credits" || result.Observation.Account.Binding != evidence.IdentityUnknown || result.Observation.Account.LastObserved != "" {
+		t.Fatalf("result=%+v binding=%+v window=%q error=%v", result, binding, window, err)
+	}
+	remaining, err := evidence.SelectValue(result.Observation, evidence.ValueRequest{Provider: "grok", Profile: "default", Window: "credits", Field: evidence.FieldRemaining}, evidence.FreshOnly)
+	if err != nil || remaining != "42\n" {
+		t.Fatalf("remaining=%q error=%v", remaining, err)
 	}
 }
 
