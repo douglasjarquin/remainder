@@ -9,7 +9,7 @@ The project is positioned for personal use by its maintainer.
 - `mise run build` builds `bin/remainder` with `CGO_ENABLED=0`.
 - `mise run test` runs race-enabled, shuffled Go tests.
 - `mise run verify` runs `scripts/verify.sh`.
-- `mise run benchmark` records full-process startup samples for the compiled binary.
+- `mise run benchmark` records full-process Cobra latency/output samples and in-process allocation benchmarks.
 - Direct equivalents are `go build ./cmd/remainder`, `go test -race -shuffle=on -count=1 ./...`, and `./scripts/verify.sh`.
 - Prime the pinned module cache once before offline verification with `GOTOOLCHAIN=local go mod download all`.
 

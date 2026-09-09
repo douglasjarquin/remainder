@@ -48,12 +48,24 @@ func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, versi
 	return executeWithAdapter(ctx, args, stdout, stderr, version, unavailableAdapter{})
 }
 
+func ExecuteWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
+	return executeWithAdapterAt(ctx, args, stdout, stderr, version, time.Now().UTC(), adapter)
+}
+
 func executeWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
+	return executeWithAdapterAt(ctx, args, stdout, stderr, version, time.Now().UTC(), adapter)
+}
+
+func ExecuteWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.Writer, version string, now time.Time, adapter Adapter) int {
+	return executeWithAdapterAt(ctx, args, stdout, stderr, version, now, adapter)
+}
+
+func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.Writer, version string, now time.Time, adapter Adapter) int {
 	if ctx.Err() != nil {
 		fmt.Fprintln(stderr, "remainder: interrupted")
 		return 130
 	}
-	root := newRoot(version, stdout, stderr, adapter)
+	root := newRoot(version, stdout, stderr, adapter, now)
 	root.SetArgs(args)
 	if err := root.ExecuteContext(ctx); err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -77,7 +89,7 @@ func executeWithAdapter(ctx context.Context, args []string, stdout, stderr io.Wr
 	return 0
 }
 
-func newRoot(version string, stdout, stderr io.Writer, adapter Adapter) *cobra.Command {
+func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time.Time) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "remainder",
 		Short:         "Read quota evidence from a supported provider",
@@ -89,7 +101,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter) *cobra.C
 			if err != nil {
 				return err
 			}
-			return runReport(cmd, adapter, opts)
+			return runReport(cmd, adapter, opts, now)
 		},
 	}
 	root.Version = version
@@ -196,7 +208,7 @@ func readOptions(cmd *cobra.Command, valueCommand bool) (options, error) {
 	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), all: all}, nil
 }
 
-func runReport(cmd *cobra.Command, adapter Adapter, opts options) error {
+func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time) error {
 	observation, err := adapter.Observe(cmd.Context(), evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, Freshness: opts.freshness, All: opts.all})
 	if err != nil {
 		return err
@@ -220,7 +232,7 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options) error {
 			return fmt.Errorf("write JSON: %w", err)
 		}
 	} else {
-		output, err := evidence.RenderCompact(observation, time.Now().UTC())
+		output, err := evidence.RenderCompact(observation, now)
 		if err != nil {
 			return err
 		}

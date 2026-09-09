@@ -25,7 +25,30 @@ Run the portable verification with `./scripts/verify.sh` or `mise run verify`.
 
 Run the direct test command with `go test -race -shuffle=on -count=1 ./...`.
 
-Run `./scripts/benchmark.sh ./bin/remainder` after building to emit JSON Lines startup samples.
+Run `mise run benchmark` after building to emit preserved JSON Lines full-process samples, fixture comparisons, and in-process allocation benchmarks.
+
+The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
+
+It records raw output, output bytes, optional actual `o200k_base` token counts, process/request counts, measured-binary build metadata, host metadata, p50/p95, mean, and dispersion.
+
+Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `tiktoken` for actual offline token counts.
+
+Set `TIKTOKEN_CACHE_DIR` to a provisioned local encoding cache when measuring tokens.
+The bridge verifies the expected encoding hash and fails closed without downloading or writing cache data.
+
+Set `REMAINDER_BENCH_COMPARATORS=1` to run the pinned installed `quota-axi` compact output and its JSON output through the actual Pinchos `jq -r` consumer projection.
+
+The developer-only Node preload fixes time and intercepts the quota endpoint with a synthetic response under temporary `HOME`, `CODEX_HOME`, and `XDG_CACHE_HOME` directories.
+
+The comparison records the shared fresh Codex account/all-model weekly percentage subset at the same observation time, each tool's extra facts, and the remaining provenance uncertainty.
+
+It does not claim full-payload equality, interchangeable token and percentage units, a speed advantage, or native endpoint performance.
+
+Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
+
+Without the optional tokenizer environment, token fields are explicitly unmeasured rather than word counts.
+
+The `o200k_base` measurement is an offline Codex-family comparison encoding and does not claim model-specific tokenizer parity.
 
 ## CLI contract
 
