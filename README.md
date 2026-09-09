@@ -100,7 +100,8 @@ Selecting an unknown or non-applicable pace exits 2 with an explicit undefined-v
 The observation records last-observed account identity separately from freshness and credential binding.
 
 The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
-Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases; cross-process burst contention and packaged-release gates remain separate.
+Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, and the [release-readiness record](docs/release-readiness.md) consolidates the completed cross-process, correctness, and performance gates.
+Downloaded executable proof remains the issue #14 packaging gate.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 

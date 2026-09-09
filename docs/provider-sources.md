@@ -60,7 +60,13 @@ The initial native observation exposed a weekly-primary/null-secondary normaliza
 Synthetic adapter and Cobra regressions reproduced it before the fix, and genuine duplicate supplied windows still fail closed.
 The successful native observations establish this selected macOS source route; they do not certify other accounts, operating systems, or future source availability.
 Claude, Grok, and Cursor remain `unrun` and require their own authorized account and source-specific lab.
-The remaining Codex release gates cover caching, concurrent refresh ownership, consumer behavior, and packaged binaries.
+The issue #13 release-readiness record consolidates the already delivered cache, cross-process refresh, output, performance, and direct example evidence.
+Downloaded executable installation and packaging remain the issue #14 gate.
+
+On 2026-09-09, a separate approved documentation canary ran all seven standalone-skill commands through the release-like binary at full source SHA `bd9ca8b9928dfb993a83abb89dde840bbc146ed5`.
+The compact, JSON, weekly remaining, weekly pace, and direct consumer paths passed against one selected native observation and its cache reuse.
+Credential file metadata remained unchanged, and the run performed no login, credential refresh, account switch, or generative request.
+That receipt remains separate from deterministic fixtures and from the earlier native feasibility canary.
 
 Help, version, invalid input, and offline verification remain credential-free.
 Expired, rejected, changed-profile, redirect, and malformed-source behavior use synthetic auth files and controlled HTTP/TLS tests.
