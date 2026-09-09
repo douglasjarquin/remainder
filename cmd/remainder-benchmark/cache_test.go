@@ -16,20 +16,24 @@ import (
 func TestCacheHitRun_recordsActualBinaryHit(t *testing.T) {
 	binary := buildCacheHitBinary(t)
 
-	result, err := runCacheHit(t.Context(), binary, 3, time.Second, time.Minute, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Samples) != 3 || result.Summary.Source != cacheHitSource || result.Summary.Workloads[cacheHitWorkload].Count != 3 || result.ObservedAt.IsZero() || result.Freshness != evidence.FreshFresh || result.IdentityBinding != evidence.IdentityHistorical || result.Account != "acct-benchmark" || result.ObservationAge != time.Second || result.MaxAge != time.Minute || result.Generation == "" || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
-		t.Fatalf("cache-hit result = %+v", result)
-	}
-	for _, value := range result.Samples {
-		if value.Source != cacheHitSource || value.ExitCode != 0 || value.Stdout != "42\n" || value.Stderr != "" || value.StdoutBytes != 3 || value.StderrBytes != 0 || value.SubprocessCount != 1 || value.RequestCount != 0 || value.ElapsedNS <= 0 || value.OutputStatus != "pass" {
-			t.Fatalf("cache-hit sample = %+v", value)
-		}
-	}
-	if result.Provenance.Workload != "cache-hit-provenance" || result.Provenance.ExitCode != 0 || result.Provenance.SubprocessCount != 1 || result.Provenance.RequestCount != 0 || result.Provenance.Stdout == "" || result.Provenance.Stderr != "" || result.Provenance.OutputStatus != "pass" {
-		t.Fatalf("cache-hit provenance = %+v", result.Provenance)
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			result, err := runCacheHit(t.Context(), binary, provider, 3, time.Second, time.Minute, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Samples) != 3 || result.Summary.Source != cacheHitSource || result.Summary.Workloads[cacheHitWorkload].Count != 3 || result.ObservedAt.IsZero() || result.Freshness != evidence.FreshFresh || result.IdentityBinding != evidence.IdentityHistorical || result.Account != "acct-benchmark" || result.ObservationAge != time.Second || result.MaxAge != time.Minute || result.Generation == "" || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
+				t.Fatalf("cache-hit result = %+v", result)
+			}
+			for _, value := range result.Samples {
+				if value.Source != cacheHitSource || value.ExitCode != 0 || value.Stdout != "42\n" || value.Stderr != "" || value.StdoutBytes != 3 || value.StderrBytes != 0 || value.SubprocessCount != 1 || value.RequestCount != 0 || value.ElapsedNS <= 0 || value.OutputStatus != "pass" {
+					t.Fatalf("cache-hit sample = %+v", value)
+				}
+			}
+			if result.Provenance.Workload != "cache-hit-provenance" || result.Provenance.ExitCode != 0 || result.Provenance.SubprocessCount != 1 || result.Provenance.RequestCount != 0 || result.Provenance.Stdout == "" || result.Provenance.Stderr != "" || result.Provenance.OutputStatus != "pass" {
+				t.Fatalf("cache-hit provenance = %+v", result.Provenance)
+			}
+		})
 	}
 }
 
@@ -46,7 +50,7 @@ func TestCacheHitObjective_appliesOnlyToAppleSilicon(t *testing.T) {
 func TestCacheHitRun_rejectsExpiredSeedWithoutReadingOAuth(t *testing.T) {
 	binary := buildCacheHitBinary(t)
 
-	result, err := runCacheHit(t.Context(), binary, 1, time.Hour, time.Second, nil)
+	result, err := runCacheHit(t.Context(), binary, "codex", 1, time.Hour, time.Second, nil)
 	if err == nil {
 		t.Fatal("expired cache hit unexpectedly passed")
 	}
@@ -98,7 +102,7 @@ func buildCacheHitBinary(t *testing.T) string {
 }
 
 func TestCacheHitRun_rejectsInvalidInput(t *testing.T) {
-	_, err := runCacheHit(t.Context(), "missing", 0, 0, 0, nil)
+	_, err := runCacheHit(t.Context(), "missing", "codex", 0, 0, 0, nil)
 	if !errors.Is(err, benchmark.ErrNoSamples) {
 		t.Fatalf("error = %v", err)
 	}

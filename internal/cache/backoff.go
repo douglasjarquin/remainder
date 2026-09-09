@@ -27,7 +27,9 @@ func (s *Store) backoffResult(loaded loadedRecord, expectedAccount string, polic
 	}
 	if policy.StaleOnError && loaded.record.Observation != nil && (expectedAccount == "" || loaded.record.Observation.Account.LastObserved == expectedAccount) {
 		observation := *loaded.record.Observation
-		observation.Account.Binding = evidence.IdentityHistorical
+		if observation.Account.Binding == evidence.IdentityVerified {
+			observation.Account.Binding = evidence.IdentityHistorical
+		}
 		observation.Freshness = evidence.FreshStale
 		return Result{Observation: observation, Generation: loaded.record.Generation, FromCache: true}, nil, true
 	}

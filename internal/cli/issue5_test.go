@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/claude"
 	"github.com/douglasjarquin/remainder/internal/codex"
 )
 
@@ -186,8 +187,21 @@ func runIssue5Helper() int {
 	transport := &issue5TimingTransport{base: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}}
 	client := &http.Client{Transport: transport}
 	fixedNow := func() time.Time { return time.Date(2026, time.March, 8, 7, 30, 0, 0, time.UTC) }
-	adapter := codex.New(codex.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoints: []string{os.Getenv("REMAINDER_ISSUE5_ENDPOINT")}, Client: client, Timeout: time.Second, Now: fixedNow})
-	code := ExecuteWithAdapterAt(context.Background(), []string{"value", "--provider", "codex", "--profile", "default", "--window", "five_hour", "--field", "remaining"}, os.Stdout, os.Stderr, "test", fixedNow(), adapter)
+	provider := os.Getenv("REMAINDER_ISSUE5_PROVIDER")
+	if provider == "" {
+		provider = "codex"
+	}
+	var adapter Adapter
+	switch provider {
+	case "codex":
+		adapter = codex.New(codex.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoints: []string{os.Getenv("REMAINDER_ISSUE5_ENDPOINT")}, Client: client, Timeout: time.Second, Now: fixedNow})
+	case "claude":
+		adapter = claude.New(claude.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), ProfileEndpoint: os.Getenv("REMAINDER_ISSUE5_PROFILE_ENDPOINT"), UsageEndpoint: os.Getenv("REMAINDER_ISSUE5_USAGE_ENDPOINT"), Client: client, Timeout: time.Second, Now: fixedNow})
+	default:
+		fmt.Fprintln(os.Stderr, "remainder benchmark helper: invalid provider")
+		return 1
+	}
+	code := ExecuteWithAdapterAt(context.Background(), []string{"value", "--provider", provider, "--profile", "default", "--window", "five_hour", "--field", "remaining"}, os.Stdout, os.Stderr, "test", fixedNow(), adapter)
 	if code != 0 {
 		return code
 	}

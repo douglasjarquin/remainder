@@ -13,6 +13,7 @@ import (
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
 	"github.com/douglasjarquin/remainder/internal/cache"
+	"github.com/douglasjarquin/remainder/internal/claude"
 	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
@@ -35,9 +36,12 @@ type cacheHitResult struct {
 	SandboxCleanup  string
 }
 
-func runCacheHit(ctx context.Context, binary string, samples int, observationAge, maxAge time.Duration, tokenizer *tokenizerClient) (result cacheHitResult, resultErr error) {
+func runCacheHit(ctx context.Context, binary, provider string, samples int, observationAge, maxAge time.Duration, tokenizer *tokenizerClient) (result cacheHitResult, resultErr error) {
 	if samples < 1 {
 		return result, benchmark.ErrNoSamples
+	}
+	if provider != "codex" && provider != "claude" {
+		return result, errors.New("cache-hit provider must be codex or claude")
 	}
 	if observationAge < 0 || maxAge < 0 {
 		return result, errors.New("cache-hit ages must not be negative")
@@ -73,10 +77,10 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	}()
 
 	home := filepath.Join(sandbox, "home")
-	codexHome := filepath.Join(sandbox, "codex-home")
+	sourceHome := filepath.Join(sandbox, "provider-home")
 	xdgCacheHome := filepath.Join(sandbox, "xdg-cache")
 	tmp := filepath.Join(sandbox, "tmp")
-	for _, directory := range []string{home, codexHome, xdgCacheHome, tmp} {
+	for _, directory := range []string{home, sourceHome, xdgCacheHome, tmp} {
 		if err := os.Mkdir(directory, 0o700); err != nil {
 			return result, fmt.Errorf("create cache-hit directory: %w", err)
 		}
@@ -85,12 +89,21 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	if err != nil {
 		return result, err
 	}
-	authPath := filepath.Join(codexHome, "auth.json")
+	authName := "auth.json"
+	if provider == "claude" {
+		authName = ".credentials.json"
+	}
+	authPath := filepath.Join(sourceHome, authName)
 	if err := os.WriteFile(authPath, []byte("{"), 0o600); err != nil {
 		return result, fmt.Errorf("write cache-hit auth metadata: %w", err)
 	}
-	request := evidence.Request{Provider: "codex", Profile: "default"}
-	binding, err := codex.New(codex.Options{AuthFile: authPath}).CacheBinding(ctx, request)
+	request := evidence.Request{Provider: evidence.Provider(provider), Profile: "default"}
+	var binding cache.Binding
+	if provider == "claude" {
+		binding, err = claude.New(claude.Options{AuthFile: authPath}).CacheBinding(ctx, request)
+	} else {
+		binding, err = codex.New(codex.Options{AuthFile: authPath}).CacheBinding(ctx, request)
+	}
 	if err != nil {
 		return result, fmt.Errorf("derive cache-hit binding: %w", err)
 	}
@@ -99,10 +112,10 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	amount := evidence.JSONNumber("42")
 	observation := evidence.Observation{
 		SchemaVersion: evidence.SchemaV1,
-		Provider:      "codex",
+		Provider:      evidence.Provider(provider),
 		Profile:       "default",
 		Account:       evidence.AccountIdentity{LastObserved: "acct-benchmark", Binding: evidence.IdentityVerified},
-		Source:        evidence.SourceIdentity{Kind: "native_file_http", Name: "codex_auth_json"},
+		Source:        evidence.SourceIdentity{Kind: binding.SourceKind, Name: binding.SourceName},
 		ObservedAt:    observedAt,
 		Freshness:     evidence.FreshFresh,
 		Outcome:       evidence.OutcomeComplete,
@@ -120,9 +133,9 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	result.MaxAge = maxAge
 	result.Samples = make([]sample, 0, samples)
 	elapsedSamples := make([]int64, 0, samples)
-	args := []string{"value", "--provider", "codex", "--profile", "default", "--window", "five_hour", "--field", "remaining", "--cache", "auto", "--max-age", maxAge.String()}
+	args := []string{"value", "--provider", provider, "--profile", "default", "--window", "five_hour", "--field", "remaining", "--cache", "auto", "--max-age", maxAge.String()}
 	for n := 1; n <= samples; n++ {
-		value, err := runCacheHitSample(ctx, binary, cacheHitWorkload, args, n, home, codexHome, xdgCacheHome, tmp, tokenizer)
+		value, err := runCacheHitSample(ctx, binary, cacheHitWorkload, args, n, home, sourceHome, xdgCacheHome, tmp, tokenizer)
 		if err != nil {
 			return result, err
 		}
@@ -135,8 +148,8 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 		result.Samples = append(result.Samples, value)
 		elapsedSamples = append(elapsedSamples, value.ElapsedNS)
 	}
-	provenanceArgs := []string{"--provider", "codex", "--profile", "default", "--format", "json", "--cache", "auto", "--max-age", maxAge.String()}
-	provenance, err := runCacheHitSample(ctx, binary, "cache-hit-provenance", provenanceArgs, 1, home, codexHome, xdgCacheHome, tmp, tokenizer)
+	provenanceArgs := []string{"--provider", provider, "--profile", "default", "--format", "json", "--cache", "auto", "--max-age", maxAge.String()}
+	provenance, err := runCacheHitSample(ctx, binary, "cache-hit-provenance", provenanceArgs, 1, home, sourceHome, xdgCacheHome, tmp, tokenizer)
 	if err != nil {
 		return result, err
 	}
@@ -144,7 +157,7 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	if err != nil || provenance.ExitCode != 0 || provenance.Stderr != "" || provenance.RequestCount != 0 {
 		return result, fmt.Errorf("cache-hit provenance failed: exit=%d stderr=%q parse=%v", provenance.ExitCode, provenance.Stderr, err)
 	}
-	selected, err := evidence.SelectValue(parsed, evidence.ValueRequest{Provider: "codex", Profile: "default", Window: "five_hour", Field: evidence.FieldRemaining}, evidence.FreshOnly)
+	selected, err := evidence.SelectValue(parsed, evidence.ValueRequest{Provider: evidence.Provider(provider), Profile: "default", Window: "five_hour", Field: evidence.FieldRemaining}, evidence.FreshOnly)
 	if err != nil || selected != "42\n" || !parsed.ObservedAt.Equal(observedAt) || parsed.Freshness != evidence.FreshFresh || parsed.Account.Binding != evidence.IdentityHistorical {
 		return result, fmt.Errorf("cache-hit provenance changed: value=%q observed_at=%s freshness=%s identity=%s error=%v", selected, parsed.ObservedAt.Format(time.RFC3339Nano), parsed.Freshness, parsed.Account.Binding, err)
 	}
@@ -162,11 +175,12 @@ func runCacheHit(ctx context.Context, binary string, samples int, observationAge
 	return result, nil
 }
 
-func runCacheHitSample(ctx context.Context, binary, workload string, args []string, number int, home, codexHome, xdgCacheHome, tmp string, tokenizer *tokenizerClient) (sample, error) {
+func runCacheHitSample(ctx context.Context, binary, workload string, args []string, number int, home, sourceHome, xdgCacheHome, tmp string, tokenizer *tokenizerClient) (sample, error) {
 	command := exec.CommandContext(ctx, binary, args...)
 	command.Env = []string{
 		"HOME=" + home,
-		"CODEX_HOME=" + codexHome,
+		"CODEX_HOME=" + sourceHome,
+		"CLAUDE_CONFIG_DIR=" + sourceHome,
 		"XDG_CACHE_HOME=" + xdgCacheHome,
 		"TMPDIR=" + tmp,
 	}
