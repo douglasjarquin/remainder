@@ -60,6 +60,7 @@ The observation records last-observed account identity separately from freshness
 This release does not prove current login, revocation, or credential binding.
 
 Codex provider collection is implemented from the selected native file source.
-The authorized Remainder live endpoint canary remains unrun, so source-specific live support is unverified.
+Two authorized native observations passed on 2026-09-09 with the same verified account binding and unchanged credential file metadata.
+This verifies the selected macOS route at the recorded source revision; see the [source evidence](../provider-sources.md).
 
-The full product inventory and any live provider route remain manual work for later issues; see the [provider source matrix](../provider-sources.md).
+Other provider routes and packaged-release acceptance remain separate work; see the [provider source matrix](../provider-sources.md).

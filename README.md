@@ -78,7 +78,8 @@ Exit 1 means the observation is unavailable, exit 2 means invocation or selectio
 
 The observation records last-observed account identity separately from freshness and credential binding.
 
-The source-built implementation has controlled local HTTP/TLS coverage, but its selected native route still requires the separate authorized live canary before a provider release claim.
+The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
+Controlled HTTP/TLS tests cover failure cases; cache, concurrency, and packaged-release gates remain separate.
 It does not access a cache.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
