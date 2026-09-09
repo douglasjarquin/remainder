@@ -77,6 +77,7 @@ func run(binary string, item workload, tokenizer *tokenizerClient) (sample, erro
 		return sample{}, err
 	}
 	return sample{
+		Source:          "full-process-cobra-entrypoint",
 		ElapsedNS:       elapsedNS,
 		ExitCode:        exitCode,
 		Stdout:          stdout.String(),

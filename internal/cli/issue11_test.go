@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
@@ -86,6 +88,42 @@ func TestExecuteWithAdapterAt_marksFutureObservationPaceUnknown(t *testing.T) {
 	pace := observation.Windows[0].Pace
 	if code != 0 || err != nil || stderr.Len() != 0 || pace == nil || pace.Status != evidence.PaceUnknown || pace.Reason != "future_observation" {
 		t.Fatalf("result: code=%d parseErr=%v stderr=%q pace=%#v", code, err, stderr.String(), pace)
+	}
+}
+
+func TestStore_CachedOnly_supportsRemainingAndPaceFromOneObservation(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	authPath := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(authPath, []byte("malformed OAuth fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	provider := codex.New(codex.Options{AuthFile: authPath, Endpoints: []string{"http://127.0.0.1:1"}, Timeout: 50 * time.Millisecond, Now: func() time.Time { return now }})
+	binding, err := provider.CacheBinding(t.Context(), evidence.Request{Provider: "codex", Profile: "default"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	observation := cacheObservation(now.Add(-time.Second))
+	resetAt := observation.ObservedAt.Add(7 * 24 * time.Hour)
+	duration := 7 * 24 * time.Hour
+	observation.Windows[1].Limits = append(observation.Windows[1].Limits,
+		evidence.Limit{ID: "weekly_reset", Field: evidence.FieldReset, Value: evidence.Value{State: evidence.ValueUnknown}, ResetAt: &resetAt},
+		evidence.Limit{ID: "weekly_duration", Field: evidence.FieldDuration, Value: evidence.Value{State: evidence.ValueUnknown}, Duration: &duration},
+	)
+	if _, err := store.Put(t.Context(), binding, observation); err != nil {
+		t.Fatal(err)
+	}
+	adapter := runtimeAdapter{codex: provider, newStore: func() (*cache.Store, error) { return store, nil }}
+
+	// When
+	var remainingOut, paceOut, stderr bytes.Buffer
+	remainingCode := executeWithAdapterAt(t.Context(), []string{"value", "--cache=only", "--provider=codex", "--profile=default", "--window=weekly", "--field=remaining"}, &remainingOut, &stderr, "test", now, adapter)
+	paceCode := executeWithAdapterAt(t.Context(), []string{"value", "--cache=only", "--provider=codex", "--profile=default", "--window=weekly", "--field=pace"}, &paceOut, &stderr, "test", now, adapter)
+
+	// Then
+	if remainingCode != 0 || paceCode != 0 || remainingOut.String() != "80\n" || paceOut.String() != "ahead\n" || stderr.Len() != 0 {
+		t.Fatalf("codes = %d/%d, remaining = %q, pace = %q, stderr = %q", remainingCode, paceCode, remainingOut.String(), paceOut.String(), stderr.String())
 	}
 }
 

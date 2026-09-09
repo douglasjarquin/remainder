@@ -17,7 +17,7 @@ func normalize(raw usageResponse, selectedAccount string, now time.Time) (eviden
 		accountID = raw.AccountIDCamel
 	}
 	if accountID != "" && accountID != selectedAccount {
-		return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", errAccountMismatch)
+		return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", ErrAccountMismatch)
 	}
 	base := raw.RateLimit
 	if base == nil {
