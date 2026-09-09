@@ -76,7 +76,7 @@ For a known percentage allowance with a duration and future reset, Remainder cal
 A reserve below `-1` is `ahead`, meaning spending is faster than the uniform reserve; a reserve above `1` is `behind`, meaning spending is slower; the inclusive range from `-1` through `1` is `on_pace`.
 These names match the pinned [quota-axi pace calculation](https://github.com/kunchenguid/quota-axi/blob/d3190237588cdf51046b27a346ff2e834855bf37/src/pace.ts#L38-L69) and [threshold classifier](https://github.com/kunchenguid/quota-axi/blob/d3190237588cdf51046b27a346ff2e834855bf37/src/pace.ts#L414-L420).
 JSON and compact output preserve the calculation identity, calculation time, original observation time, remaining value, reset, duration, time remaining percentage, and reserve.
-The pace describes the original observation and is recomputed for each output after freshness classification; stale evidence, a reset that has passed by evaluation time, a future implied cycle, or missing usage, duration, or reset produces `unknown` with a reason.
+The pace describes the original observation and is recomputed for each output after freshness classification; stale evidence, a reset that has passed by evaluation time, a future observation or implied cycle, or missing usage, duration, or reset produces `unknown` with a reason.
 Unlimited, unknown, and zero remaining remain distinct, and non-percentage windows have no pace calculation.
 Remainder does not combine account and model windows, choose an aggregate minimum across unlike pools, or fold paid credits into included allowance.
 

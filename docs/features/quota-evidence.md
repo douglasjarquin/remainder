@@ -8,7 +8,7 @@ Status: implemented for deterministic fixtures, unavailable behavior, controlled
 - `remainder --format compact` renders one deterministic compact observation.
 - `remainder --format json` renders one versioned JSON observation.
 - `remainder value --provider PROVIDER --profile PROFILE --window WINDOW --field FIELD` emits one exact scalar remaining, reset, duration, or pace value.
-- `internal/cli/run.go` owns Cobra parsing, adapter calls, output routing, and exit semantics.
+- `internal/cli/run.go` owns Cobra parsing, adapter calls, output routing, and exit semantics; `internal/cli/clock.go` supplies the ordinary post-collection UTC clock.
 - `internal/evidence/evidence.go`, `internal/evidence/parse.go`, `internal/evidence/render.go`, and `internal/evidence/select.go` own the typed observation, parsing, projections, and exact selection.
 - `internal/evidence/pace.go` derives per-window pace from one observation and a caller-supplied evaluation clock.
 - `internal/codex/adapter.go`, `internal/codex/auth.go`, `internal/codex/source.go`, and `internal/codex/normalize.go` own the selected native source, bounded I/O, source schema, and normalization.
@@ -30,7 +30,7 @@ Status: implemented for deterministic fixtures, unavailable behavior, controlled
 | codex-native-bounds | Missing, malformed, expired, wrong-profile, wrong-account, delayed, oversized, malformed, redirected, rejected, rate-limited, canceled, and schema-drift inputs fail safely without secret disclosure. | automated `internal/codex/codex_test.go` | `go test -race -shuffle=on -count=1 ./internal/codex` |
 | codex-native-process | A compiled helper process drives the actual Cobra entrypoint against a controlled HTTP source and emits the exact scalar. | automated `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | quota-pace | Percentage windows classify spending as `ahead`, `on_pace`, or `behind` from the same remaining/reset/duration observation, including inclusive threshold ties and zero remaining. | automated `internal/evidence/pace_test.go` | `go test -race -shuffle=on -count=1 ./internal/evidence` |
-| quota-pace-unknown | Stale, missing, expired-reset, future-cycle, unlimited, unknown, malformed, and ambiguous inputs preserve an explicit unknown reason without a manufactured scalar. | automated `internal/evidence/pace_test.go` | `go test -race -shuffle=on -count=1 ./internal/evidence` |
+| quota-pace-unknown | Stale, missing, expired-reset, future-observation, future-cycle, unlimited, unknown, malformed, and ambiguous inputs preserve an explicit unknown reason without a manufactured scalar. | automated `internal/evidence/pace_test.go` and `internal/cli/issue11_test.go` | `go test -race -shuffle=on -count=1 ./internal/evidence ./internal/cli` |
 | quota-pace-process | A compiled helper process drives the actual Cobra entrypoint against a controlled Codex HTTP fixture and emits the exact weekly pace scalar. | automated `internal/cli/issue11_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 
 ## Driving it
@@ -60,7 +60,7 @@ An explicit Codex/default request reads only the selected auth file and performs
 Pace is calculated independently for each applicable percentage window.
 The calculation assumes uniform allowance through the cycle and uses the original observation time, remaining percentage, reset, and duration.
 It records the current calculation time so a cached observation can be re-evaluated after freshness classification.
-Stale evidence and a reset that has passed at evaluation time are unknown even when an earlier calculation was known.
+Stale evidence, a reset that has passed at evaluation time, and an observation later than the evaluation clock are unknown even when the quota inputs would otherwise calculate a status.
 The signed reserve is percentage remaining minus cycle time remaining percentage: below `-1` is `ahead` spending faster, above `1` is `behind` spending slower, and both threshold ties are `on_pace`.
 This matches [quota-axi's formula and status meanings at pinned revision `d3190237588cdf51046b27a346ff2e834855bf37`](https://github.com/kunchenguid/quota-axi/blob/d3190237588cdf51046b27a346ff2e834855bf37/src/pace.ts#L38-L69); Remainder intentionally omits burn forecasts and aggregate selection scores because issue #11 requires scalar status without cross-pool prediction.
 Account, model, short-window, unknown, zero, and unlimited constraints remain separate.

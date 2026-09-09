@@ -87,6 +87,10 @@ func derivePace(observation Observation, window Window, evaluatedAt time.Time) *
 		pace.Status, pace.Reason = PaceUnknown, "stale"
 		return pace
 	}
+	if evaluatedAt.Before(observation.ObservedAt) {
+		pace.Status, pace.Reason = PaceUnknown, "future_observation"
+		return pace
+	}
 
 	remaining, resetAt, duration, ok := paceInputs(window)
 	pace.Inputs.Remaining, pace.Inputs.ResetAt, pace.Inputs.Duration = remaining, resetAt, duration
