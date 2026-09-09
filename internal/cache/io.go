@@ -80,7 +80,7 @@ func readRecord(path, wantBinding string) loadedRecord {
 	}
 	generation, generationErr := hex.DecodeString(value.Generation)
 	validFailure := value.LastFailure == FailureNone || value.LastFailure == FailureTransient || value.LastFailure == FailurePermanent || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
-	validRevocation := !value.Revoked || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
+	validRevocation := !value.Revoked || value.LastFailure != FailureNone
 	if value.BindingHash != wantBinding || generationErr != nil || len(generation) != 16 || value.Observation.Validate() != nil || !validFailure || !validRevocation {
 		return loadedRecord{state: recordCorrupt}
 	}

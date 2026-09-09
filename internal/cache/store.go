@@ -206,13 +206,14 @@ func cachedOnlyError(loaded loadedRecord) error {
 func (s *Store) handleFailure(binding Binding, current loadedRecord, expectedAccount string, policy Policy, fetched FetchResult) (Result, error) {
 	if current.state == recordSupported {
 		now := s.options.Now()
+		wasRevoked := current.record.Revoked
 		current.record.LastAttemptAt = &now
 		current.record.LastFailure = fetched.Failure
-		current.record.Revoked = fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
+		current.record.Revoked = wasRevoked || fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
 		if err := writeRecord(s.SnapshotPath(binding), current.record); err != nil {
 			return Result{}, fetched.Err
 		}
-		if policy.StaleOnError && fetched.Failure == FailureTransient && (expectedAccount == "" || current.record.Observation.Account.LastObserved == expectedAccount) {
+		if policy.StaleOnError && !current.record.Revoked && fetched.Failure == FailureTransient && (expectedAccount == "" || current.record.Observation.Account.LastObserved == expectedAccount) {
 			observation := current.record.Observation
 			observation.Account.Binding = evidence.IdentityHistorical
 			observation.Freshness = evidence.FreshStale
