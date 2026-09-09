@@ -9,6 +9,9 @@ The roadmap and product direction were informed by the positive prior work in [q
 
 Remainder does not copy quota-axi source, depend on its binaries, or imply that quota-axi endorses this project.
 
+The native Codex source contract was researched against [quota-axi revision d3190237588cdf51046b27a346ff2e834855bf37](https://github.com/kunchenguid/quota-axi/tree/d3190237588cdf51046b27a346ff2e834855bf37) and [OpenAI Codex revision 283f34387b7e16bd524d8f3a431f77aa7395471d](https://github.com/openai/codex/tree/283f34387b7e16bd524d8f3a431f77aa7395471d).
+These are source-contract references, not additional runtime dependencies; the [provider source matrix](docs/provider-sources.md) records the route and its observed limits.
+
 ## Pinned dependency provenance
 
 The following inventory is the complete graph from go list -m all for the pinned versions in go.mod and go.sum.

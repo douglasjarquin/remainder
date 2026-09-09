@@ -14,7 +14,7 @@ description = "Run the portable project verification"
 run = "./scripts/verify.sh"
 
 [tasks.benchmark]
-description = "Record the reproducible latency and output baseline"
+description = "Record release startup and controlled refresh benchmark evidence"
 depends = ["build"]
 run = [
   "mkdir -p artifacts",

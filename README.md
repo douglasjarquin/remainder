@@ -4,9 +4,10 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-This slice provides honest help, version, unavailable-provider behavior, and the typed evidence output contract.
+This slice provides a native read-only Codex quota path plus honest help, version, unavailable-provider behavior, and the typed evidence output contract.
 
-It does not access credentials, the network, a cache, or any provider.
+An explicit `--provider codex --profile default` selection reads only `$CODEX_HOME/auth.json` or `~/.codex/auth.json`, then makes a bounded request to the Codex usage endpoint.
+It does not log in, refresh credentials, switch accounts, invoke another CLI, make a generative request, or write a cache.
 
 ## Build and verify
 
@@ -29,6 +30,11 @@ Run `mise run benchmark` after building to emit preserved JSON Lines full-proces
 
 The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
 
+Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and native Codex adapter against loopback TLS with synthetic authentication.
+Each sample must make exactly one counted request; helper-process elapsed time and controlled TLS round-trip time to response headers have separate p50/p95 summaries.
+The helper measurement includes test-runtime and metrics overhead and does not measure release-binary refresh or the live provider endpoint.
+The in-process refresh benchmark reports allocations and requests per operation.
+
 It records raw output, output bytes, optional actual `o200k_base` token counts, process/request counts, measured-binary build metadata, host metadata, p50/p95, mean, and dispersion.
 
 Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `tiktoken` for actual offline token counts.
@@ -44,7 +50,7 @@ The comparison records the shared fresh Codex account/all-model weekly percentag
 
 It does not claim full-payload equality, interchangeable token and percentage units, a speed advantage, or native endpoint performance.
 
-Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
+Cache reads remain unimplemented pending issue #6.
 
 Without the optional tokenizer environment, token fields are explicitly unmeasured rather than word counts.
 
@@ -57,6 +63,9 @@ The `o200k_base` measurement is an offline Codex-family comparison encoding and 
 `remainder --version` writes the release or source identity to stdout and exits successfully.
 
 An invocation without a provider writes an honest unavailable message to stderr and exits nonzero.
+
+Use `remainder --provider codex --profile default` for the selected native Codex context.
+The `default` profile label means the single `CODEX_HOME` context selected by the process environment; Remainder does not scan or discover other profiles.
 
 Unknown flags and positional commands write an actionable error to stderr and exit nonzero.
 
@@ -74,7 +83,9 @@ Exit 1 means the observation is unavailable, exit 2 means invocation or selectio
 
 The observation records last-observed account identity separately from freshness and credential binding.
 
-This release does not prove current login, revocation, or credential binding, and it does not access credentials, a provider, or a cache.
+The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
+Controlled HTTP/TLS tests cover failure cases; cache, concurrency, and packaged-release gates remain separate.
+It does not access a cache.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 
@@ -84,7 +95,7 @@ Remainder owns provider evidence collection, normalization, cache, rendering, an
 
 Pinchos and Sum remain independent consumers.
 
-The first provider work begins in issue #5 after the output contract and credential feasibility gates.
+The first provider implementation is the Codex native route from issue #5.
 
 See [the feature map](docs/features/README.md), [verification](VERIFY.md), and [attributions](ATTRIBUTIONS.md).
 
