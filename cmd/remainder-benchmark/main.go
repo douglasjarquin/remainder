@@ -40,11 +40,6 @@ func main() {
 	if *helper == "" {
 		fatalf("controlled refresh helper is required")
 	}
-	controlled, err := runControlledRefresh(*helper, *samples, nil)
-	if err != nil {
-		fatalf("controlled refresh: %v", err)
-	}
-
 	workloads := []workload{
 		{Name: "startup-help", Args: []string{"--help"}, ExitCode: 0},
 		{Name: "startup-version", Args: []string{"--version"}, ExitCode: 0},
@@ -59,6 +54,10 @@ func main() {
 	tokenizer, tokenizerInfo, err := startTokenizer(*tokenizerPython)
 	if err != nil {
 		fatalf("start tokenizer: %v", err)
+	}
+	controlled, err := runControlledRefresh(*helper, *samples, tokenizer)
+	if err != nil {
+		fatalf("controlled refresh: %v", err)
 	}
 	buildInfo := inspectBuild(*binary)
 	host := inspectHost()

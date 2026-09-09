@@ -57,7 +57,7 @@ An explicit Codex/default request reads only the selected auth file and performs
 
 The observation records last-observed account identity separately from freshness and binding.
 
-This release does not prove current login, revocation, or credential binding.
+Verified binding describes the provider response at observation time; it does not prove the current login or detect later revocation without another observation.
 
 Codex provider collection is implemented from the selected native file source.
 Two authorized native observations passed on 2026-09-09 with the same verified account binding and unchanged credential file metadata.
