@@ -114,4 +114,7 @@ The first provider implementation is the Codex native route from issue #5.
 
 See [the feature map](docs/features/README.md), [verification](VERIFY.md), and [attributions](ATTRIBUTIONS.md).
 
+Release candidate construction, the strict asset contents, checksum verification, and future standalone installation are documented in [the release guide](docs/release.md).
+No public artifact exists yet, and publication remains blocked on the owner license choice and the issue 13 readiness gate.
+
 The proposed MIT license is recorded for owner review in [LICENSE_PROPOSAL.md].

@@ -21,3 +21,7 @@ run = [
   "GOTOOLCHAIN=local GOPROXY=off go test -bench 'BenchmarkExecute' -benchmem -count=10 ./internal/cli > artifacts/benchmark-in-process.txt",
   "./scripts/benchmark.sh ./bin/remainder > artifacts/benchmark-cli.jsonl",
 ]
+
+[tasks.package-test]
+description = "Build and validate the native release candidate contract"
+run = "./scripts/package-release.test.sh"
