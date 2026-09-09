@@ -22,8 +22,10 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-const appleSiliconP95ObjectiveNS int64 = 10_000_000
-const quotaAxiVersion = "0.1.41"
+const (
+	appleSiliconP95ObjectiveNS int64 = 10_000_000
+	quotaAxiVersion                  = "0.1.41"
+)
 
 type workload struct {
 	Name     string
