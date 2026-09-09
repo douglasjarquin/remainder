@@ -10,7 +10,7 @@ import (
 )
 
 func TestAdapterObserve_rejectsQuotedNonJSONNumbers(t *testing.T) {
-	for _, raw := range []string{`"0x1p2"`, `"1_000"`} {
+	for _, raw := range []string{`"0x1p2"`, `"1_000"`, `".5"`} {
 		t.Run(raw, func(t *testing.T) {
 			// Given
 			server := fixtureServer(t, map[string]fixtureResponse{
@@ -32,21 +32,53 @@ func TestAdapterObserve_rejectsQuotedNonJSONNumbers(t *testing.T) {
 }
 
 func TestAdapterObserve_preservesPaidAmountPrecision(t *testing.T) {
-	// Given
-	server := fixtureServer(t, map[string]fixtureResponse{
-		"GetCurrentPeriodUsage": {body: `{"spendLimitUsage":{"individualLimit":"9007199254740993"}}`},
-		"GetPlanInfo":           {body: `{}`},
-		"GetSandUsageStatus":    {body: `{}`},
-	})
-	defer server.Close()
-
-	// When
-	observation, err := testAdapter(t, server).Observe(t.Context(), cursorRequest())
-	// Then
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "large integer", raw: "9007199254740993"},
+		{name: "fractional exponent", raw: "1.234567890123456789e2"},
 	}
-	assertValue(t, observation, "spend_limit", evidence.Field("limit"), "9007199254740993\n")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Given
+			server := fixtureServer(t, map[string]fixtureResponse{
+				"GetCurrentPeriodUsage": {body: fmt.Sprintf(`{"spendLimitUsage":{"individualLimit":%q}}`, test.raw)},
+				"GetPlanInfo":           {body: `{}`},
+				"GetSandUsageStatus":    {body: `{}`},
+			})
+			defer server.Close()
+
+			// When
+			observation, err := testAdapter(t, server).Observe(t.Context(), cursorRequest())
+			// Then
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertValue(t, observation, "spend_limit", evidence.Field("limit"), test.raw+"\n")
+		})
+	}
+}
+
+func TestAdapterObserve_rejectsQuotedNonJSONTimestamps(t *testing.T) {
+	for _, raw := range []string{"0x1p2", "1_000", ".5"} {
+		t.Run(raw, func(t *testing.T) {
+			// Given
+			server := fixtureServer(t, map[string]fixtureResponse{
+				"GetCurrentPeriodUsage": {body: fmt.Sprintf(`{"billingCycleStart":%q,"planUsage":{"totalPercentUsed":25}}`, raw)},
+				"GetPlanInfo":           {body: `{}`},
+				"GetSandUsageStatus":    {body: `{}`},
+			})
+			defer server.Close()
+
+			// When
+			_, err := testAdapter(t, server).Observe(t.Context(), cursorRequest())
+			// Then
+			if err == nil {
+				t.Fatalf("Observe() accepted non-JSON timestamp %q", raw)
+			}
+		})
+	}
 }
 
 func TestAdapterObserve_omitsUnrepresentableCycleDuration(t *testing.T) {

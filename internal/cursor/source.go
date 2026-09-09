@@ -68,19 +68,24 @@ func (n *sourceNumber) UnmarshalJSON(data []byte) error {
 		}
 		raw = strings.TrimSpace(text)
 	}
-	encoded := jsontext.Value(raw)
-	if !encoded.IsValid() || encoded.Kind() != '0' {
-		return errors.New("number must use JSON decimal syntax")
-	}
-	value, err := strconv.ParseFloat(raw, 64)
+	value, err := parseJSONFloat(raw)
 	if err != nil {
-		return errors.New("number must be finite")
-	}
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return errors.New("number must be finite")
+		return err
 	}
 	*n = sourceNumber{raw: raw, value: value}
 	return nil
+}
+
+func parseJSONFloat(raw string) (float64, error) {
+	encoded := jsontext.Value(raw)
+	if !encoded.IsValid() || encoded.Kind() != '0' {
+		return 0, errors.New("number must use JSON decimal syntax")
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, errors.New("number must be finite")
+	}
+	return value, nil
 }
 
 type sourceTime struct{ time.Time }
@@ -95,14 +100,14 @@ func (t *sourceTime) UnmarshalJSON(data []byte) error {
 			t.Time = parsed.UTC()
 			return nil
 		}
-		value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+		value, err := parseJSONFloat(strings.TrimSpace(raw))
 		if err != nil {
 			return err
 		}
 		return t.setEpoch(value)
 	}
-	var value float64
-	if err := json.Unmarshal(data, &value); err != nil {
+	value, err := parseJSONFloat(strings.TrimSpace(string(data)))
+	if err != nil {
 		return err
 	}
 	return t.setEpoch(value)
