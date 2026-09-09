@@ -13,15 +13,16 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-func TestRuntimeAdapter_ObserveAllStartsThreeOperationsConcurrently(t *testing.T) {
+func TestRuntimeAdapter_ObserveAllStartsProviderOperationsConcurrently(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	started := make(chan evidence.Provider, 3)
+	started := make(chan evidence.Provider, len(allRequests))
 	release := make(chan struct{})
 	adapter := runtimeAdapter{
 		codex:  blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "codex"), started: started, release: release},
 		claude: blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "claude"), started: started, release: release},
 		grok:   blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "grok"), started: started, release: release},
+		cursor: blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "cursor"), started: started, release: release},
 	}
 	completed := make(chan []collectionResult, 1)
 	go func() {
@@ -29,18 +30,18 @@ func TestRuntimeAdapter_ObserveAllStartsThreeOperationsConcurrently(t *testing.T
 	}()
 
 	seen := make(map[evidence.Provider]bool)
-	for range 3 {
+	for range len(allRequests) {
 		select {
 		case provider := <-started:
 			seen[provider] = true
 		case <-ctx.Done():
-			t.Fatal("three provider operations did not start concurrently")
+			t.Fatal("provider operations did not start concurrently")
 		}
 	}
 	close(release)
 	results := <-completed
 
-	if len(results) != 3 || !seen["codex"] || !seen["claude"] || !seen["grok"] {
+	if len(results) != len(allRequests) || !seen["codex"] || !seen["claude"] || !seen["grok"] || len(allRequests) == 4 && !seen["cursor"] {
 		t.Fatalf("started=%v results=%+v", seen, results)
 	}
 }
@@ -51,6 +52,7 @@ func TestExecuteAll_sharedDeadlineRetainsCompletedProvider(t *testing.T) {
 		codex:      blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "codex")},
 		claude:     blockingNativeAdapter{provider: "claude", release: block},
 		grok:       blockingNativeAdapter{provider: "grok", release: block},
+		cursor:     blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "cursor")},
 		allTimeout: 20 * time.Millisecond,
 	}
 	var stdout, stderr bytes.Buffer
@@ -64,16 +66,17 @@ func TestExecuteAll_sharedDeadlineRetainsCompletedProvider(t *testing.T) {
 
 func TestExecuteAll_cancellationWaitsForOwnedOperationsAndWritesNoStdout(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
-	started := make(chan evidence.Provider, 3)
+	started := make(chan evidence.Provider, len(allRequests))
 	block := make(chan struct{})
 	var active atomic.Int32
 	adapter := runtimeAdapter{
 		codex:  blockingNativeAdapter{provider: "codex", started: started, release: block, active: &active},
 		claude: blockingNativeAdapter{provider: "claude", started: started, release: block, active: &active},
 		grok:   blockingNativeAdapter{provider: "grok", started: started, release: block, active: &active},
+		cursor: blockingNativeAdapter{provider: "cursor", started: started, release: block, active: &active},
 	}
 	go func() {
-		for range 3 {
+		for range len(allRequests) {
 			<-started
 		}
 		cancel()

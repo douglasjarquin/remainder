@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,12 @@ var allRequests = []evidence.Request{
 	{Provider: "codex", Profile: "default"},
 	{Provider: "claude", Profile: "default"},
 	{Provider: "grok", Profile: "default"},
+}
+
+func init() {
+	if runtime.GOOS == "linux" {
+		allRequests = append(allRequests, evidence.Request{Provider: "cursor", Profile: "default"})
+	}
 }
 
 type collectionResult struct {

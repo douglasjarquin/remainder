@@ -140,7 +140,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 	root.PersistentFlags().DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
 	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require an observation newer than this request's starting generation")
 	root.PersistentFlags().BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
-	root.PersistentFlags().BoolVar(&values.all, "all", false, "read codex/default, claude/default, and grok/default")
+	root.PersistentFlags().BoolVar(&values.all, "all", false, "read every supported provider's default profile")
 
 	value := &cobra.Command{
 		Use:   "value",

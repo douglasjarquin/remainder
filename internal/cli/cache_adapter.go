@@ -9,6 +9,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/claude"
 	"github.com/douglasjarquin/remainder/internal/codex"
+	"github.com/douglasjarquin/remainder/internal/cursor"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/douglasjarquin/remainder/internal/grok"
 	"github.com/spf13/cobra"
@@ -18,12 +19,13 @@ type runtimeAdapter struct {
 	codex      nativeAdapter
 	claude     nativeAdapter
 	grok       nativeAdapter
+	cursor     nativeAdapter
 	newStore   func() (*cache.Store, error)
 	allTimeout time.Duration
 }
 
 func defaultRuntimeAdapter() runtimeAdapter {
-	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), grok: grok.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
+	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), grok: grok.Default(), cursor: cursor.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
 }
 
 func (a runtimeAdapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
@@ -85,6 +87,8 @@ func (a runtimeAdapter) provider(request evidence.Request) (nativeAdapter, error
 		return a.claude, nil
 	case "grok":
 		return a.grok, nil
+	case "cursor":
+		return a.cursor, nil
 	default:
 		return nil, fmt.Errorf("%w: unsupported provider %q", evidence.ErrInvalidSelection, request.Provider)
 	}
