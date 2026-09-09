@@ -34,17 +34,18 @@ func (unavailableAdapter) Observe(ctx context.Context, _ evidence.Request) (evid
 }
 
 type options struct {
-	format      string
-	provider    evidence.Provider
-	profile     evidence.Profile
-	window      evidence.WindowID
-	scope       evidence.Scope
-	field       evidence.Field
-	account     string
-	freshness   evidence.FreshnessPolicy
-	cachePolicy cache.Policy
-	cacheSet    bool
-	all         bool
+	format              string
+	provider            evidence.Provider
+	profile             evidence.Profile
+	window              evidence.WindowID
+	scope               evidence.Scope
+	field               evidence.Field
+	account             string
+	freshness           evidence.FreshnessPolicy
+	cachePolicy         cache.Policy
+	cacheSet            bool
+	allowKeychainPrompt bool
+	all                 bool
 }
 
 func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, version string) int {
@@ -105,23 +106,28 @@ func executeWithAdapterClock(ctx context.Context, args []string, stdout, stderr 
 type flagValues struct {
 	format, provider, profile, window, scope, account, freshness, cache, field string
 	maxAge                                                                     time.Duration
-	refresh, staleOnError, all                                                 bool
+	refresh, staleOnError, allowKeychainPrompt, all                            bool
 }
 
 func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func() time.Time) *cobra.Command {
-	var values flagValues
-	root := &cobra.Command{
+	state := &struct {
+		values      flagValues
+		root, value cobra.Command
+	}{}
+	values := &state.values
+	root := &state.root
+	*root = cobra.Command{
 		Use:           "remainder",
 		Short:         "Read quota evidence from a supported provider",
 		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := readOptions(cmd, values, false)
+			opts, err := readOptions(cmd, *values, false)
 			if err != nil {
 				return err
 			}
-			return runReport(cmd, adapter, opts, now)
+			return runReport(cmd, authorizeKeychainPrompt(adapter, opts.allowKeychainPrompt), opts, now)
 		},
 	}
 	root.Version = version
@@ -129,25 +135,28 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().StringVar(&values.format, "format", "compact", "output format: compact or json")
-	root.PersistentFlags().StringVar(&values.provider, "provider", "", "exact provider selection")
-	root.PersistentFlags().StringVar(&values.profile, "profile", "", "exact profile selection")
-	root.PersistentFlags().StringVar(&values.window, "window", "", "exact window selection")
-	root.PersistentFlags().StringVar(&values.scope, "scope", "", "exact scope selection")
-	root.PersistentFlags().StringVar(&values.account, "account", "", "expected last-observed account")
-	root.PersistentFlags().StringVar(&values.freshness, "freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
-	root.PersistentFlags().StringVar(&values.cache, "cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
-	root.PersistentFlags().DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
-	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require an observation newer than this request's starting generation")
-	root.PersistentFlags().BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
-	root.PersistentFlags().BoolVar(&values.all, "all", false, "read every supported provider's default profile")
+	flags := root.PersistentFlags()
+	flags.StringVar(&values.format, "format", "compact", "output format: compact or json")
+	flags.StringVar(&values.provider, "provider", "", "exact provider selection")
+	flags.StringVar(&values.profile, "profile", "", "exact profile selection")
+	flags.StringVar(&values.window, "window", "", "exact window selection")
+	flags.StringVar(&values.scope, "scope", "", "exact scope selection")
+	flags.StringVar(&values.account, "account", "", "expected last-observed account")
+	flags.StringVar(&values.freshness, "freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
+	flags.StringVar(&values.cache, "cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
+	flags.DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
+	flags.BoolVar(&values.refresh, "refresh", false, "require an observation newer than this request's starting generation")
+	flags.BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
+	flags.BoolVar(&values.allowKeychainPrompt, "allow-keychain-prompt", false, "allow macOS Cursor collection to prompt for Keychain access")
+	flags.BoolVar(&values.all, "all", false, "read every supported provider's default profile")
 
-	value := &cobra.Command{
+	value := &state.value
+	*value = cobra.Command{
 		Use:   "value",
 		Short: "Print one exact quota value",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := readOptions(cmd, values, true)
+			opts, err := readOptions(cmd, *values, true)
 			if err != nil {
 				return err
 			}
@@ -155,7 +164,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 				return fmt.Errorf("%w: value does not support format %q", ErrUsage, opts.format)
 			}
 			request := evidence.ValueRequest{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account}
-			observation, err := observe(cmd, adapter, evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account, Freshness: opts.freshness}, opts.cachePolicy, opts.cacheSet)
+			observation, err := observe(cmd, authorizeKeychainPrompt(adapter, opts.allowKeychainPrompt), evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account, Freshness: opts.freshness}, opts.cachePolicy, opts.cacheSet)
 			if err != nil {
 				return err
 			}
@@ -195,6 +204,9 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 		return options{}, fmt.Errorf("%w: unsupported freshness %q", ErrUsage, freshness)
 	}
 	all := values.all
+	if values.allowKeychainPrompt && !all && provider != "cursor" {
+		return options{}, fmt.Errorf("%w: --allow-keychain-prompt requires --provider cursor or --all", ErrUsage)
+	}
 	if valueCommand && all {
 		return options{}, fmt.Errorf("%w: value cannot use --all", ErrUsage)
 	}
@@ -217,5 +229,5 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 			return options{}, err
 		}
 	}
-	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), cachePolicy: policy, cacheSet: cacheSet, all: all}, nil
+	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), cachePolicy: policy, cacheSet: cacheSet, allowKeychainPrompt: values.allowKeychainPrompt, all: all}, nil
 }

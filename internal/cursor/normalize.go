@@ -9,7 +9,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-func normalize(usage usageResponse, plan planResponse, sand sandResponse, failures []evidence.Failure, now time.Time) (evidence.Observation, error) {
+func normalize(usage usageResponse, plan planResponse, sand sandResponse, failures []evidence.Failure, now time.Time, source evidence.SourceIdentity) (evidence.Observation, error) {
 	cycleStart := usage.BillingCycleStart
 	cycleEnd := usage.BillingCycleEnd
 	if plan.PlanInfo != nil {
@@ -44,7 +44,7 @@ func normalize(usage usageResponse, plan planResponse, sand sandResponse, failur
 	if len(failures) > 0 {
 		outcome = evidence.OutcomePartial
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "cursor", Profile: "default", Account: evidence.AccountIdentity{Binding: evidence.IdentityUnknown}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows, Failures: failures}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "cursor", Profile: "default", Account: evidence.AccountIdentity{Binding: evidence.IdentityUnknown}, Source: source, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows, Failures: failures}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, fmt.Errorf("Cursor normalized evidence is invalid: %w", err)
 	}
