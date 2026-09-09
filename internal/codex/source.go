@@ -54,6 +54,8 @@ type sourceReset struct {
 	time.Time
 }
 
+const maxRFC3339Unix = 253402300799
+
 func (n *sourceNumber) UnmarshalJSON(data []byte) error {
 	var value float64
 	if len(data) > 0 && data[0] == '"' {
@@ -100,8 +102,8 @@ func (r *sourceReset) UnmarshalJSON(data []byte) error {
 }
 
 func (r *sourceReset) setUnix(value float64) error {
-	if math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 || value > math.MaxInt64 {
-		return errors.New("reset time must be a finite positive epoch")
+	if math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 || value > maxRFC3339Unix {
+		return errors.New("reset time must be a positive RFC3339-representable epoch")
 	}
 	r.Time = time.Unix(int64(value), 0).UTC()
 	return nil

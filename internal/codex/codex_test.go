@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,7 @@ func TestAdapterObserve_normalizesCodexWindows(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer synthetic-secret" || r.Header.Get("ChatGPT-Account-Id") != "acct-test" {
 			t.Fatal("request did not carry the selected synthetic identity")
 		}
-		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":100,"limit_window_seconds":18000,"reset_at":"2026-03-08T20:00:00Z"},"secondary_window":{"used_percent":"20","limit_window_seconds":"604800"}},"code_review_rate_limit":{"primary_window":{"used_percent":10,"limit_window_seconds":18000}},"additional_rate_limits":[{"metered_feature":"gpt-test","limit_name":"Test model","rate_limit":{"primary_window":{"used_percent":25,"limit_window_seconds":3600}}}],"credits":{"balance":"7"}}`)
+		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":100,"limit_window_seconds":18000,"reset_at":"2026-03-08T20:00:00Z"},"secondary_window":{"used_percent":"20","limit_window_seconds":"604800","reset_at":1773000000}},"code_review_rate_limit":{"primary_window":{"used_percent":10,"limit_window_seconds":18000}},"additional_rate_limits":[{"metered_feature":"gpt-test","limit_name":"Test model","rate_limit":{"primary_window":{"used_percent":25,"limit_window_seconds":3600}}}],"credits":{"balance":"7"}}`)
 	}))
 	defer server.Close()
 
@@ -33,6 +34,17 @@ func TestAdapterObserve_normalizesCodexWindows(t *testing.T) {
 	if len(observation.Windows) != 7 {
 		t.Fatalf("windows = %d, want known and unknown base, review, model, and credits windows", len(observation.Windows))
 	}
+	resets := make(map[evidence.WindowID]time.Time)
+	for _, window := range observation.Windows {
+		for _, limit := range window.Limits {
+			if limit.Field == evidence.FieldReset && limit.ResetAt != nil {
+				resets[window.ID] = *limit.ResetAt
+			}
+		}
+	}
+	if resets["five_hour"].Format(time.RFC3339) != "2026-03-08T20:00:00Z" || resets["weekly"].Unix() != 1_773_000_000 {
+		t.Fatalf("resets = %v, want preserved ISO and numeric epochs", resets)
+	}
 	remaining, err := evidence.SelectValue(observation, evidence.ValueRequest{Provider: "codex", Profile: "default", Window: "five_hour", Field: evidence.FieldRemaining}, evidence.FreshOnly)
 	if err != nil || remaining != "0\n" {
 		t.Fatalf("five-hour remaining = %q, %v, want exhausted zero", remaining, err)
@@ -40,6 +52,29 @@ func TestAdapterObserve_normalizesCodexWindows(t *testing.T) {
 	model, err := evidence.SelectValue(observation, evidence.ValueRequest{Provider: "codex", Profile: "default", Window: "model_gpt-test_window_3600", Field: evidence.FieldRemaining}, evidence.FreshOnly)
 	if err != nil || model != "75\n" {
 		t.Fatalf("model remaining = %q, %v, want 75", model, err)
+	}
+}
+
+func TestAdapterObserve_rejectsUnrenderableResetEpochs(t *testing.T) {
+	tests := []struct {
+		name  string
+		reset string
+	}{
+		{name: "integer conversion overflow", reset: `9223372036854775808`},
+		{name: "integer string conversion overflow", reset: `"9223372036854775808"`},
+		{name: "after year 9999", reset: `"253402300800"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				fmt.Fprintf(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":1,"reset_at":%s}}}`, test.reset)
+			}))
+			defer server.Close()
+			observation, err := newTestAdapter(t, server.Client(), []string{server.URL}).Observe(t.Context(), evidence.Request{Provider: "codex", Profile: "default"})
+			if err == nil || !errors.Is(err, evidence.ErrProviderUnavailable) || !strings.Contains(err.Error(), "malformed JSON") || !observation.ObservedAt.IsZero() {
+				t.Fatalf("Observe() = %+v, %v, want no evidence and provider-unavailable error", observation, err)
+			}
+		})
 	}
 }
 
