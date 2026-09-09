@@ -11,9 +11,12 @@ Start with `remainder --help`, and use `remainder value --help` before selecting
 If the executable is absent, give one actionable diagnostic: `remainder is not installed; install a Remainder release artifact or build it from source.`
 Stop after that diagnostic unless the user asks to install or build it.
 
-The current source supports the selected native Codex file context as provider `codex` and profile `default`.
+The v0.1.0 release supports provider `codex` with profile `default`.
+The current source also implements `claude` with profile `default`, using only its selected credentials file; its native canary remains unverified.
+Check the installed executable before assuming a source increment is available.
 It reads quota evidence without logging in, refreshing credentials, switching accounts, or making a generative request.
-Claude, Grok, and Cursor are not supported sources yet.
+Grok and Cursor are not supported by this increment.
+Missing Claude credentials are unavailable; do not use Keychain, refresh, or another credential route as a fallback.
 
 Use exact provider, profile, window, scope, field, and optional last-observed account IDs from the user's request or a prior Remainder observation.
 Do not guess an identifier or combine unlike windows.

@@ -183,7 +183,9 @@ func eligible(loaded loadedRecord, expectedAccount string, maxAge time.Duration,
 		return Result{}, false
 	}
 	observation := *loaded.record.Observation
-	observation.Account.Binding = evidence.IdentityHistorical
+	if observation.Account.Binding == evidence.IdentityVerified {
+		observation.Account.Binding = evidence.IdentityHistorical
+	}
 	return Result{Observation: observation, Generation: loaded.record.Generation, FromCache: true}, true
 }
 

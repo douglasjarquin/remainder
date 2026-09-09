@@ -23,6 +23,7 @@ const (
 func main() {
 	binary := flag.String("binary", "./bin/remainder", "compiled remainder binary to measure")
 	helper := flag.String("controlled-refresh-helper", "", "compiled internal/cli test helper for controlled refresh measurements")
+	provider := flag.String("provider", "codex", "provider for controlled refresh and release-binary cache measurements: codex or claude")
 	samples := flag.Int("samples", 10, "samples per workload")
 	tokenizerPython := flag.String("tokenizer-python", "", "optional Python executable with tiktoken installed")
 	comparators := flag.Bool("comparators", false, "run controlled preinstalled quota-axi and Pinchos consumer probes")
@@ -67,11 +68,11 @@ func main() {
 	if err != nil {
 		fatalf("start tokenizer: %v", err)
 	}
-	controlled, err := runControlledRefresh(*helper, *samples, tokenizer)
+	controlled, err := runControlledRefresh(*helper, *provider, *samples, tokenizer)
 	if err != nil {
 		fatalf("controlled refresh: %v", err)
 	}
-	cached, err := runCacheHit(context.Background(), *binary, *samples, time.Second, time.Hour, tokenizer)
+	cached, err := runCacheHit(context.Background(), *binary, *provider, *samples, time.Second, time.Hour, tokenizer)
 	if err != nil {
 		fatalf("cache hit: %v", err)
 	}
@@ -111,7 +112,7 @@ func main() {
 		FixtureClock:       benchmark.FixtureClock,
 		FixtureSHA256:      benchmark.FixtureHash(),
 		TokenApplicability: "o200k_base is an offline Codex-family comparison encoding; model-specific tokenizer certification remains outside this baseline",
-		CacheWorkload:      "eligible release-binary cache hit with synthetic metadata binding",
+		CacheWorkload:      fmt.Sprintf("%s eligible release-binary cache hit with synthetic metadata binding", *provider),
 		CacheMeasurement: cacheMeasurement{
 			Source:                 cacheHitSource,
 			Policy:                 "auto",
@@ -125,7 +126,7 @@ func main() {
 			ProvenanceSubprocesses: cached.Provenance.SubprocessCount,
 			SandboxCleanup:         cached.SandboxCleanup,
 		},
-		RefreshWorkload:        "controlled compiled test helper through Cobra and native Codex adapter",
+		RefreshWorkload:        fmt.Sprintf("controlled compiled test helper through Cobra and native %s adapter; summed request time to response headers", *provider),
 		ObservedSubprocesses:   (len(workloads)+2)*(*samples) + cached.Provenance.SubprocessCount,
 		ObservedRequests:       controlled.RequestCount,
 		AllocationsMeasurement: "go test -bench -benchmem output in artifacts/benchmark-in-process.txt",

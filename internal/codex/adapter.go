@@ -151,6 +151,24 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	return evidence.Observation{}, errors.New("Codex quota source is unavailable")
 }
 
+func (a Adapter) Failure(err error) (cache.FailureKind, time.Time) {
+	switch {
+	case err == nil:
+		return cache.FailureNone, time.Time{}
+	case errors.Is(err, ErrAuthorizationRejected):
+		return cache.FailureRevoked, time.Time{}
+	case errors.Is(err, ErrAccountMismatch), errors.Is(err, evidence.ErrWrongAccount):
+		return cache.FailureAccountMismatch, time.Time{}
+	case errors.Is(err, ErrTransient):
+		if retry, ok := errors.AsType[*RetryError](err); ok {
+			return cache.FailureTransient, retry.RetryAt
+		}
+		return cache.FailureTransient, time.Time{}
+	default:
+		return cache.FailurePermanent, time.Time{}
+	}
+}
+
 func collectionError(err error) error {
 	return fmt.Errorf("%w: %w", evidence.ErrProviderUnavailable, err)
 }
