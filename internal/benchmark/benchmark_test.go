@@ -32,7 +32,7 @@ func TestSummarizeRejectsEmptySamples(t *testing.T) {
 }
 
 func TestFixtureHashIsStable(t *testing.T) {
-	const want = "31d906dfdd1a9d5acf114d58b92f705f6cfec8946b082a74ffaeafea247f7093"
+	const want = "566a4234a1a7fe2bd3ccad498fd3620e53701d2a3027e3ebf73a112287e8f60f"
 	if got := FixtureHash(); got != want {
 		t.Fatalf("FixtureHash() = %q, want %q", got, want)
 	}
@@ -40,10 +40,10 @@ func TestFixtureHashIsStable(t *testing.T) {
 
 func TestFixturesCoverRequiredObservationStates(t *testing.T) {
 	fixtures := Fixtures()
-	if len(fixtures) != 4 {
-		t.Fatalf("fixture count = %d, want 4", len(fixtures))
+	if len(fixtures) != 5 {
+		t.Fatalf("fixture count = %d, want 5", len(fixtures))
 	}
-	want := []string{"healthy", "exhausted", "stale", "partial-unknown"}
+	want := []string{"healthy", "exhausted", "stale", "partial-unknown", "shared-percent"}
 	for index, fixture := range fixtures {
 		if fixture.Name != want[index] {
 			t.Fatalf("fixture %d = %q, want %q", index, fixture.Name, want[index])
@@ -52,6 +52,26 @@ func TestFixturesCoverRequiredObservationStates(t *testing.T) {
 			t.Fatalf("fixture %q validation error = %v", fixture.Name, err)
 		}
 	}
+}
+
+func TestFixturesIncludeSharedPercentComparatorScope(t *testing.T) {
+	for _, fixture := range Fixtures() {
+		if fixture.Name != "shared-percent" {
+			continue
+		}
+		window := fixture.Observation.Windows[0]
+		if window.ID != "weekly" || window.Scope != "account" || window.Unit != "percent" {
+			t.Fatalf("shared-percent id/scope/unit = %q/%q/%q, want weekly/account/percent", window.ID, window.Scope, window.Unit)
+		}
+		if !fixture.Observation.ObservedAt.Equal(FixtureTime()) {
+			t.Fatalf("shared-percent observed_at = %s, want %s", fixture.Observation.ObservedAt, FixtureTime())
+		}
+		if got := window.Limits[0].Value.Amount.String(); got != "42" {
+			t.Fatalf("shared-percent remaining = %s, want 42", got)
+		}
+		return
+	}
+	t.Fatal("shared-percent fixture missing")
 }
 
 func TestDetectLatencyRegressionUsesSeededP95(t *testing.T) {

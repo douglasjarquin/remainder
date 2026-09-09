@@ -36,9 +36,13 @@ Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `
 Set `TIKTOKEN_CACHE_DIR` to a provisioned local encoding cache when measuring tokens.
 The bridge verifies the expected encoding hash and fails closed without downloading or writing cache data.
 
-Set `REMAINDER_BENCH_COMPARATORS=1` to run the preinstalled `quota-axi` version probe and the actual Pinchos JSON plus `jq -r` consumer projection against a controlled fixture.
+Set `REMAINDER_BENCH_COMPARATORS=1` to run the pinned installed `quota-axi` compact output and its JSON output through the actual Pinchos `jq -r` consumer projection.
 
-The compact quota-axi comparison remains explicitly unresolved until quota-axi accepts controlled offline fixture input or Remainder implements the later provider/cache mapping.
+The developer-only Node preload fixes time and intercepts the quota endpoint with a synthetic response under temporary `HOME`, `CODEX_HOME`, and `XDG_CACHE_HOME` directories.
+
+The comparison records the shared fresh Codex account/all-model weekly percentage subset at the same observation time, each tool's extra facts, and the remaining provenance uncertainty.
+
+It does not claim full-payload equality, interchangeable token and percentage units, a speed advantage, or native endpoint performance.
 
 Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
 

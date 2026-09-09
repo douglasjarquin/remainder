@@ -115,11 +115,16 @@ var requiredFacts = []string{
 }
 
 func Fixtures() []Fixture {
+	sharedPercent := fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("42")})
+	sharedPercent.ObservedAt = FixtureTime()
+	sharedPercent.Windows[0].Scope = evidence.ScopeAccount
+	sharedPercent.Windows[0].Unit = "percent"
 	return []Fixture{
 		{Name: "healthy", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("42")})},
 		{Name: "exhausted", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueZero, Amount: number("0")})},
 		{Name: "stale", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshStale, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("17")})},
 		{Name: "partial-unknown", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomePartial, evidence.Value{State: evidence.ValueUnknown}, []evidence.Failure{{Scope: "daily", Message: "source unavailable"}})},
+		{Name: "shared-percent", RequiredFacts: requiredFacts, Observation: sharedPercent},
 	}
 }
 
