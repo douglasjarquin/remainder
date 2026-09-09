@@ -4,10 +4,16 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-This slice provides a native read-only Codex quota path plus honest help, version, unavailable-provider behavior, and the typed evidence output contract.
+The source implements read-only Codex and Claude file providers, plus help, version, unavailable-provider behavior, and typed evidence output.
+The released v0.1.0 artifact supports Codex; the Claude source increment has controlled fixture verification and no successful native canary yet.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
 It does not log in, refresh credentials, switch accounts, invoke another CLI, or make a generative request.
+
+Use `--provider claude --profile default` for the single selected `$CLAUDE_CONFIG_DIR/.credentials.json` or `~/.claude/.credentials.json` context.
+On a cache miss, Claude collection verifies the account through the profile endpoint before reading quota.
+It preserves session, weekly, model, and separate paid usage windows; see [Claude file collection](docs/features/claude.md) for selectors and source limits.
+An absent or expired file returns unavailable; there is no Keychain or refresh fallback.
 
 ## Build and verify
 
@@ -30,8 +36,10 @@ Run `mise run benchmark` after building to emit preserved JSON Lines full-proces
 
 The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
 
-Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and native Codex adapter against loopback TLS with synthetic authentication.
-Each sample must make exactly one counted request; helper-process elapsed time and controlled TLS round-trip time to response headers have separate p50/p95 summaries.
+Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and selected native adapter against loopback TLS with synthetic authentication.
+Run `scripts/benchmark.sh bin/remainder --provider claude` for Claude refresh and cache measurements; the default provider is Codex.
+Each Codex sample makes one counted request; each Claude sample makes a profile request followed by a usage request.
+Helper-process elapsed time and the sum of request times to response headers have separate p50/p95 summaries.
 The helper measurement includes test-runtime and metrics overhead and does not measure release-binary refresh or the live provider endpoint.
 The in-process refresh benchmark reports allocations and requests per operation.
 
@@ -101,7 +109,7 @@ The observation records last-observed account identity separately from freshness
 
 The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
 Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, and the [release-readiness record](docs/release-readiness.md) consolidates the completed cross-process, correctness, and performance gates.
-Downloaded executable proof remains the issue #14 packaging gate.
+The [v0.1.0 release](https://github.com/douglasjarquin/remainder/releases/tag/v0.1.0) has verified downloaded Codex executables; this does not certify later provider source changes.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 
@@ -117,4 +125,4 @@ See [the feature map](docs/features/README.md), [verification](VERIFY.md), and [
 
 Release candidate construction, the strict asset contents, checksum verification, and future standalone installation are documented in [the release guide](docs/release.md).
 Remainder is licensed under the [MIT License](LICENSE).
-This local candidate is not a public artifact; publication remains pending independent final-candidate verification.
+New provider increments require their own source-specific release evidence before publication.
