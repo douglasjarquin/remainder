@@ -27,6 +27,15 @@ func TestAdapter_Observe_preserves_exact_paid_numbers(t *testing.T) {
 			leftState: evidence.ValueDefined,
 		},
 		{
+			name:      "quoted decimal and exponent",
+			usage:     `{"extra_usage":{"is_enabled":true,"used_credits":"250.5","monthly_limit":"1e3"}}`,
+			unit:      "credits_native",
+			wantUsed:  "250.5",
+			wantLimit: "1000",
+			wantLeft:  "749.5",
+			leftState: evidence.ValueDefined,
+		},
+		{
 			name:      "large precise fraction",
 			usage:     `{"extra_usage":{"is_enabled":true,"used_credits":900719925474099312345678.9,"monthly_limit":900719925474099312346000.0,"decimal_places":3}}`,
 			unit:      "credits",
@@ -93,6 +102,9 @@ func TestAdapter_Observe_rejects_invalid_paid_numbers(t *testing.T) {
 		name  string
 		usage string
 	}{
+		{"hexadecimal exponent", `{"extra_usage":{"is_enabled":true,"used_credits":"0x1p-100000","decimal_places":2}}`},
+		{"underscores", `{"extra_usage":{"is_enabled":true,"used_credits":"1_000","decimal_places":2}}`},
+		{"missing integer part", `{"extra_usage":{"is_enabled":true,"used_credits":".5","decimal_places":2}}`},
 		{"negative", `{"extra_usage":{"is_enabled":true,"used_credits":-0.1,"decimal_places":2}}`},
 		{"nonfinite", `{"extra_usage":{"is_enabled":true,"used_credits":"NaN","decimal_places":2}}`},
 	} {

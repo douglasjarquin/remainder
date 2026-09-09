@@ -47,4 +47,6 @@ When used exceeds the stated limit, both supplied values are retained and remain
 | claude-native-canary | An authorized usable file must establish the actual source route before native certification. | manual source-specific canary | Unverified: selected default file absent; no fallback authorized. |
 
 The [source matrix](../provider-sources.md) pins the upstream research and records the authorization boundary.
+The OAuth payload contract is inferred from that pinned implementation; no published first-party schema is assumed.
+Paid amounts retain the shared v1 finite numeric range while exact arithmetic preserves their decimal digits.
 Controlled fixtures prove implementation behavior only.

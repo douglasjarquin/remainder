@@ -3,6 +3,7 @@ package claude
 import (
 	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -27,6 +28,9 @@ func (n *sourceNumber) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		raw = strings.TrimSpace(value)
+	}
+	if !jsontext.Value(raw).IsValid() {
+		return errors.New("number must use JSON decimal syntax")
 	}
 	value, err := strconv.ParseFloat(raw, 64)
 	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
