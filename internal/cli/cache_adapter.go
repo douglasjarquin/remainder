@@ -113,6 +113,9 @@ func observe(cmd *cobra.Command, adapter Adapter, request evidence.Request, poli
 		return adapter.Observe(cmd.Context(), request)
 	}
 	result, err := cached.ObserveWithCache(cmd.Context(), request, policy)
+	if canceled := cmd.Context().Err(); canceled != nil {
+		return evidence.Observation{}, canceled
+	}
 	if result.Warning != "" {
 		fmt.Fprintf(cmd.ErrOrStderr(), "remainder: warning: %s\n", result.Warning)
 	}
