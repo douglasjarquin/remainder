@@ -76,7 +76,9 @@ Use `--format json` for the versioned JSON observation or `value --provider PROV
 Use `--freshness any` to allow stale evidence or `--freshness fresh` to reject stale and unknown freshness.
 
 The default `--cache auto --max-age 5s` policy reuses an eligible complete provider observation before selecting a report field or window.
-Use `--cache off` for a bounded live read, `--cache only` to refuse a miss without credential parsing or network access, `--refresh` to require a newer cache generation, and `--stale-on-error` to allow an expired observation only after a transient refresh failure.
+Use `--cache off` for a bounded live read, `--cache only` to refuse a miss without credential parsing or network access, `--refresh` to require an observation newer than the request's starting generation, and `--stale-on-error` to allow an expired observation only after a transient refresh failure.
+Forced requests that overlap can share the same newer observation; a forced request that starts after that observation was recorded requires another refresh.
+Transient failures use a one-second local retry delay when the provider supplies no valid deadline, and provider retry deadlines are capped at one minute so a cached failure cannot create a permanent local lockout.
 Cached observations retain their original `observed_at` and label the last-observed account identity as historical.
 Cache records live under the operating system user cache directory at `remainder/v1/<binding-hash>/`, use restrictive permissions and atomic replacement, and contain no credential or raw auth path.
 

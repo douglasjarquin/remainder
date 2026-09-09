@@ -34,6 +34,7 @@ Status: implemented for deterministic fixtures, unavailable behavior, and contro
 | cache-refresh | Misses, expiry, future clocks, forced generations, stale-on-transient-error, revocation, and account mismatch preserve age and identity policy. | automated `internal/cache/store_errors_test.go`, `internal/cache/store_concurrency_test.go`, and `internal/cli/issue6_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache ./internal/cli` |
 | cache-storage | Corrupt, partial, unsupported-schema, unavailable-storage, killed-writer, and concurrent older-write cases never expose partial data or overwrite newer/unknown records. | automated `internal/cache/store_errors_test.go`, `internal/cache/store_concurrency_test.go`, and `internal/cache/process_lock_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache` |
 | cache-process | A compiled helper process drives two actual Cobra executions against one temp auth/cache root and makes one controlled provider request. | automated `internal/cli/issue6_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
+| cache-coalescing | At least 12 release-binary processes share one expired observation refresh across weekly/five-hour and used/remaining projections; overlapping forced requests share one newer generation, a later forced request refreshes again, and empty-cache 429 responses record one bounded backoff. | automated `internal/cache/backoff_test.go`, `internal/cache/store_concurrency_test.go`, `internal/codex/retry_test.go`, and `cmd/remainder-benchmark/coalescing_test.go`; manual explicit release workload through `cmd/remainder-benchmark --coalescing-acceptance` | `.omo/evidence/issue7/green/coalescing-acceptance.json` |
 
 ## Driving it
 
@@ -77,6 +78,13 @@ Credential values, raw auth payloads, and absolute auth paths are not serialized
 
 A consumer presentation cache adds to the age of Remainder's original observation.
 Consumers should use a short Remainder reuse window for nearby field reads rather than stacking another five-minute TTL and calling the total age five minutes.
+
+`--refresh` captures the starting successful generation before lock acquisition.
+Overlapping callers may reuse one observation whose generation is newer than their captured generation, while a caller started after that write captures the new generation and requires another refresh.
+
+Transient failures record a typed retry deadline in the same account/source record guarded by the existing response lock, including when no valid observation exists yet.
+Provider deadlines are capped at one minute and an absent, invalid, or elapsed provider deadline receives a one-second local delay.
+The deadline suppresses a refresh stampede without changing the last valid observation time or account and expires without creating a permanent lockout.
 
 Codex provider collection is implemented from the selected native file source.
 Two authorized native observations passed on 2026-09-09 with the same verified account binding and unchanged credential file metadata.

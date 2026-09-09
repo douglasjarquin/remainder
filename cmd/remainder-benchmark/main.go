@@ -26,6 +26,7 @@ func main() {
 	samples := flag.Int("samples", 10, "samples per workload")
 	tokenizerPython := flag.String("tokenizer-python", "", "optional Python executable with tiktoken installed")
 	comparators := flag.Bool("comparators", false, "run controlled preinstalled quota-axi and Pinchos consumer probes")
+	coalescing := flag.Bool("coalescing-acceptance", false, "run the release-binary cross-process cache acceptance workload")
 	quotaAxiPreload := flag.String("quota-axi-preload", "scripts/quota_axi_fixture.mjs", "developer-only Node preload for synthetic quota-axi input")
 	latencyBaseline := flag.String("latency-baseline", "", "optional JSON baseline for seeded p95 regression detection")
 	flag.Parse()
@@ -38,6 +39,14 @@ func main() {
 	}
 	if info.Mode().Perm()&0o111 == 0 {
 		fatalf("benchmark binary is not executable: %s", *binary)
+	}
+	if *coalescing {
+		result, err := runCoalescingAcceptance(context.Background(), *binary)
+		if err != nil {
+			fatalf("coalescing acceptance: %v", err)
+		}
+		writeJSON(result)
+		return
 	}
 	if *helper == "" {
 		fatalf("controlled refresh helper is required")

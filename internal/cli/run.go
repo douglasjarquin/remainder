@@ -128,7 +128,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 	root.PersistentFlags().StringVar(&values.freshness, "freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
 	root.PersistentFlags().StringVar(&values.cache, "cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
 	root.PersistentFlags().DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
-	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require a newer cache generation")
+	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require an observation newer than this request's starting generation")
 	root.PersistentFlags().BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
 	root.PersistentFlags().BoolVar(&values.all, "all", false, "read all configured sources")
 

@@ -87,3 +87,26 @@ func TestStore_RetryBackoff_isBoundedLocally(t *testing.T) {
 		t.Fatalf("error = %v, want retry at %s", err, now.Add(time.Minute))
 	}
 }
+
+func TestStore_TransientFailureWithoutDeadline_usesLocalBackoff(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }, LocalBackoff: 2 * time.Second})
+	binding := testBinding()
+	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}
+
+	// When
+	_, _ = store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
+		return cache.FetchResult{Failure: cache.FailureTransient, Err: errors.New("temporary failure")}
+	})
+	_, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
+		t.Fatal("fetch called during local backoff")
+		return cache.FetchResult{}
+	})
+
+	// Then
+	backoff, ok := errors.AsType[*cache.BackoffError](err)
+	if !ok || !backoff.RetryAt.Equal(now.Add(2*time.Second)) {
+		t.Fatalf("error = %v, want retry at %s", err, now.Add(2*time.Second))
+	}
+}

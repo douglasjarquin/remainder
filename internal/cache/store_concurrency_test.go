@@ -143,13 +143,15 @@ func TestStore_SeparateBindings_doNotShareRefreshOwnership(t *testing.T) {
 		firstDone <- err
 	}()
 	<-firstStarted
-	second, secondErr := store.Resolve(t.Context(), secondBinding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Observation: testObservation(now)}
+	second, secondErr := store.Resolve(t.Context(), secondBinding, "acct-other", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
+		observation := testObservation(now)
+		observation.Account.LastObserved = "acct-other"
+		return cache.FetchResult{Observation: observation}
 	})
 	close(releaseFirst)
 
 	// Then
-	if secondErr != nil || second.Generation == "" {
+	if secondErr != nil || second.Generation == "" || second.Observation.Account.LastObserved != "acct-other" {
 		t.Fatalf("second = %+v, error = %v", second, secondErr)
 	}
 	if err := <-firstDone; err != nil {
