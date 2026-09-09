@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/codex"
@@ -52,8 +53,15 @@ func (a runtimeAdapter) ObserveWithCache(ctx context.Context, request evidence.R
 	}
 	return store.Resolve(ctx, binding, request.Account, policy, func(fetchContext context.Context) cache.FetchResult {
 		observation, fetchErr := a.codex.Observe(fetchContext, request)
-		return cache.FetchResult{Observation: observation, Failure: classifyFailure(fetchErr), Err: fetchErr}
+		return cache.FetchResult{Observation: observation, Failure: classifyFailure(fetchErr), RetryAt: retryAt(fetchErr), Err: fetchErr}
 	})
+}
+
+func retryAt(err error) time.Time {
+	if retry, ok := errors.AsType[*codex.RetryError](err); ok {
+		return retry.RetryAt
+	}
+	return time.Time{}
 }
 
 func classifyFailure(err error) cache.FailureKind {

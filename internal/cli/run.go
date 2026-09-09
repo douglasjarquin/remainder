@@ -77,7 +77,7 @@ func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.
 		}
 		fmt.Fprintf(stderr, "remainder: %s\n", err)
 		switch {
-		case errors.Is(err, ErrUnavailable), errors.Is(err, cache.ErrUnavailable), errors.Is(err, cache.ErrLockTimeout), errors.Is(err, context.DeadlineExceeded), errors.Is(err, evidence.ErrProviderUnavailable):
+		case errors.Is(err, ErrUnavailable), errors.Is(err, cache.ErrUnavailable), errors.Is(err, cache.ErrLockTimeout), errors.Is(err, cache.ErrBackoff), errors.Is(err, context.DeadlineExceeded), errors.Is(err, evidence.ErrProviderUnavailable):
 			return 1
 		case errors.Is(err, ErrPartial):
 			return 3

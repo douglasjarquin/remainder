@@ -72,6 +72,9 @@ func (s *Store) Resolve(ctx context.Context, binding Binding, expectedAccount st
 	if policy.Mode == ModeOnly {
 		return Result{}, cachedOnlyError(initial)
 	}
+	if result, err, ok := s.backoffResult(initial, expectedAccount, policy); ok {
+		return result, err
+	}
 	directory, err := s.prepare(binding)
 	if err != nil {
 		result, fetchErr := resolveLive(ctx, expectedAccount, fetch)
@@ -91,6 +94,9 @@ func (s *Store) Resolve(ctx context.Context, binding Binding, expectedAccount st
 	}
 	defer lock.Close()
 	current := readRecord(s.SnapshotPath(binding), wantBinding)
+	if result, err, ok := s.backoffResult(current, expectedAccount, policy); ok {
+		return result, err
+	}
 	if result, ok := reuseAfterLock(initial, current, expectedAccount, policy, s.options.Now()); ok {
 		return result, nil
 	}
@@ -129,7 +135,7 @@ func (s *Store) putLocked(binding Binding, observation evidence.Observation, exi
 	if existing.state == recordUnknown {
 		return "", ErrUnknownSchema
 	}
-	if existing.state == recordSupported && existing.record.Observation.ObservedAt.After(observation.ObservedAt) {
+	if existing.state == recordSupported && existing.record.Observation != nil && existing.record.Observation.ObservedAt.After(observation.ObservedAt) {
 		return "", ErrOlderObservation
 	}
 	random := make([]byte, 16)
@@ -137,7 +143,7 @@ func (s *Store) putLocked(binding Binding, observation evidence.Observation, exi
 		return "", fmt.Errorf("create cache generation: %w", err)
 	}
 	generation := hex.EncodeToString(random)
-	value := record{SchemaVersion: recordVersion, BindingHash: bindingHash(binding), Generation: generation, Observation: observation}
+	value := record{SchemaVersion: recordVersion, BindingHash: bindingHash(binding), Generation: generation, Observation: &observation}
 	if err := writeRecord(s.SnapshotPath(binding), value); err != nil {
 		return "", err
 	}
@@ -169,14 +175,14 @@ func resolveLive(ctx context.Context, expectedAccount string, fetch func(context
 }
 
 func eligible(loaded loadedRecord, expectedAccount string, maxAge time.Duration, now time.Time) (Result, bool) {
-	if loaded.state != recordSupported || loaded.record.Revoked || (expectedAccount != "" && loaded.record.Observation.Account.LastObserved != expectedAccount) {
+	if loaded.state != recordSupported || loaded.record.Observation == nil || loaded.record.Revoked || (expectedAccount != "" && loaded.record.Observation.Account.LastObserved != expectedAccount) {
 		return Result{}, false
 	}
 	age := now.Sub(loaded.record.Observation.ObservedAt)
 	if age < 0 || age > maxAge {
 		return Result{}, false
 	}
-	observation := loaded.record.Observation
+	observation := *loaded.record.Observation
 	observation.Account.Binding = evidence.IdentityHistorical
 	return Result{Observation: observation, Generation: loaded.record.Generation, FromCache: true}, true
 }
@@ -204,20 +210,27 @@ func cachedOnlyError(loaded loadedRecord) error {
 }
 
 func (s *Store) handleFailure(binding Binding, current loadedRecord, expectedAccount string, policy Policy, fetched FetchResult) (Result, error) {
+	if current.state == recordUnknown {
+		return Result{}, fetched.Err
+	}
+	now := s.options.Now()
+	value := record{SchemaVersion: recordVersion, BindingHash: bindingHash(binding)}
 	if current.state == recordSupported {
-		now := s.options.Now()
-		current.record.LastAttemptAt = &now
-		current.record.LastFailure = fetched.Failure
-		current.record.Revoked = fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
-		if err := writeRecord(s.SnapshotPath(binding), current.record); err != nil {
-			return Result{}, fetched.Err
-		}
-		if policy.StaleOnError && fetched.Failure == FailureTransient && (expectedAccount == "" || current.record.Observation.Account.LastObserved == expectedAccount) {
-			observation := current.record.Observation
-			observation.Account.Binding = evidence.IdentityHistorical
-			observation.Freshness = evidence.FreshStale
-			return Result{Observation: observation, Generation: current.record.Generation, FromCache: true}, nil
-		}
+		value = current.record
+	}
+	value.LastAttemptAt = &now
+	value.LastFailure = fetched.Failure
+	value.Revoked = fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
+	value.RetryAt = nil
+	if fetched.Failure == FailureTransient {
+		retryAt := s.retryDeadline(now, fetched.RetryAt)
+		value.RetryAt = &retryAt
+	}
+	if err := writeRecord(s.SnapshotPath(binding), value); err != nil {
+		return Result{}, fetched.Err
+	}
+	if result, _, ok := s.backoffResult(loadedRecord{state: recordSupported, record: value}, expectedAccount, policy); ok && result.Observation.Provider != "" {
+		return result, nil
 	}
 	return Result{}, fetched.Err
 }

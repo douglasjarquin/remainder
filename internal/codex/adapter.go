@@ -49,6 +49,21 @@ type Adapter struct {
 	now       func() time.Time
 }
 
+type RetryError struct {
+	RetryAt time.Time
+}
+
+func (e *RetryError) Error() string {
+	if e.RetryAt.IsZero() {
+		return "Codex quota endpoint is rate limited"
+	}
+	return "Codex quota endpoint is rate limited until " + e.RetryAt.UTC().Format(time.RFC3339)
+}
+
+func (e *RetryError) Unwrap() error {
+	return ErrTransient
+}
+
 func Default() Adapter {
 	home := os.Getenv("CODEX_HOME")
 	if home == "" {
@@ -160,11 +175,7 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return evidence.Observation{}, true, ErrAuthorizationRejected
 	case http.StatusTooManyRequests:
-		retryAfter := response.Header.Get("Retry-After")
-		if retryAfter == "" {
-			return evidence.Observation{}, false, fmt.Errorf("%w: Codex quota endpoint is rate limited", ErrTransient)
-		}
-		return evidence.Observation{}, false, fmt.Errorf("%w: Codex quota endpoint is rate limited; retry after %s", ErrTransient, safeRetryAfter(retryAfter))
+		return evidence.Observation{}, false, &RetryError{RetryAt: parseRetryAfter(response.Header.Get("Retry-After"), a.now())}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return evidence.Observation{}, true, fmt.Errorf("%w: Codex quota endpoint returned HTTP %d", ErrTransient, response.StatusCode)
@@ -188,12 +199,12 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	return observation, false, nil
 }
 
-func safeRetryAfter(value string) string {
+func parseRetryAfter(value string, now time.Time) time.Time {
 	if seconds, err := strconv.ParseUint(value, 10, 32); err == nil {
-		return strconv.FormatUint(seconds, 10) + " seconds"
+		return now.Add(time.Duration(seconds) * time.Second)
 	}
 	if date, err := http.ParseTime(value); err == nil {
-		return date.UTC().Format(http.TimeFormat)
+		return date.UTC()
 	}
-	return "the provider-specified interval"
+	return time.Time{}
 }

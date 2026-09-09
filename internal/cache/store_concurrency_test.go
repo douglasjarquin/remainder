@@ -97,6 +97,66 @@ func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 	}
 }
 
+func TestStore_LaterForcedRequest_requiresAnotherGeneration(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	binding := testBinding()
+	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Second))); err != nil {
+		t.Fatal(err)
+	}
+	fetches := 0
+	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute, Refresh: true}
+	fetch := func(context.Context) cache.FetchResult {
+		fetches++
+		return cache.FetchResult{Observation: testObservation(now.Add(time.Duration(fetches) * time.Second))}
+	}
+
+	// When
+	first, firstErr := store.Resolve(t.Context(), binding, "", policy, fetch)
+	second, secondErr := store.Resolve(t.Context(), binding, "", policy, fetch)
+
+	// Then
+	if firstErr != nil || secondErr != nil || fetches != 2 || first.Generation == second.Generation || !second.Observation.ObservedAt.After(first.Observation.ObservedAt) {
+		t.Fatalf("first = %+v/%v, second = %+v/%v, fetches = %d", first, firstErr, second, secondErr, fetches)
+	}
+}
+
+func TestStore_SeparateBindings_doNotShareRefreshOwnership(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	firstBinding := testBinding()
+	secondBinding := testBinding()
+	secondBinding.CredentialFingerprint = "other-fingerprint"
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	firstDone := make(chan error, 1)
+
+	// When
+	go func() {
+		_, err := store.Resolve(t.Context(), firstBinding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
+			close(firstStarted)
+			<-releaseFirst
+			return cache.FetchResult{Observation: testObservation(now)}
+		})
+		firstDone <- err
+	}()
+	<-firstStarted
+	second, secondErr := store.Resolve(t.Context(), secondBinding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
+		return cache.FetchResult{Observation: testObservation(now)}
+	})
+	close(releaseFirst)
+
+	// Then
+	if secondErr != nil || second.Generation == "" {
+		t.Fatalf("second = %+v, error = %v", second, secondErr)
+	}
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestStore_KilledWriterArtifact_doesNotExposePartialJSON(t *testing.T) {
 	// Given
 	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)

@@ -79,9 +79,14 @@ func readRecord(path, wantBinding string) loadedRecord {
 		return loadedRecord{state: recordCorrupt, err: err}
 	}
 	generation, generationErr := hex.DecodeString(value.Generation)
+	hasObservation := value.Observation != nil
+	validGeneration := hasObservation && generationErr == nil && len(generation) == 16 || !hasObservation && value.Generation == ""
+	validObservation := !hasObservation || value.Observation.Validate() == nil
 	validFailure := value.LastFailure == FailureNone || value.LastFailure == FailureTransient || value.LastFailure == FailurePermanent || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
 	validRevocation := !value.Revoked || value.LastFailure == FailureRevoked || value.LastFailure == FailureAccountMismatch
-	if value.BindingHash != wantBinding || generationErr != nil || len(generation) != 16 || value.Observation.Validate() != nil || !validFailure || !validRevocation {
+	validAttempt := value.LastFailure == FailureNone && value.LastAttemptAt == nil && value.RetryAt == nil && !value.Revoked || value.LastFailure != FailureNone && value.LastAttemptAt != nil
+	validRetry := value.RetryAt == nil || value.LastFailure == FailureTransient
+	if value.BindingHash != wantBinding || !validGeneration || !validObservation || !validFailure || !validRevocation || !validAttempt || !validRetry {
 		return loadedRecord{state: recordCorrupt}
 	}
 	return loadedRecord{state: recordSupported, record: value}
