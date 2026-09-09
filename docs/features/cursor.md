@@ -2,7 +2,9 @@
 
 Status: Linux file and macOS Keychain collection have controlled source and HTTP fixtures.
 Native certification is source-specific.
-This increment does not certify native quota access or change the released v0.1.0 Codex artifact.
+A maintainer-run macOS CLI Keychain canary succeeded headlessly on 2026-09-09 at source commit `c8267eb582f74b50fcd0e201e9bd990a5b7e049a`, returning five separate fresh windows with caching disabled.
+Linux native access and packaged provider release certification remain unverified.
+The released v0.1.0 Codex artifact is unchanged.
 
 ## Selection and source boundary
 

@@ -10,8 +10,8 @@ The issue #4 baseline is tracked in [performance baseline](performance-baseline.
 | --- | --- | --- |
 | `--help` and `--version` | Implemented | CLI tests and empty-home manual transcript in issue #2 evidence |
 | Honest unavailable-provider result | Implemented | CLI test and default invocation return a nonzero exit without a fake report |
-| Provider source feasibility | Selected native Codex route observed twice | [Provider source matrix](../provider-sources.md); two read-only native observations with matching verified binding; other provider labs remain unrun |
-| Provider collection | Codex native route verified; Claude, Grok, and Cursor CLI implementations verified with controlled fixtures only | Bounded selected auth read, current native usage endpoint, normalization, and controlled HTTP/TLS tests in issue #5 |
+| Provider source feasibility | Selected native Codex and macOS Cursor routes observed | [Provider source matrix](../provider-sources.md); Codex verified binding and [Cursor Keychain canary](cursor.md); other native provider gates remain open |
+| Provider collection | Codex native route and macOS Cursor CLI Keychain canary verified; Claude, Grok, and Linux Cursor implementations verified with controlled fixtures only | Bounded selected auth read, current native usage endpoint, normalization, and controlled HTTP/TLS tests in issue #5 |
 | Claude file collection | Implemented; native canary unverified | [Claude source, selectors, and fixture coverage](claude.md) |
 | Grok file collection and mixed reports | Implemented; native canary unverified | [Grok source, scopes, and mixed reports](grok.md) |
 | Cursor CLI collection | Implemented; native certification is source-specific | [Cursor source, platform boundary, and fixture coverage](cursor.md) |
