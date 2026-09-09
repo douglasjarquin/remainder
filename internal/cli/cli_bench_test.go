@@ -33,6 +33,10 @@ func benchmarkObservation() evidence.Observation {
 	return benchmark.Fixtures()[0].Observation
 }
 
+func paceBenchmarkObservation() evidence.Observation {
+	return benchmark.Fixtures()[4].Observation
+}
+
 func TestBenchmarkFixtureOutputs(t *testing.T) {
 	adapter := benchmarkAdapter{observation: benchmarkObservation()}
 	var compactOut, compactErr bytes.Buffer
@@ -66,17 +70,21 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 
 func TestBenchmarkFixtureAllocationBudgets(t *testing.T) {
 	tests := []struct {
-		name string
-		args []string
-		max  float64
+		name        string
+		args        []string
+		observation evidence.Observation
+		max         float64
 	}{
-		{name: "compact", args: []string{"--format", "compact"}, max: 130},
-		{name: "json", args: []string{"--format", "json"}, max: 120},
-		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, max: 125},
+		{name: "compact", args: []string{"--format", "compact"}, observation: benchmarkObservation(), max: 130},
+		{name: "json", args: []string{"--format", "json"}, observation: benchmarkObservation(), max: 120},
+		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, observation: benchmarkObservation(), max: 125},
+		{name: "pace compact", args: []string{"--format", "compact"}, observation: paceBenchmarkObservation(), max: 180},
+		{name: "pace json", args: []string{"--format", "json"}, observation: paceBenchmarkObservation(), max: 180},
+		{name: "pace scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "pace"}, observation: paceBenchmarkObservation(), max: 140},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			adapter := benchmarkAdapter{observation: benchmarkObservation()}
+			adapter := benchmarkAdapter{observation: test.observation}
 			var stdout, stderr bytes.Buffer
 			allocs := testing.AllocsPerRun(100, func() {
 				stdout.Reset()
@@ -102,8 +110,16 @@ func BenchmarkExecuteFixtureScalar(b *testing.B) {
 	benchmarkExecute(b, []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"})
 }
 
+func BenchmarkExecuteFixturePaceScalar(b *testing.B) {
+	benchmarkExecuteObservation(b, []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "pace"}, paceBenchmarkObservation())
+}
+
 func benchmarkExecute(b *testing.B, args []string) {
-	adapter := benchmarkAdapter{observation: benchmarkObservation()}
+	benchmarkExecuteObservation(b, args, benchmarkObservation())
+}
+
+func benchmarkExecuteObservation(b *testing.B, args []string, observation evidence.Observation) {
+	adapter := benchmarkAdapter{observation: observation}
 	var stdout, stderr bytes.Buffer
 	b.ReportAllocs()
 	b.ResetTimer()

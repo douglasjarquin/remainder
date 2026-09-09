@@ -28,6 +28,24 @@ type rawWindow struct {
 	Scope  Scope      `json:"scope"`
 	Unit   string     `json:"unit"`
 	Limits []rawLimit `json:"limits"`
+	Pace   *rawPace   `json:"pace,omitempty"`
+}
+
+type rawPace struct {
+	Status               PaceStatus    `json:"status"`
+	Reason               string        `json:"reason,omitempty"`
+	Calculation          string        `json:"calculation"`
+	CalculatedAt         string        `json:"calculated_at"`
+	Inputs               rawPaceInputs `json:"inputs"`
+	TimeRemainingPercent *json.Number  `json:"time_remaining_percent,omitempty"`
+	ReservePercentPoints *json.Number  `json:"reserve_percent_points,omitempty"`
+}
+
+type rawPaceInputs struct {
+	ObservedAt string  `json:"observed_at"`
+	Remaining  Value   `json:"remaining"`
+	ResetAt    *string `json:"reset_at,omitempty"`
+	Duration   *string `json:"duration,omitempty"`
 }
 
 type rawLimit struct {
@@ -82,12 +100,50 @@ func ParseJSON(data []byte) (Observation, error) {
 			}
 			parsed.Limits = append(parsed.Limits, parsedLimit)
 		}
+		if window.Pace != nil {
+			pace, err := parsePace(*window.Pace)
+			if err != nil {
+				return Observation{}, err
+			}
+			parsed.Pace = &pace
+		}
 		o.Windows = append(o.Windows, parsed)
 	}
 	if err := o.Validate(); err != nil {
 		return Observation{}, err
 	}
 	return o, nil
+}
+
+func parsePace(raw rawPace) (Pace, error) {
+	calculatedAt, err := parseTime(raw.CalculatedAt)
+	if err != nil {
+		return Pace{}, err
+	}
+	observedAt, err := parseTime(raw.Inputs.ObservedAt)
+	if err != nil {
+		return Pace{}, err
+	}
+	pace := Pace{
+		Status: raw.Status, Reason: raw.Reason, Calculation: raw.Calculation, CalculatedAt: calculatedAt,
+		Inputs:               PaceInputs{ObservedAt: observedAt, Remaining: raw.Inputs.Remaining},
+		TimeRemainingPercent: raw.TimeRemainingPercent, ReservePercentPoints: raw.ReservePercentPoints,
+	}
+	if raw.Inputs.ResetAt != nil {
+		resetAt, err := parseTime(*raw.Inputs.ResetAt)
+		if err != nil {
+			return Pace{}, err
+		}
+		pace.Inputs.ResetAt = &resetAt
+	}
+	if raw.Inputs.Duration != nil {
+		duration, err := time.ParseDuration(*raw.Inputs.Duration)
+		if err != nil {
+			return Pace{}, fmt.Errorf("parse pace duration: %w", err)
+		}
+		pace.Inputs.Duration = &duration
+	}
+	return pace, nil
 }
 
 func parseTime(raw string) (time.Time, error) {

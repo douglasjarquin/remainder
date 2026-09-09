@@ -150,6 +150,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 			if observation.Outcome == evidence.OutcomeUnavailable {
 				return ErrUnavailable
 			}
+			observation = evidence.WithPace(observation, now)
 			output, err := evidence.SelectValue(observation, request, opts.freshness)
 			if err != nil {
 				return err
@@ -231,6 +232,7 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time)
 	if opts.freshness == evidence.FreshOnly && observation.Freshness != evidence.FreshFresh {
 		return evidence.ErrStale
 	}
+	observation = evidence.WithPace(observation, now)
 	observation, err = observation.ForRequest(evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, All: opts.all})
 	if err != nil {
 		return err

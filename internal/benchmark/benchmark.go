@@ -119,12 +119,20 @@ func Fixtures() []Fixture {
 	sharedPercent.ObservedAt = FixtureTime()
 	sharedPercent.Windows[0].Scope = evidence.ScopeAccount
 	sharedPercent.Windows[0].Unit = "percent"
+	resetAt := FixtureTime().Add(7 * 24 * time.Hour)
+	duration := 7 * 24 * time.Hour
+	sharedPercent.Windows[0].Limits = append(sharedPercent.Windows[0].Limits,
+		evidence.Limit{ID: "weekly-duration", Field: evidence.FieldDuration, Value: evidence.Value{State: evidence.ValueUnknown}, Duration: &duration},
+		evidence.Limit{ID: "weekly-reset", Field: evidence.FieldReset, Value: evidence.Value{State: evidence.ValueUnknown}, ResetAt: &resetAt},
+	)
+	sharedRequiredFacts := append([]string(nil), requiredFacts...)
+	sharedRequiredFacts = append(sharedRequiredFacts, "window.pace.status", "window.pace.calculation", "window.pace.inputs", "window.pace.time_remaining_percent", "window.pace.reserve_percent_points")
 	return []Fixture{
 		{Name: "healthy", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("42")})},
 		{Name: "exhausted", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueZero, Amount: number("0")})},
 		{Name: "stale", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshStale, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("17")})},
 		{Name: "partial-unknown", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomePartial, evidence.Value{State: evidence.ValueUnknown}, []evidence.Failure{{Scope: "daily", Message: "source unavailable"}})},
-		{Name: "shared-percent", RequiredFacts: requiredFacts, Observation: sharedPercent},
+		{Name: "shared-percent", RequiredFacts: sharedRequiredFacts, Observation: sharedPercent},
 	}
 }
 
