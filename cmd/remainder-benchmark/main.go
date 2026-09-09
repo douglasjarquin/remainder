@@ -1,25 +1,16 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
-	"strings"
-	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
-	"github.com/douglasjarquin/remainder/internal/cli"
-	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
 const (
@@ -27,167 +18,12 @@ const (
 	quotaAxiVersion                  = "0.1.41"
 )
 
-type workload struct {
-	Name     string
-	Args     []string
-	ExitCode int
-}
-
-type sample struct {
-	Kind            string   `json:"kind"`
-	Workload        string   `json:"workload"`
-	Args            []string `json:"args"`
-	Sample          int      `json:"sample"`
-	FilesystemState string   `json:"filesystem_state"`
-	ElapsedNS       int64    `json:"elapsed_ns"`
-	ExitCode        int      `json:"exit_code"`
-	Stdout          string   `json:"stdout"`
-	Stderr          string   `json:"stderr"`
-	StdoutBytes     int      `json:"stdout_bytes"`
-	StderrBytes     int      `json:"stderr_bytes"`
-	StdoutTokens    *int     `json:"stdout_tokens,omitempty"`
-	StderrTokens    *int     `json:"stderr_tokens,omitempty"`
-	StdoutSHA256    string   `json:"stdout_sha256"`
-	StderrSHA256    string   `json:"stderr_sha256"`
-	SubprocessCount int      `json:"subprocess_count"`
-	RequestCount    int      `json:"request_count"`
-	OutputStatus    string   `json:"output_status"`
-}
-
-type metadata struct {
-	Kind                   string            `json:"kind"`
-	Source                 string            `json:"source"`
-	Binary                 string            `json:"binary"`
-	Version                string            `json:"version"`
-	Machine                string            `json:"machine"`
-	GoVersion              string            `json:"driver_go_version"`
-	GoOS                   string            `json:"driver_goos"`
-	GoArch                 string            `json:"driver_goarch"`
-	CPUCount               int               `json:"cpu_count"`
-	GOMAXPROCS             int               `json:"gomaxprocs"`
-	Host                   hostMetadata      `json:"host"`
-	Build                  buildMetadata     `json:"measured_binary_build"`
-	SizeBytes              int64             `json:"size_bytes"`
-	SamplesPerWorkload     int               `json:"samples_per_workload"`
-	Workloads              []string          `json:"workloads"`
-	Tokenizer              tokenizerMetadata `json:"tokenizer"`
-	FixtureSeed            string            `json:"fixture_seed"`
-	FixtureClock           string            `json:"fixture_clock"`
-	FixtureSHA256          string            `json:"fixture_sha256"`
-	TokenApplicability     string            `json:"token_applicability"`
-	CacheWorkload          string            `json:"cache_workload"`
-	RefreshWorkload        string            `json:"refresh_workload"`
-	ObservedSubprocesses   int               `json:"observed_subprocesses"`
-	ObservedRequests       int               `json:"observed_requests"`
-	AllocationsMeasurement string            `json:"allocations_measurement"`
-	P95ObjectiveNS         int64             `json:"p95_objective_ns"`
-	P95ObjectiveScope      string            `json:"p95_objective_scope"`
-	P95Policy              string            `json:"p95_policy"`
-	Comparators            []comparator      `json:"comparators"`
-}
-
-type latencyRecord struct {
-	Kind     string   `json:"kind"`
-	Status   string   `json:"status"`
-	Scope    string   `json:"scope"`
-	Baseline string   `json:"baseline,omitempty"`
-	Failures []string `json:"failures,omitempty"`
-}
-
-type summary struct {
-	Kind      string                       `json:"kind"`
-	Source    string                       `json:"source"`
-	Workloads map[string]benchmark.Summary `json:"workloads"`
-}
-
-type hostMetadata struct {
-	OSVersion string `json:"os_version"`
-	Kernel    string `json:"kernel"`
-	CPUModel  string `json:"cpu_model"`
-}
-
-type buildMetadata struct {
-	Status            string            `json:"status"`
-	Raw               string            `json:"raw,omitempty"`
-	GoVersion         string            `json:"go_version,omitempty"`
-	Path              string            `json:"path,omitempty"`
-	SourceRevision    string            `json:"source_revision,omitempty"`
-	SourceModified    string            `json:"source_modified,omitempty"`
-	BuildSettings     map[string]string `json:"build_settings,omitempty"`
-	Dependencies      []string          `json:"dependencies,omitempty"`
-	UnavailableReason string            `json:"unavailable_reason,omitempty"`
-}
-
-type tokenizerMetadata struct {
-	Status            string `json:"status"`
-	Package           string `json:"package,omitempty"`
-	Version           string `json:"version,omitempty"`
-	Encoding          string `json:"encoding,omitempty"`
-	Applicability     string `json:"applicability"`
-	UnavailableReason string `json:"unavailable_reason,omitempty"`
-}
-
-type comparator struct {
-	Name            string             `json:"name"`
-	Status          string             `json:"status"`
-	Version         string             `json:"version,omitempty"`
-	JQVersion       string             `json:"jq_version,omitempty"`
-	ExpectedVersion string             `json:"expected_version"`
-	Commands        [][]string         `json:"commands"`
-	FixtureSHA256   string             `json:"fixture_sha256,omitempty"`
-	Reason          string             `json:"reason,omitempty"`
-	Outputs         []comparatorOutput `json:"outputs,omitempty"`
-}
-
-type comparatorOutput struct {
-	Format string `json:"format"`
-	Status string `json:"status"`
-	Bytes  int    `json:"bytes"`
-	Tokens *int   `json:"tokens,omitempty"`
-	SHA256 string `json:"sha256,omitempty"`
-}
-
-type fixtureRecord struct {
-	Kind              string          `json:"kind"`
-	Fixture           string          `json:"fixture"`
-	FixtureClock      string          `json:"fixture_clock"`
-	FixtureSHA256     string          `json:"fixture_sha256"`
-	RequiredFacts     []string        `json:"required_facts"`
-	ComparableFormats []string        `json:"comparable_formats"`
-	ScalarProjection  string          `json:"scalar_projection"`
-	ComparisonStatus  string          `json:"comparison_status"`
-	ComparisonReason  string          `json:"comparison_reason,omitempty"`
-	Formats           []fixtureFormat `json:"formats"`
-}
-
-type fixtureFormat struct {
-	Format       string   `json:"format"`
-	Args         []string `json:"args"`
-	ExitCode     int      `json:"exit_code"`
-	Stdout       string   `json:"stdout"`
-	Stderr       string   `json:"stderr"`
-	StdoutBytes  int      `json:"stdout_bytes"`
-	StderrBytes  int      `json:"stderr_bytes"`
-	StdoutTokens *int     `json:"stdout_tokens,omitempty"`
-	StderrTokens *int     `json:"stderr_tokens,omitempty"`
-	StdoutSHA256 string   `json:"stdout_sha256"`
-	StderrSHA256 string   `json:"stderr_sha256"`
-	Information  string   `json:"information"`
-}
-
-type fixtureAdapter struct {
-	observation evidence.Observation
-}
-
-func (a fixtureAdapter) Observe(context.Context, evidence.Request) (evidence.Observation, error) {
-	return a.observation, nil
-}
-
 func main() {
 	binary := flag.String("binary", "./bin/remainder", "compiled remainder binary to measure")
 	samples := flag.Int("samples", 10, "samples per workload")
 	tokenizerPython := flag.String("tokenizer-python", "", "optional Python executable with tiktoken installed")
 	comparators := flag.Bool("comparators", false, "run controlled preinstalled quota-axi and Pinchos consumer probes")
+	quotaAxiPreload := flag.String("quota-axi-preload", "scripts/quota_axi_fixture.mjs", "developer-only Node preload for synthetic quota-axi input")
 	latencyBaseline := flag.String("latency-baseline", "", "optional JSON baseline for seeded p95 regression detection")
 	flag.Parse()
 	if *samples < 1 {
@@ -219,8 +55,10 @@ func main() {
 	buildInfo := inspectBuild(*binary)
 	host := inspectHost()
 	var comparison []comparator
+	var regressions []string
 	if *comparators {
-		comparison = runComparators(tokenizer)
+		comparison = runComparators(tokenizer, *quotaAxiPreload)
+		regressions = append(regressions, comparatorFailures(comparison)...)
 	} else {
 		comparison = notRunComparators()
 	}
@@ -256,7 +94,6 @@ func main() {
 		Comparators:            comparison,
 	})
 
-	var regressions []string
 	for _, fixture := range benchmark.Fixtures() {
 		record, err := measureFixture(fixture, tokenizer)
 		if err != nil {
@@ -310,7 +147,7 @@ func main() {
 	}
 	writeJSON(latency)
 	if len(regressions) > 0 {
-		writeJSON(map[string]interface{}{"kind": "regression", "source": "full-process-cobra-entrypoint", "status": "failed", "failures": regressions})
+		writeJSON(map[string]any{"kind": "regression", "source": "full-process-cobra-entrypoint", "status": "failed", "failures": regressions})
 	}
 	writeJSON(summary{Kind: "summary", Source: "full-process-cobra-entrypoint", Workloads: summaries})
 	if tokenizer != nil {
@@ -321,405 +158,6 @@ func main() {
 	if len(regressions) > 0 {
 		os.Exit(1)
 	}
-}
-
-func checkLatencyRegression(current map[string]benchmark.Summary, path string) latencyRecord {
-	record := latencyRecord{Kind: "latency-regression", Status: "not-run", Scope: "optional seeded p95 baseline; startup and failure trends are not checked against the eligible-cache 10 ms objective"}
-	if path == "" {
-		return record
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		record.Status = "failed"
-		record.Baseline = path
-		record.Failures = []string{"latency baseline: " + err.Error()}
-		return record
-	}
-	var baseline struct {
-		Workloads map[string]benchmark.Summary `json:"workloads"`
-	}
-	if err := json.Unmarshal(data, &baseline); err != nil {
-		record.Status = "failed"
-		record.Baseline = path
-		record.Failures = []string{"latency baseline: " + err.Error()}
-		return record
-	}
-	record.Status = "passed"
-	record.Baseline = path
-	for name, expected := range baseline.Workloads {
-		actual, ok := current[name]
-		if !ok {
-			record.Status = "failed"
-			record.Failures = append(record.Failures, "latency baseline workload missing: "+name)
-			continue
-		}
-		if err := benchmark.DetectLatencyRegression(actual, expected); err != nil {
-			record.Status = "failed"
-			record.Failures = append(record.Failures, name+": "+err.Error())
-		}
-	}
-	return record
-}
-
-func run(binary string, item workload, tokenizer *tokenizerClient) (sample, error) {
-	start := time.Now()
-	command := exec.Command(binary, item.Args...)
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-	elapsedNS := time.Since(start).Nanoseconds()
-	exitCode := 0
-	if err != nil {
-		exitCode = 125
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			exitCode = exitErr.ExitCode()
-		}
-	}
-	stdoutTokens, err := countTokens(tokenizer, stdout.String())
-	if err != nil {
-		return sample{}, err
-	}
-	stderrTokens, err := countTokens(tokenizer, stderr.String())
-	if err != nil {
-		return sample{}, err
-	}
-	return sample{
-		ElapsedNS:       elapsedNS,
-		ExitCode:        exitCode,
-		Stdout:          stdout.String(),
-		Stderr:          stderr.String(),
-		StdoutBytes:     stdout.Len(),
-		StderrBytes:     stderr.Len(),
-		StdoutTokens:    stdoutTokens,
-		StderrTokens:    stderrTokens,
-		StdoutSHA256:    digest(stdout.Bytes()),
-		StderrSHA256:    digest(stderr.Bytes()),
-		SubprocessCount: 1,
-		RequestCount:    0,
-	}, nil
-}
-
-type tokenizerClient struct {
-	command *exec.Cmd
-	stdin   io.WriteCloser
-	output  *json.Decoder
-	nextID  int
-}
-
-func startTokenizer(python string) (*tokenizerClient, tokenizerMetadata, error) {
-	if python == "" {
-		return nil, tokenizerMetadata{Status: "unmeasured", Applicability: "o200k_base Codex-family comparison; provide --tokenizer-python to measure"}, nil
-	}
-	script, err := filepath.Abs(filepath.Join("scripts", "benchmark_tokens.py"))
-	if err != nil {
-		return nil, tokenizerMetadata{}, err
-	}
-	command := exec.Command(python, script, "--encoding", "o200k_base")
-	stdout, err := command.StdoutPipe()
-	if err != nil {
-		return nil, tokenizerMetadata{}, err
-	}
-	stdin, err := command.StdinPipe()
-	if err != nil {
-		return nil, tokenizerMetadata{}, err
-	}
-	if err := command.Start(); err != nil {
-		return nil, tokenizerMetadata{}, err
-	}
-	var info tokenizerMetadata
-	if err := json.NewDecoder(stdout).Decode(&info); err != nil {
-		return nil, tokenizerMetadata{}, err
-	}
-	if info.Status == "" {
-		info.Status = "measured"
-	}
-	info.Applicability = "o200k_base Codex-family comparison; not a model-specific tokenizer certification"
-	return &tokenizerClient{command: command, stdin: stdin, output: json.NewDecoder(stdout)}, info, nil
-}
-
-func (c *tokenizerClient) Count(text string) (*int, error) {
-	c.nextID++
-	if err := json.NewEncoder(c.stdin).Encode(map[string]interface{}{"id": c.nextID, "text": text}); err != nil {
-		return nil, err
-	}
-	var response struct {
-		ID     int `json:"id"`
-		Tokens int `json:"tokens"`
-	}
-	if err := c.output.Decode(&response); err != nil {
-		return nil, err
-	}
-	if response.ID != c.nextID {
-		return nil, fmt.Errorf("tokenizer response id %d, want %d", response.ID, c.nextID)
-	}
-	return &response.Tokens, nil
-}
-
-func (c *tokenizerClient) Close() error {
-	if err := c.stdin.Close(); err != nil {
-		return err
-	}
-	return c.command.Wait()
-}
-
-func countTokens(tokenizer *tokenizerClient, text string) (*int, error) {
-	if tokenizer == nil {
-		return nil, nil
-	}
-	return tokenizer.Count(text)
-}
-
-func inspectBuild(binary string) buildMetadata {
-	output, err := exec.Command("go", "version", "-m", binary).Output()
-	if err != nil {
-		return buildMetadata{Status: "unknown", UnavailableReason: err.Error()}
-	}
-	raw := string(output)
-	metadata := buildMetadata{Status: "observed", Raw: raw, GoVersion: "unknown", Path: "unknown", SourceRevision: "unknown", SourceModified: "unknown", BuildSettings: make(map[string]string)}
-	lines := strings.Split(strings.TrimSpace(raw), "\n")
-	if len(lines) > 0 {
-		metadata.GoVersion = strings.TrimSpace(strings.TrimPrefix(lines[0], binary+":"))
-	}
-	for _, line := range lines[1:] {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		switch fields[0] {
-		case "path":
-			metadata.Path = fields[1]
-		case "dep":
-			metadata.Dependencies = append(metadata.Dependencies, strings.Join(fields[1:], " "))
-		case "build":
-			key, value, found := strings.Cut(strings.Join(fields[1:], " "), "=")
-			if found {
-				metadata.BuildSettings[key] = value
-				if key == "vcs.revision" {
-					metadata.SourceRevision = value
-				}
-				if key == "vcs.modified" {
-					metadata.SourceModified = value
-				}
-			}
-		}
-	}
-	return metadata
-}
-
-func inspectHost() hostMetadata {
-	return hostMetadata{
-		OSVersion: probe("sw_vers", "-productVersion"),
-		Kernel:    probe("uname", "-sr"),
-		CPUModel:  probe("sysctl", "-n", "hw.model"),
-	}
-}
-
-func probe(name string, args ...string) string {
-	output, err := exec.Command(name, args...).Output()
-	if err != nil {
-		return "unknown"
-	}
-	value := strings.TrimSpace(string(output))
-	if value == "" {
-		return "unknown"
-	}
-	return value
-}
-
-const pinchosFilter = `.providers[0].windows[] | select(.label=="week") | .percentRemaining`
-
-const quotaAxiFixture = `{"generatedAt":"2026-03-08T07:30:00Z","schemaVersion":5,"providers":[{"provider":"codex","plan":"pro","windows":[{"id":"weekly","label":"week","kind":"weekly","resetsAt":"2026-03-15T07:30:00Z","percentRemaining":42}]}]}`
-
-func notRunComparators() []comparator {
-	return []comparator{
-		{Name: "quota-axi-compact", Status: "not-run", ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--provider", "codex", "--no-credential-refresh"}}, Reason: "optional provider/cache probe disabled; controlled offline fixture input is unavailable and no live provider read is permitted"},
-		{Name: "pinchos-quota-axi-json-jq", Status: "not-run", ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--provider", "codex", "--json", "--no-credential-refresh"}, {"jq", "-r", pinchosFilter}}, Reason: "optional controlled consumer probe disabled"},
-	}
-}
-
-func runComparators(tokenizer *tokenizerClient) []comparator {
-	quotaPath, quotaErr := exec.LookPath("quota-axi")
-	jqPath, jqErr := exec.LookPath("jq")
-	if quotaErr != nil || jqErr != nil {
-		return []comparator{
-			{Name: "quota-axi-compact", Status: "unavailable", ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--provider", "codex", "--no-credential-refresh"}}, Reason: "preinstalled comparator missing: quota-axi=" + errorText(quotaErr) + ", jq=" + errorText(jqErr)},
-			{Name: "pinchos-quota-axi-json-jq", Status: "unavailable", ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--provider", "codex", "--json", "--no-credential-refresh"}, {"jq", "-r", pinchosFilter}}, Reason: "preinstalled comparator missing: quota-axi=" + errorText(quotaErr) + ", jq=" + errorText(jqErr)},
-		}
-	}
-	version, err := exec.Command(quotaPath, "--version").Output()
-	if err != nil {
-		return []comparator{{Name: "quota-axi-compact", Status: "unavailable", ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--version"}}, Reason: "quota-axi version probe failed: " + err.Error()}}
-	}
-	quotaVersion := strings.TrimSpace(string(version))
-	jqVersionBytes, jqVersionErr := exec.Command(jqPath, "--version").Output()
-	if jqVersionErr != nil {
-		return []comparator{{Name: "pinchos-quota-axi-json-jq", Status: "unavailable", Version: quotaVersion, ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--version"}, {"jq", "--version"}}, Reason: "jq version probe failed: " + jqVersionErr.Error()}}
-	}
-	if quotaVersion != quotaAxiVersion {
-		return []comparator{{Name: "quota-axi-compact", Status: "version-mismatch", Version: quotaVersion, ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--version"}}, Reason: "preinstalled quota-axi version does not match the pinned comparator version"}}
-	}
-	jqVersion := strings.TrimSpace(string(jqVersionBytes))
-	jq := exec.Command(jqPath, "-r", pinchosFilter)
-	jq.Stdin = strings.NewReader(quotaAxiFixture)
-	jqOutput, jqErr := jq.Output()
-	return []comparator{
-		{Name: "quota-axi-compact", Status: "unavailable-controlled-input", Version: quotaVersion, ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--provider", "codex", "--no-credential-refresh"}}, Reason: "quota-axi compact has no offline fixture input; true compact equivalence requires a fixture-capable quota-axi path or the later Remainder provider/cache implementation (#5/#6)"},
-		{Name: "pinchos-quota-axi-json-jq", Status: "controlled-fixture-projection-only", Version: quotaVersion, JQVersion: jqVersion, ExpectedVersion: quotaAxiVersion, Commands: [][]string{{"quota-axi", "--version"}, {"jq", "--version"}, {"jq", "-r", pinchosFilter}}, FixtureSHA256: digest([]byte(quotaAxiFixture)), Reason: "controlled fixture proves the real Pinchos JSON+jq projection, but percentRemaining is not semantically equal to Remainder token remaining; later provider mapping must define the shared fact and freshness contract", Outputs: []comparatorOutput{comparatorResult("pinchos-json-jq", jqOutput, jqErr, tokenizer)}},
-	}
-}
-
-func errorText(err error) string {
-	if err == nil {
-		return "present"
-	}
-	return err.Error()
-}
-
-func comparatorResult(format string, output []byte, err error, tokenizer *tokenizerClient) comparatorOutput {
-	status := "observed"
-	if err != nil {
-		status = "unavailable: " + err.Error()
-	}
-	tokens, tokenErr := countTokens(tokenizer, string(output))
-	if tokenErr != nil {
-		status = "tokenization failed: " + tokenErr.Error()
-	}
-	return comparatorOutput{Format: format, Status: status, Bytes: len(output), Tokens: tokens, SHA256: digest(output)}
-}
-
-func measureFixture(fixture benchmark.Fixture, tokenizer *tokenizerClient) (fixtureRecord, error) {
-	formats := []struct {
-		name string
-		args []string
-		info string
-	}{
-		{name: "compact", args: []string{"--format", "compact", "--provider", "codex", "--profile", "main", "--window", "weekly"}, info: "full observation summary"},
-		{name: "json", args: []string{"--format", "json", "--provider", "codex", "--profile", "main", "--window", "weekly"}, info: "full observation"},
-		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, info: "selected remaining value projection"},
-	}
-	record := fixtureRecord{
-		Kind:             "fixture-comparison",
-		Fixture:          fixture.Name,
-		FixtureClock:     benchmark.FixtureClock,
-		FixtureSHA256:    benchmark.FixtureHashFor(fixture),
-		RequiredFacts:    fixture.RequiredFacts,
-		ScalarProjection: "selected remaining value; not equivalent to the full required-facts observation",
-		ComparisonStatus: "unresolved",
-	}
-	var comparisonIssues []string
-	for _, format := range formats {
-		var stdout, stderr bytes.Buffer
-		code := cli.ExecuteWithAdapterAt(context.Background(), format.args, &stdout, &stderr, "v0.1.0", benchmark.FixtureTime(), fixtureAdapter{observation: fixture.Observation})
-		stdoutTokens, err := countTokens(tokenizer, stdout.String())
-		if err != nil {
-			return fixtureRecord{}, err
-		}
-		stderrTokens, err := countTokens(tokenizer, stderr.String())
-		if err != nil {
-			return fixtureRecord{}, err
-		}
-		record.Formats = append(record.Formats, fixtureFormat{
-			Format: format.name, Args: format.args, ExitCode: code,
-			Stdout: stdout.String(), Stderr: stderr.String(),
-			StdoutBytes: stdout.Len(), StderrBytes: stderr.Len(),
-			StdoutTokens: stdoutTokens, StderrTokens: stderrTokens,
-			StdoutSHA256: digest(stdout.Bytes()), StderrSHA256: digest(stderr.Bytes()),
-			Information: format.info,
-		})
-		wantCode, wantStdout, wantStderr := expectedFixtureOutput(fixture.Name, format.name)
-		if code != wantCode || stdout.String() != wantStdout || stderr.String() != wantStderr {
-			comparisonIssues = append(comparisonIssues, format.name+" output does not preserve the approved fixture facts")
-		}
-	}
-	if len(comparisonIssues) == 0 {
-		record.ComparableFormats = []string{"compact", "json"}
-		record.ComparisonStatus = "equivalent-required-facts"
-	} else {
-		record.ComparisonReason = strings.Join(comparisonIssues, "; ")
-	}
-	return record, nil
-}
-
-func expectedFixtureOutput(fixture, format string) (int, string, string) {
-	type golden struct {
-		compact      string
-		json         string
-		scalar       string
-		code         int
-		stderr       string
-		scalarCode   int
-		scalarStderr string
-	}
-	goldens := map[string]golden{
-		"healthy": {
-			compact: `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=1800 freshness=fresh outcome=complete identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=42tokens` + "\n",
-			json:    `{"schema_version":"v1","provider":"codex","profile":"main","account":{"last_observed":"acct-1","binding":"historical"},"source":{"kind":"fixture","name":"local"},"observed_at":"2026-03-08T07:00:00Z","freshness":"fresh","outcome":"complete","windows":[{"id":"weekly","scope":"model","unit":"tokens","limits":[{"id":"weekly-remaining","field":"remaining","state":"defined","amount":42}]}]}` + "\n",
-			scalar:  "42\n",
-		},
-		"exhausted": {
-			compact: `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=1800 freshness=fresh outcome=complete identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=0tokens` + "\n",
-			json:    `{"schema_version":"v1","provider":"codex","profile":"main","account":{"last_observed":"acct-1","binding":"historical"},"source":{"kind":"fixture","name":"local"},"observed_at":"2026-03-08T07:00:00Z","freshness":"fresh","outcome":"complete","windows":[{"id":"weekly","scope":"model","unit":"tokens","limits":[{"id":"weekly-remaining","field":"remaining","state":"zero","amount":0}]}]}` + "\n",
-			scalar:  "0\n",
-		},
-		"stale": {
-			compact: `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=1800 freshness=stale outcome=complete identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=17tokens` + "\n",
-			json:    `{"schema_version":"v1","provider":"codex","profile":"main","account":{"last_observed":"acct-1","binding":"historical"},"source":{"kind":"fixture","name":"local"},"observed_at":"2026-03-08T07:00:00Z","freshness":"stale","outcome":"complete","windows":[{"id":"weekly","scope":"model","unit":"tokens","limits":[{"id":"weekly-remaining","field":"remaining","state":"defined","amount":17}]}]}` + "\n",
-			scalar:  "17\n",
-		},
-		"partial-unknown": {
-			compact:      `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=1800 freshness=fresh outcome=partial identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=unknown unit=tokens failures="daily:source unavailable"` + "\n",
-			json:         `{"schema_version":"v1","provider":"codex","profile":"main","account":{"last_observed":"acct-1","binding":"historical"},"source":{"kind":"fixture","name":"local"},"observed_at":"2026-03-08T07:00:00Z","freshness":"fresh","outcome":"partial","windows":[{"id":"weekly","scope":"model","unit":"tokens","limits":[{"id":"weekly-remaining","field":"remaining","state":"unknown"}]}],"failures":[{"scope":"daily","message":"source unavailable"}]}` + "\n",
-			code:         3,
-			stderr:       "remainder: partial evidence\n",
-			scalarCode:   2,
-			scalarStderr: "remainder: evidence value is undefined\n",
-		},
-	}
-	want, ok := goldens[fixture]
-	if !ok {
-		return 2, "", "remainder: unknown fixture golden\n"
-	}
-	switch format {
-	case "compact":
-		return want.code, want.compact, want.stderr
-	case "json":
-		return want.code, want.json, want.stderr
-	case "scalar":
-		code, stderr := want.code, want.stderr
-		if want.scalarCode != 0 {
-			code, stderr = want.scalarCode, want.scalarStderr
-		}
-		return code, want.scalar, stderr
-	default:
-		return 2, "", "remainder: unknown fixture format\n"
-	}
-}
-
-func validateOutput(item workload, result sample) string {
-	if len(result.Stderr) > 0 && item.ExitCode == 0 {
-		return "unexpected stderr"
-	}
-	switch item.Name {
-	case "startup-help":
-		if result.Stdout != expectedHelp || result.Stderr != "" {
-			return "help output mismatch"
-		}
-	case "startup-version":
-		if result.Stdout != "remainder v0.1.0 (github.com/douglasjarquin/remainder)\n" || result.Stderr != "" {
-			return "version output mismatch"
-		}
-	case "failure-unavailable":
-		if result.Stdout != "" || result.Stderr != "remainder: no provider is implemented; quota is unavailable\n" {
-			return "unavailable error output mismatch"
-		}
-	case "failure-invalid-freshness":
-		if result.Stdout != "" || result.Stderr != "remainder: invalid command usage: unsupported freshness \"ignored\"\n" {
-			return "invalid-freshness error output mismatch"
-		}
-	}
-	return "pass"
 }
 
 func commandOutput(binary string, arg string) string {
@@ -735,7 +173,7 @@ func digest(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func writeJSON(value interface{}) {
+func writeJSON(value any) {
 	if err := json.NewEncoder(os.Stdout).Encode(value); err != nil {
 		fatalf("write JSON: %v", err)
 	}

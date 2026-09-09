@@ -12,7 +12,7 @@ The report preserves environment and build metadata, binary size, raw samples, a
 
 The deterministic fixture corpus, its fixed rendering clock, and its SHA-256 are included in the metadata so repeated measurements can be tied to the exact input.
 
-The fixture corpus emits healthy, exhausted, stale, and partial-unknown observations through compact, JSON, and scalar Cobra paths.
+The fixture corpus emits healthy, exhausted, stale, partial-unknown, and shared-percent observations through compact, JSON, and scalar Cobra paths.
 
 Compact and JSON records share the declared required-facts comparison scope.
 
@@ -22,7 +22,7 @@ The first sample is labeled `first-process` and later samples are labeled `warm-
 
 The normal benchmark does not purge a cache or access credentials, network, telemetry, or a provider.
 
-The optional comparator does not invoke a provider or read a cache.
+The optional comparator invokes quota-axi only inside its synthetic fetch harness and writes only to an owned temporary cache that it verifies and removes.
 
 ## Scenarios
 
@@ -32,7 +32,7 @@ The optional comparator does not invoke a provider or read a cache.
 | bench-tokenizer | The optional pinned `tiktoken` bridge measures actual `o200k_base` tokens offline and records its identity and applicability. | manual optional measurement through `scripts/benchmark_tokens.py` and `scripts/benchmark.sh` with `REMAINDER_TOKENIZER_PYTHON` | `artifacts/benchmark-cli.jsonl` |
 | bench-cli | The compiled Cobra entrypoint measures help, version, unavailable, and invalid-freshness output with expected exit codes and exact output regression checks. | automated `scripts/benchmark.sh` and `cmd/remainder-benchmark/main.go` | `artifacts/benchmark-cli.jsonl` |
 | bench-renderers | Compact, JSON, and scalar fixture output stays observable across healthy, exhausted, stale, and partial-unknown states while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` and the benchmark driver | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` |
-| bench-comparator | The optional pinned preinstalled `quota-axi` version and actual Pinchos JSON plus `jq -r` consumer path run against a controlled fixture; compact quota-axi equivalence remains explicitly unresolved without controlled offline input. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
+| bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | Eligible-cache reads are unimplemented pending issue #6. | manual not-applicable: cache is not implemented in this release | issue #6 |
 | bench-refresh | Controlled loopback refresh is unimplemented pending issue #5. | manual not-applicable: provider refresh is not implemented in this release | issue #5 |
@@ -49,9 +49,25 @@ The recorded `o200k_base` counts are applicable to the declared Codex-family com
 
 If the optional tokenizer is omitted, token fields are explicitly unmeasured rather than replaced with word counts.
 
-The optional comparator does not invoke a provider or read a cache.
+The optional comparator executes the pinned installed quota-axi package with `--no-credential-refresh` under synthetic `HOME`, `CODEX_HOME`, and `XDG_CACHE_HOME` directories.
 
-It verifies the real Pinchos JSON plus `jq -r` projection against a controlled synthetic input and records the exact prerequisite preventing compact quota-axi equivalence.
+A developer-only Node preload fixes the clock and intercepts global `fetch` before quota-axi loads, so no real provider, credential, cache, or installed package is accessed or modified.
+
+The fixture response uses quota-axi's real `rate_limit.primary_window` and `secondary_window` input shape.
+
+Both the compact command and JSON command are genuine quota-axi runs, and the JSON stdout is piped to the real Pinchos `jq -r` projection.
+
+The metadata records the fresh temporary cache snapshot and measures Node preload startup separately as harness overhead.
+
+It also records successful removal of the owned temporary sandbox after capture.
+
+Comparator elapsed times include the harness and are observations only, not native endpoint performance or a speed-advantage claim.
+
+The shared comparison is deliberately limited to provider, identical observation time and age, freshness, account/all-model scope, weekly window identity, percentage unit, and remaining value.
+
+Remainder's profile, historical account binding, source, outcome, and value state remain extra facts, while quota-axi adds a constraining five-hour session window, reset times, plan, and pace.
+
+The report preserves the scope and provenance uncertainty and does not claim full-payload equality or interchange token and percentage units.
 
 The `go test -bench -benchmem` artifact is the source for in-process allocations and bytes per operation.
 
