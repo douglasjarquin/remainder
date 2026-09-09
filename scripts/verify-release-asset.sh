@@ -186,7 +186,7 @@ cat >"$output_manifest" <<EOF
   "limitations": [
     "This is a local pre-publication candidate, not a GitHub download or public release.",
     "Public publication remains blocked until the owner adopts or replaces LICENSE_PROPOSAL.md.",
-    "The root session must integrate and independently verify issue 13 readiness before publication.",
+    "The root session must independently verify the integrated issue 13 readiness on the final release candidate before publication.",
     "Packaged data outputs, cache faults, interruption, coexistence, startup timing, and the authorized live Codex canary remain final root-owned release gates.",
     "No live provider canary, global installation, mise GitHub install, upload, tag, or release was performed."
   ]

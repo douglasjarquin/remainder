@@ -6,7 +6,8 @@ The archive carries the executable, the standalone Codex skill, the provider sou
 
 No public Remainder release exists yet.
 `LICENSE_PROPOSAL.md` is an owner decision record and has not been adopted as the project's license.
-Public publication remains blocked until the owner chooses a license and the issue 13 Codex readiness result is integrated and independently verified.
+The issue 13 Codex readiness result is integrated.
+Public publication remains blocked until the owner chooses a license and the final release candidate is independently verified against that readiness result.
 
 ## Candidate construction
 
