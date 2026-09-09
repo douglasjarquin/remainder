@@ -1,9 +1,45 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
+
+func TestRunCoalescedBurst_preservesRawExitCodeOnOutputMismatch(t *testing.T) {
+	// Given
+	binary := filepath.Join(t.TempDir(), "wrong-output")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf 'wrong\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// When
+	result, err := runCoalescedBurst(t.Context(), binary, nil, false, false)
+
+	// Then
+	if err == nil || len(result.Samples) != coalescingProcessCount {
+		t.Fatalf("result = %+v, error = %v", result, err)
+	}
+	for _, sample := range result.Samples {
+		if sample.ExitCode != 0 || sample.Stdout != "wrong\n" {
+			t.Fatalf("sample = %+v, want raw exit 0 and wrong stdout", sample)
+		}
+	}
+}
+
+func TestForcedRequestCounts_rejectsTwoOverlapRequestsAndNoLaterRequest(t *testing.T) {
+	// Given
+	const overlapRequests, laterRequests = int64(2), int64(0)
+
+	// When
+	valid := forcedRequestCountsValid(overlapRequests, laterRequests)
+
+	// Then
+	if valid {
+		t.Fatal("request gate accepted overlap=2 and later=0")
+	}
+}
 
 func TestCoalescedArgs_coverSharedResponseProjections(t *testing.T) {
 	// Given
