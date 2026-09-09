@@ -132,22 +132,20 @@ func normalizeExtraUsage(raw extraUsage) (evidence.Window, error) {
 			unit = "credits_native"
 		}
 		if raw.Used != "" {
-			value, integer, err := minorUnitValue(raw.Used, int(decimalPlaces))
+			value, usedDecimal, err := minorUnitValue(raw.Used, int(decimalPlaces))
 			if err != nil {
 				return evidence.Window{}, err
 			}
 			used = value
 			if raw.MonthlyLimit != "" {
-				limitValue, limitInteger, err := minorUnitValue(raw.MonthlyLimit, int(decimalPlaces))
+				limitValue, limitDecimal, err := minorUnitValue(raw.MonthlyLimit, int(decimalPlaces))
 				if err != nil {
 					return evidence.Window{}, err
 				}
 				limit = limitValue
-				remainingInteger := new(big.Int).Sub(limitInteger, integer)
-				if remainingInteger.Sign() < 0 {
-					return evidence.Window{}, errors.New("Claude extra usage exceeds the monthly limit")
+				if remainingDecimal, ok := subtractDecimal(limitDecimal, usedDecimal); ok {
+					remaining = numericValue(remainingDecimal.String())
 				}
-				remaining = numericValue(formatMinorUnits(remainingInteger, int(decimalPlaces)))
 			}
 		} else {
 			var err error
@@ -160,24 +158,51 @@ func normalizeExtraUsage(raw extraUsage) (evidence.Window, error) {
 	return evidence.Window{ID: "extra_usage", Scope: evidence.ScopeAccount, Unit: unit, Limits: []evidence.Limit{{ID: "extra_usage_used", Field: evidence.Field("used"), Value: used}, {ID: "extra_usage_limit", Field: evidence.Field("limit"), Value: limit}, {ID: "extra_usage_remaining", Field: evidence.FieldRemaining, Value: remaining}}}, nil
 }
 
-func minorUnitValue(raw sourceNumber, places int) (evidence.Value, *big.Int, error) {
-	integer := new(big.Int)
-	if _, ok := integer.SetString(string(raw), 10); !ok || integer.Sign() < 0 {
-		return evidence.Value{}, nil, errors.New("Claude extra usage value is invalid")
-	}
-	return numericValue(formatMinorUnits(integer, places)), integer, nil
+const (
+	maxPaidNumberBytes = 1024
+	maxPaidExponent    = 4096
+)
+
+type exactDecimal struct {
+	value *big.Rat
 }
 
-func formatMinorUnits(value *big.Int, places int) string {
-	digits := value.String()
-	if places == 0 {
-		return digits
+func minorUnitValue(raw sourceNumber, places int) (evidence.Value, exactDecimal, error) {
+	text := string(raw)
+	if text == "" || len(text) > maxPaidNumberBytes || strings.HasPrefix(text, "-") || strings.HasPrefix(text, "+") || !paidExponentBounded(text) {
+		return evidence.Value{}, exactDecimal{}, errors.New("Claude extra usage value is invalid")
 	}
-	if len(digits) <= places {
-		digits = strings.Repeat("0", places-len(digits)+1) + digits
+	value, ok := new(big.Rat).SetString(text)
+	if !ok || value.Sign() < 0 {
+		return evidence.Value{}, exactDecimal{}, errors.New("Claude extra usage value is invalid")
 	}
-	cut := len(digits) - places
-	result := strings.TrimRight(digits[:cut]+"."+digits[cut:], "0")
+	if places > 0 {
+		divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(places)), nil)
+		value.Quo(value, new(big.Rat).SetInt(divisor))
+	}
+	decimal := exactDecimal{value: value}
+	return numericValue(decimal.String()), decimal, nil
+}
+
+func paidExponentBounded(raw string) bool {
+	index := strings.IndexAny(raw, "eE")
+	if index < 0 {
+		return true
+	}
+	exponent, err := strconv.ParseInt(raw[index+1:], 10, 16)
+	return err == nil && exponent >= -maxPaidExponent && exponent <= maxPaidExponent
+}
+
+func subtractDecimal(left, right exactDecimal) (exactDecimal, bool) {
+	difference := new(big.Rat).Sub(left.value, right.value)
+	return exactDecimal{value: difference}, difference.Sign() >= 0
+}
+
+func (d exactDecimal) String() string {
+	if d.value.IsInt() {
+		return d.value.Num().String()
+	}
+	result := strings.TrimRight(d.value.FloatString(maxPaidNumberBytes+maxPaidExponent+9), "0")
 	return strings.TrimSuffix(result, ".")
 }
 
