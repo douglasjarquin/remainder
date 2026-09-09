@@ -81,6 +81,13 @@ func TestWithPace_reportsUnknownWithoutSufficientCurrentEvidence(t *testing.T) {
 			if pace == nil || pace.Status != evidence.PaceUnknown || pace.Reason != test.wantReason || pace.TimeRemainingPercent != nil || pace.ReservePercentPoints != nil {
 				t.Fatalf("pace = %#v, want unknown reason %q", pace, test.wantReason)
 			}
+			encoded, err := evidence.RenderJSON(got)
+			if err != nil {
+				t.Fatalf("RenderJSON() error = %v", err)
+			}
+			if _, err := evidence.ParseJSON(encoded); err != nil {
+				t.Fatalf("ParseJSON() error = %v", err)
+			}
 		})
 	}
 }
@@ -120,6 +127,89 @@ func TestWithPace_JSONGoldenPreservesCalculationProvenance(t *testing.T) {
 	wantPace := `"pace":{"status":"ahead","calculation":"uniform_percent_reserve_v1","calculated_at":"2026-03-08T12:00:00Z","inputs":{"observed_at":"2026-03-08T12:00:00Z","remaining":{"state":"defined","amount":42},"reset_at":"2026-03-09T00:00:00Z","duration":"24h0m0s"},"time_remaining_percent":50,"reserve_percent_points":-8}`
 	if err != nil || parseErr != nil || !strings.Contains(string(encoded), wantPace) || parsed.Windows[0].Pace == nil {
 		t.Fatalf("RenderJSON=%s err=%v parseErr=%v parsedPace=%#v", encoded, err, parseErr, parsed.Windows[0].Pace)
+	}
+}
+
+func TestParseJSON_rejectsFabricatedKnownPace(t *testing.T) {
+	// Given
+	observedAt := time.Date(2026, time.March, 8, 12, 0, 0, 0, time.UTC)
+	resetAt := observedAt.Add(12 * time.Hour)
+	duration := 24 * time.Hour
+	valid, err := evidence.RenderJSON(evidence.WithPace(paceObservation(observedAt, evidence.FreshFresh, "weekly", evidence.ScopeAccount, percentValue("42"), &resetAt, &duration), observedAt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, old, replacement string
+	}{
+		{name: "review fixture", old: `"pace":{"status":"ahead","calculation":"uniform_percent_reserve_v1","calculated_at":"2026-03-08T12:00:00Z","inputs":{"observed_at":"2026-03-08T12:00:00Z","remaining":{"state":"defined","amount":42},"reset_at":"2026-03-09T00:00:00Z","duration":"24h0m0s"},"time_remaining_percent":50,"reserve_percent_points":-8}`, replacement: `"pace":{"status":"ahead","calculation":"uniform_percent_reserve_v1","calculated_at":"2026-03-08T12:00:00Z","inputs":{"observed_at":"2026-03-08T11:00:00Z","remaining":{"state":"unknown"}},"time_remaining_percent":1000,"reserve_percent_points":1000}`},
+		{name: "unknown remaining", old: `"remaining":{"state":"defined","amount":42}`, replacement: `"remaining":{"state":"unknown"}`},
+		{name: "mismatched remaining", old: `"remaining":{"state":"defined","amount":42}`, replacement: `"remaining":{"state":"defined","amount":43}`},
+		{name: "missing reset", old: `"remaining":{"state":"defined","amount":42},"reset_at":"2026-03-09T00:00:00Z"`, replacement: `"remaining":{"state":"defined","amount":42}`},
+		{name: "missing duration", old: `,"duration":"24h0m0s"},"time_remaining_percent"`, replacement: `},"time_remaining_percent"`},
+		{name: "mismatched observation", old: `"inputs":{"observed_at":"2026-03-08T12:00:00Z"`, replacement: `"inputs":{"observed_at":"2026-03-08T11:00:00Z"`},
+		{name: "impossible time percentage", old: `"time_remaining_percent":50`, replacement: `"time_remaining_percent":1000`},
+		{name: "impossible reserve", old: `"reserve_percent_points":-8`, replacement: `"reserve_percent_points":1000`},
+		{name: "inconsistent status", old: `"status":"ahead"`, replacement: `"status":"behind"`},
+		{name: "unknown calculation", old: `"calculation":"uniform_percent_reserve_v1"`, replacement: `"calculation":"different"`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			malformed := strings.Replace(string(valid), test.old, test.replacement, 1)
+			if malformed == string(valid) {
+				t.Fatalf("fixture replacement %q was not applied", test.old)
+			}
+
+			// When
+			_, err := evidence.ParseJSON([]byte(malformed))
+
+			// Then
+			if !errors.Is(err, evidence.ErrInvalidObservation) {
+				t.Fatalf("ParseJSON() error = %v, want ErrInvalidObservation", err)
+			}
+		})
+	}
+}
+
+func TestParseJSON_rejectsUnknownPaceFromDifferentObservation(t *testing.T) {
+	// Given
+	observedAt := time.Date(2026, time.March, 8, 12, 0, 0, 0, time.UTC)
+	duration := 24 * time.Hour
+	derived := evidence.WithPace(paceObservation(observedAt, evidence.FreshFresh, "weekly", evidence.ScopeAccount, percentValue("42"), nil, &duration), observedAt)
+	valid, err := evidence.RenderJSON(derived)
+	if err != nil {
+		t.Fatal(err)
+	}
+	malformed := strings.Replace(string(valid), `"inputs":{"observed_at":"2026-03-08T12:00:00Z"`, `"inputs":{"observed_at":"2026-03-08T11:00:00Z"`, 1)
+
+	// When
+	_, err = evidence.ParseJSON([]byte(malformed))
+
+	// Then
+	if !errors.Is(err, evidence.ErrInvalidObservation) {
+		t.Fatalf("ParseJSON() error = %v, want ErrInvalidObservation", err)
+	}
+}
+
+func TestParseJSON_acceptsEquivalentKnownPaceNumberSpellings(t *testing.T) {
+	// Given
+	observedAt := time.Date(2026, time.March, 8, 12, 0, 0, 0, time.UTC)
+	resetAt := observedAt.Add(12 * time.Hour)
+	duration := 24 * time.Hour
+	valid, err := evidence.RenderJSON(evidence.WithPace(paceObservation(observedAt, evidence.FreshFresh, "weekly", evidence.ScopeAccount, percentValue("42"), &resetAt, &duration), observedAt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	equivalent := strings.Replace(string(valid), `"remaining":{"state":"defined","amount":42}`, `"remaining":{"state":"defined","amount":42.0}`, 1)
+	equivalent = strings.Replace(equivalent, `"time_remaining_percent":50`, `"time_remaining_percent":50.0`, 1)
+	equivalent = strings.Replace(equivalent, `"reserve_percent_points":-8`, `"reserve_percent_points":-8.0`, 1)
+
+	// When
+	_, err = evidence.ParseJSON([]byte(equivalent))
+
+	// Then
+	if err != nil {
+		t.Fatalf("ParseJSON() error = %v", err)
 	}
 }
 

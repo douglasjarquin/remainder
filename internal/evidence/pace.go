@@ -39,8 +39,11 @@ type Pace struct {
 	ReservePercentPoints *json.Number `json:"reserve_percent_points,omitempty"`
 }
 
-func (p Pace) validate() error {
+func (p Pace) validate(observation Observation, window Window) error {
 	if p.Calculation == "" || p.CalculatedAt.IsZero() || p.Inputs.ObservedAt.IsZero() {
+		return ErrInvalidObservation
+	}
+	if !p.Inputs.ObservedAt.Equal(observation.ObservedAt) {
 		return ErrInvalidObservation
 	}
 	if err := p.Inputs.Remaining.validate(); err != nil {
@@ -54,7 +57,13 @@ func (p Pace) validate() error {
 		if err := validateNumber(p.TimeRemainingPercent); err != nil {
 			return err
 		}
-		return validateSignedNumber(p.ReservePercentPoints)
+		if err := validateSignedNumber(p.ReservePercentPoints); err != nil {
+			return err
+		}
+		if !sameKnownPace(p, derivePace(observation, window, p.CalculatedAt)) {
+			return ErrInvalidObservation
+		}
+		return nil
 	case PaceUnknown, PaceNotApplicable:
 		if p.Reason == "" || p.TimeRemainingPercent != nil || p.ReservePercentPoints != nil {
 			return ErrInvalidObservation
@@ -63,6 +72,30 @@ func (p Pace) validate() error {
 	default:
 		return ErrInvalidObservation
 	}
+}
+
+func sameKnownPace(actual Pace, expected *Pace) bool {
+	if expected == nil || expected.TimeRemainingPercent == nil || expected.ReservePercentPoints == nil ||
+		actual.Inputs.Remaining.Amount == nil || expected.Inputs.Remaining.Amount == nil ||
+		actual.Inputs.ResetAt == nil || expected.Inputs.ResetAt == nil ||
+		actual.Inputs.Duration == nil || expected.Inputs.Duration == nil {
+		return false
+	}
+	return actual.Status == expected.Status &&
+		actual.Reason == expected.Reason &&
+		actual.Calculation == expected.Calculation &&
+		actual.Inputs.Remaining.State == expected.Inputs.Remaining.State &&
+		samePaceNumber(actual.Inputs.Remaining.Amount, expected.Inputs.Remaining.Amount) &&
+		actual.Inputs.ResetAt.Equal(*expected.Inputs.ResetAt) &&
+		*actual.Inputs.Duration == *expected.Inputs.Duration &&
+		samePaceNumber(actual.TimeRemainingPercent, expected.TimeRemainingPercent) &&
+		samePaceNumber(actual.ReservePercentPoints, expected.ReservePercentPoints)
+}
+
+func samePaceNumber(actual, expected *json.Number) bool {
+	actualValue, actualErr := strconv.ParseFloat(actual.String(), 64)
+	expectedValue, expectedErr := strconv.ParseFloat(expected.String(), 64)
+	return actualErr == nil && expectedErr == nil && actualValue == expectedValue
 }
 
 func WithPace(observation Observation, evaluatedAt time.Time) Observation {
