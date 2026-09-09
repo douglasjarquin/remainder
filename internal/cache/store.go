@@ -13,7 +13,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-const WarningStorageUnavailable Warning = "cache storage is unavailable; returned live evidence without caching"
+const WarningStorageUnavailable Warning = "cache storage is unavailable; live collection bypasses caching"
 
 type Store struct {
 	root    string

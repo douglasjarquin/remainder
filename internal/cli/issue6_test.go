@@ -189,7 +189,30 @@ func TestStore_WriteUnavailable_emitsOneSanitizedWarningWithLiveResult(t *testin
 	code := executeWithAdapterAt(t.Context(), []string{"--provider=codex", "--profile=default"}, &stdout, &stderr, "test", now, adapter)
 
 	// Then
-	if code != 0 || stdout.Len() == 0 || strings.Count(stderr.String(), "remainder: warning:") != 1 || strings.Contains(stderr.String(), "/Users/") {
+	wantWarning := "remainder: warning: cache storage is unavailable; live collection bypasses caching\n"
+	if code != 0 || stdout.Len() == 0 || stderr.String() != wantWarning {
+		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestStore_WriteUnavailable_warningDoesNotClaimLiveResultOnFailure(t *testing.T) {
+	// Given
+	authPath := filepath.Join(t.TempDir(), "auth.json")
+	if err := os.WriteFile(authPath, []byte("malformed OAuth fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	provider := codex.New(codex.Options{AuthFile: authPath})
+	adapter := runtimeAdapter{codex: provider, newStore: func() (*cache.Store, error) {
+		return nil, errors.New("cache unavailable")
+	}}
+
+	// When
+	var stdout, stderr bytes.Buffer
+	code := executeWithAdapter(t.Context(), []string{"--provider=codex", "--profile=default"}, &stdout, &stderr, "test", adapter)
+
+	// Then
+	wantWarning := "remainder: warning: cache storage is unavailable; live collection bypasses caching\n"
+	if code != 1 || stdout.Len() != 0 || !strings.HasPrefix(stderr.String(), wantWarning) || !strings.Contains(stderr.String(), "authentication file is malformed") || strings.Contains(stderr.String(), "Usage:") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
 	}
 }
