@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,13 +50,18 @@ func TestStore_ConcurrentWrites_keepNewestCompleteObservation(t *testing.T) {
 func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 	// Given
 	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
-	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	allInitialReads := make(chan struct{})
+	var nowCalls atomic.Int64
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time {
+		if nowCalls.Add(1) == 3 {
+			close(allInitialReads)
+		}
+		return now
+	}})
 	binding := testBinding()
 	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Second))); err != nil {
 		t.Fatal(err)
 	}
-	started := make(chan struct{})
-	release := make(chan struct{})
 	var fetches int
 	var mutex sync.Mutex
 	results := make(chan cache.Result, 2)
@@ -68,19 +74,14 @@ func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 			result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 				mutex.Lock()
 				fetches++
-				if fetches == 1 {
-					close(started)
-				}
 				mutex.Unlock()
-				<-release
+				<-allInitialReads
 				return cache.FetchResult{Observation: testObservation(now)}
 			})
 			results <- result
 			errorsFound <- err
 		}()
 	}
-	<-started
-	close(release)
 	first, second := <-results, <-results
 
 	// Then
