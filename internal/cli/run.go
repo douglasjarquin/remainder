@@ -48,6 +48,10 @@ func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, versi
 	return executeWithAdapter(ctx, args, stdout, stderr, version, unavailableAdapter{})
 }
 
+func ExecuteWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
+	return executeWithAdapter(ctx, args, stdout, stderr, version, adapter)
+}
+
 func executeWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
 	if ctx.Err() != nil {
 		fmt.Fprintln(stderr, "remainder: interrupted")

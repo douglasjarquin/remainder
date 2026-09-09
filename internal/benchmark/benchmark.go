@@ -3,9 +3,12 @@ package benchmark
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"sort"
-	"strings"
+	"time"
+
+	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
 var ErrNoSamples = errors.New("benchmark requires at least one sample")
@@ -45,11 +48,77 @@ func Summarize(samples []int64) (Summary, error) {
 	}, nil
 }
 
-func TokenCount(output string) int {
-	return len(strings.Fields(output))
+func FixtureHash() string {
+	data, err := json.Marshal(Fixtures())
+	if err != nil {
+		panic(err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
-func FixtureHash() string {
-	sum := sha256.Sum256([]byte(FixtureSeed))
-	return hex.EncodeToString(sum[:])
+type Fixture struct {
+	Name          string               `json:"name"`
+	RequiredFacts []string             `json:"required_facts"`
+	Observation   evidence.Observation `json:"observation"`
+}
+
+var requiredFacts = []string{
+	"schema_version",
+	"provider",
+	"profile",
+	"account.last_observed",
+	"account.binding",
+	"source.kind",
+	"source.name",
+	"observed_at",
+	"freshness",
+	"outcome",
+	"window.id",
+	"window.scope",
+	"window.unit",
+	"limit.field",
+	"limit.value",
+	"failures",
+}
+
+func Fixtures() []Fixture {
+	return []Fixture{
+		{Name: "healthy", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("42")})},
+		{Name: "exhausted", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueZero, Amount: number("0")})},
+		{Name: "stale", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshStale, evidence.OutcomeComplete, evidence.Value{State: evidence.ValueDefined, Amount: number("17")})},
+		{Name: "partial-unknown", RequiredFacts: requiredFacts, Observation: fixtureObservation(evidence.FreshFresh, evidence.OutcomePartial, evidence.Value{State: evidence.ValueUnknown}, []evidence.Failure{{Scope: "daily", Message: "source unavailable"}})},
+	}
+}
+
+func number(value string) *json.Number {
+	number := json.Number(value)
+	return &number
+}
+
+func fixtureObservation(freshness evidence.Freshness, outcome evidence.Outcome, value evidence.Value, failures ...[]evidence.Failure) evidence.Observation {
+	observation := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		Account:       evidence.AccountIdentity{LastObserved: "acct-1", Binding: evidence.IdentityHistorical},
+		Source:        evidence.SourceIdentity{Kind: "fixture", Name: "local"},
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     freshness,
+		Outcome:       outcome,
+		Windows: []evidence.Window{{
+			ID:    "weekly",
+			Scope: evidence.ScopeModel,
+			Unit:  "tokens",
+			Limits: []evidence.Limit{{
+				ID:    "weekly-remaining",
+				Field: evidence.FieldRemaining,
+				Value: value,
+			}},
+		}},
+	}
+	if len(failures) > 0 {
+		observation.Failures = failures[0]
+	}
+	return observation
 }

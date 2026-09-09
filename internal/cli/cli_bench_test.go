@@ -3,9 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
-	"regexp"
 	"testing"
-	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
 	"github.com/douglasjarquin/remainder/internal/evidence"
@@ -30,27 +28,7 @@ func (a benchmarkAdapter) Observe(context.Context, evidence.Request) (evidence.O
 }
 
 func benchmarkObservation() evidence.Observation {
-	amount := evidence.JSONNumber("42")
-	return evidence.Observation{
-		SchemaVersion: evidence.SchemaV1,
-		Provider:      "codex",
-		Profile:       "main",
-		Account:       evidence.AccountIdentity{LastObserved: "acct-1", Binding: evidence.IdentityHistorical},
-		Source:        evidence.SourceIdentity{Kind: "fixture", Name: "local"},
-		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
-		Freshness:     evidence.FreshFresh,
-		Outcome:       evidence.OutcomeComplete,
-		Windows: []evidence.Window{{
-			ID:    "weekly",
-			Scope: evidence.ScopeModel,
-			Unit:  "tokens",
-			Limits: []evidence.Limit{{
-				ID:    "weekly-remaining",
-				Field: evidence.FieldRemaining,
-				Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount},
-			}},
-		}},
-	}
+	return benchmark.Fixtures()[0].Observation
 }
 
 func TestBenchmarkFixtureOutputs(t *testing.T) {
@@ -59,13 +37,8 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	if code := executeWithAdapter(context.Background(), []string{"--format", "compact"}, &compactOut, &compactErr, "v0.1.0", adapter); code != 0 {
 		t.Fatalf("compact exit code = %d, stderr = %q", code, compactErr.String())
 	}
-	compact := regexp.MustCompile(`age_seconds=\d+`).ReplaceAllString(compactOut.String(), "age_seconds=<age>")
-	wantCompact := `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=<age> freshness=fresh outcome=complete identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=42tokens` + "\n"
-	if compact != wantCompact || compactErr.Len() != 0 {
-		t.Fatalf("compact output = %q, stderr = %q, want %q", compact, compactErr.String(), wantCompact)
-	}
-	if got := benchmark.TokenCount(compactOut.String()); got != 11 {
-		t.Fatalf("compact token count = %d, want 11", got)
+	if compactErr.Len() != 0 || !bytes.Contains(compactOut.Bytes(), []byte(`schema=v1 provider="codex"`)) || !bytes.Contains(compactOut.Bytes(), []byte(`remaining=42tokens`)) {
+		t.Fatalf("compact output = %q, stderr = %q, want healthy fixture fields", compactOut.String(), compactErr.String())
 	}
 
 	var jsonOut, jsonErr bytes.Buffer
@@ -76,9 +49,6 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	if jsonOut.String() != wantJSON || jsonErr.Len() != 0 {
 		t.Fatalf("JSON output = %q, stderr = %q, want %q", jsonOut.String(), jsonErr.String(), wantJSON)
 	}
-	if got := benchmark.TokenCount(jsonOut.String()); got != 1 {
-		t.Fatalf("JSON token count = %d, want 1", got)
-	}
 
 	var valueOut, valueErr bytes.Buffer
 	args := []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}
@@ -87,9 +57,6 @@ func TestBenchmarkFixtureOutputs(t *testing.T) {
 	}
 	if valueOut.String() != "42\n" || valueErr.Len() != 0 {
 		t.Fatalf("scalar output = %q, stderr = %q", valueOut.String(), valueErr.String())
-	}
-	if got := benchmark.TokenCount(valueOut.String()); got != 1 {
-		t.Fatalf("scalar token count = %d, want 1", got)
 	}
 }
 

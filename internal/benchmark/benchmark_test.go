@@ -30,15 +30,25 @@ func TestSummarizeRejectsEmptySamples(t *testing.T) {
 	}
 }
 
-func TestTokenCountUsesDeclaredOfflineWordTokenizer(t *testing.T) {
-	if got := TokenCount(`schema=v1 provider="codex" remaining=42tokens`); got != 3 {
-		t.Fatalf("TokenCount() = %d, want 3", got)
+func TestFixtureHashIsStable(t *testing.T) {
+	const want = "a11fda4fe0caf891b76bd963540a265a60bec6eec771b7e7c9c047c74840f1d9"
+	if got := FixtureHash(); got != want {
+		t.Fatalf("FixtureHash() = %q, want %q", got, want)
 	}
 }
 
-func TestFixtureHashIsStable(t *testing.T) {
-	const want = "6526de8f9bf4cdf9e3714e6ff7be4b94978509c6a44e75da4b9aad6911fc0b55"
-	if got := FixtureHash(); got != want {
-		t.Fatalf("FixtureHash() = %q, want %q", got, want)
+func TestFixturesCoverRequiredObservationStates(t *testing.T) {
+	fixtures := Fixtures()
+	if len(fixtures) != 4 {
+		t.Fatalf("fixture count = %d, want 4", len(fixtures))
+	}
+	want := []string{"healthy", "exhausted", "stale", "partial-unknown"}
+	for index, fixture := range fixtures {
+		if fixture.Name != want[index] {
+			t.Fatalf("fixture %d = %q, want %q", index, fixture.Name, want[index])
+		}
+		if err := fixture.Observation.Validate(); err != nil {
+			t.Fatalf("fixture %q validation error = %v", fixture.Name, err)
+		}
 	}
 }

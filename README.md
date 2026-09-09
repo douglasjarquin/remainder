@@ -25,17 +25,21 @@ Run the portable verification with `./scripts/verify.sh` or `mise run verify`.
 
 Run the direct test command with `go test -race -shuffle=on -count=1 ./...`.
 
-Run `mise run benchmark` after building to emit preserved JSON Lines full-process samples and in-process allocation benchmarks.
+Run `mise run benchmark` after building to emit preserved JSON Lines full-process samples, fixture comparisons, and in-process allocation benchmarks.
 
-The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint.
+The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
 
-It records raw output, output bytes, declared offline-word-v1 structural token counts, process/request counts, environment/build metadata, p50/p95, mean, and dispersion.
+It records raw output, output bytes, optional actual `o200k_base` token counts, process/request counts, measured-binary build metadata, host metadata, p50/p95, mean, and dispersion.
+
+Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `tiktoken` for actual offline token counts.
+
+Set `REMAINDER_BENCH_COMPARATORS=1` to run the preinstalled cache-only `quota-axi` compact and JSON plus `jq -c` comparator paths once without credential refresh.
 
 Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
 
-The structural tokenizer is only an equivalent-output comparison aid.
+Without the optional tokenizer environment, token fields are explicitly unmeasured rather than word counts.
 
-It does not measure or claim a model-token advantage.
+The `o200k_base` measurement is an offline Codex-family comparison encoding and does not claim model-specific tokenizer parity.
 
 ## CLI contract
 
