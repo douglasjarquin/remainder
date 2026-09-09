@@ -61,6 +61,7 @@ type metadata struct {
 	FixtureSHA256          string            `json:"fixture_sha256"`
 	TokenApplicability     string            `json:"token_applicability"`
 	CacheWorkload          string            `json:"cache_workload"`
+	CacheMeasurement       cacheMeasurement  `json:"cache_measurement"`
 	RefreshWorkload        string            `json:"refresh_workload"`
 	ObservedSubprocesses   int               `json:"observed_subprocesses"`
 	ObservedRequests       int               `json:"observed_requests"`
@@ -69,6 +70,20 @@ type metadata struct {
 	P95ObjectiveScope      string            `json:"p95_objective_scope"`
 	P95Policy              string            `json:"p95_policy"`
 	Comparators            []comparator      `json:"comparators"`
+}
+
+type cacheMeasurement struct {
+	Source                 string `json:"source"`
+	Policy                 string `json:"policy"`
+	ObservationAgeNS       int64  `json:"observation_age_ns"`
+	MaxAgeNS               int64  `json:"max_age_ns"`
+	ObservedAt             string `json:"observed_at"`
+	Freshness              string `json:"freshness"`
+	Account                string `json:"account"`
+	IdentityBinding        string `json:"identity_binding"`
+	TimedSamples           int    `json:"timed_samples"`
+	ProvenanceSubprocesses int    `json:"provenance_subprocesses"`
+	SandboxCleanup         string `json:"sandbox_cleanup"`
 }
 
 type latencyRecord struct {

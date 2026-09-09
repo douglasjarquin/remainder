@@ -92,7 +92,14 @@ func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.
 	return 0
 }
 
+type flagValues struct {
+	format, provider, profile, window, scope, account, freshness, cache, field string
+	maxAge                                                                     time.Duration
+	refresh, staleOnError, all                                                 bool
+}
+
 func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time.Time) *cobra.Command {
+	var values flagValues
 	root := &cobra.Command{
 		Use:           "remainder",
 		Short:         "Read quota evidence from a supported provider",
@@ -100,7 +107,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := readOptions(cmd, false)
+			opts, err := readOptions(cmd, values, false)
 			if err != nil {
 				return err
 			}
@@ -112,25 +119,25 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().String("format", "compact", "output format: compact or json")
-	root.PersistentFlags().String("provider", "", "exact provider selection")
-	root.PersistentFlags().String("profile", "", "exact profile selection")
-	root.PersistentFlags().String("window", "", "exact window selection")
-	root.PersistentFlags().String("scope", "", "exact scope selection")
-	root.PersistentFlags().String("account", "", "expected last-observed account")
-	root.PersistentFlags().String("freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
-	root.PersistentFlags().String("cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
-	root.PersistentFlags().Duration("max-age", 5*time.Second, "maximum cache observation age")
-	root.PersistentFlags().Bool("refresh", false, "require a newer cache generation")
-	root.PersistentFlags().Bool("stale-on-error", false, "return stale evidence after a transient refresh failure")
-	root.PersistentFlags().Bool("all", false, "read all configured sources")
+	root.PersistentFlags().StringVar(&values.format, "format", "compact", "output format: compact or json")
+	root.PersistentFlags().StringVar(&values.provider, "provider", "", "exact provider selection")
+	root.PersistentFlags().StringVar(&values.profile, "profile", "", "exact profile selection")
+	root.PersistentFlags().StringVar(&values.window, "window", "", "exact window selection")
+	root.PersistentFlags().StringVar(&values.scope, "scope", "", "exact scope selection")
+	root.PersistentFlags().StringVar(&values.account, "account", "", "expected last-observed account")
+	root.PersistentFlags().StringVar(&values.freshness, "freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
+	root.PersistentFlags().StringVar(&values.cache, "cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
+	root.PersistentFlags().DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
+	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require a newer cache generation")
+	root.PersistentFlags().BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
+	root.PersistentFlags().BoolVar(&values.all, "all", false, "read all configured sources")
 
 	value := &cobra.Command{
 		Use:   "value",
 		Short: "Print one exact quota value",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			opts, err := readOptions(cmd, true)
+			opts, err := readOptions(cmd, values, true)
 			if err != nil {
 				return err
 			}
@@ -155,54 +162,30 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 			return partialError(observation)
 		},
 	}
-	value.Flags().String("field", "", "exact value field")
+	value.Flags().StringVar(&values.field, "field", "", "exact value field")
 	root.AddCommand(value)
 	return root
 }
 
-func readOptions(cmd *cobra.Command, valueCommand bool) (options, error) {
-	format, err := cmd.Flags().GetString("format")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: format: %v", ErrUsage, err)
-	}
+func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (options, error) {
+	format := values.format
 	if format != "compact" && format != "json" {
 		return options{}, fmt.Errorf("%w: unsupported format %q", ErrUsage, format)
 	}
-	provider, err := cmd.Flags().GetString("provider")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: provider: %v", ErrUsage, err)
-	}
-	profile, err := cmd.Flags().GetString("profile")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: profile: %v", ErrUsage, err)
-	}
-	window, err := cmd.Flags().GetString("window")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: window: %v", ErrUsage, err)
-	}
-	scope, err := cmd.Flags().GetString("scope")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: scope: %v", ErrUsage, err)
-	}
-	account, err := cmd.Flags().GetString("account")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: account: %v", ErrUsage, err)
-	}
-	freshness, err := cmd.Flags().GetString("freshness")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: freshness: %v", ErrUsage, err)
-	}
+	provider := values.provider
+	profile := values.profile
+	window := values.window
+	scope := values.scope
+	account := values.account
+	freshness := values.freshness
 	if freshness != string(evidence.FreshAny) && freshness != string(evidence.FreshOnly) {
 		return options{}, fmt.Errorf("%w: unsupported freshness %q", ErrUsage, freshness)
 	}
-	all, err := cmd.Flags().GetBool("all")
-	if err != nil {
-		return options{}, fmt.Errorf("%w: all: %v", ErrUsage, err)
-	}
+	all := values.all
 	field := ""
 	if valueCommand {
-		field, err = cmd.Flags().GetString("field")
-		if err != nil || field == "" {
+		field = values.field
+		if field == "" {
 			return options{}, fmt.Errorf("%w: value requires --field", ErrUsage)
 		}
 		if provider == "" || profile == "" || window == "" {
@@ -215,6 +198,7 @@ func readOptions(cmd *cobra.Command, valueCommand bool) (options, error) {
 	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: 5 * time.Second}
 	cacheSet := cmd.Flags().Changed("cache") || cmd.Flags().Changed("max-age") || cmd.Flags().Changed("refresh") || cmd.Flags().Changed("stale-on-error")
 	if cacheSet {
+		var err error
 		policy, err = readCachePolicy(cmd)
 		if err != nil {
 			return options{}, err

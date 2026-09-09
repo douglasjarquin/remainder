@@ -22,9 +22,9 @@ The fixture corpus emits healthy, exhausted, stale, partial-unknown, and shared-
 
 Compact and JSON records share the declared required-facts comparison scope.
 
-The public cache policy adds four flags to every real Cobra command tree; the in-process compact, JSON, and scalar allocation ceilings include that command-construction cost.
-Without race instrumentation, the measured compact, JSON, and scalar allocation counts were 136, 124, and 139.
-With the canonical race-enabled test command, three runs observed compact at 139-140, JSON at 130-132, and scalar at 142 allocations; the proposed ceilings are 141, 133, and 143.
+The public cache policy adds four flags to every real Cobra command tree.
+Each command owns one typed flag-value structure, avoiding separate value allocations and redundant string conversions.
+The original compact, JSON, and scalar allocation ceilings remain 130, 120, and 125; a canonical race-enabled probe observed 126, 116, and 124 allocations, respectively.
 
 Scalar records are explicitly labeled as selected-value projections and are not claimed to be equivalent to the full observation.
 
@@ -46,7 +46,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-renderers | Compact, JSON, and scalar fixture output stays observable across healthy, exhausted, stale, and partial-unknown states while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` and the benchmark driver | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` |
 | bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
-| bench-cache | Atomic eligible-cache reads are implemented; the actual release-binary workload is completed by the root-owned issue #6 benchmark integration. | automated `internal/cache/` and `internal/cli/issue6_test.go`; release measurement pending root integration | issue #6 |
+| bench-cache | A normally seeded complete observation is read through the actual release binary and in-process runtime adapter with invalid OAuth JSON proving eligible hits avoid credential parsing and provider requests. | automated `cmd/remainder-benchmark/cache_test.go` and `internal/cli/issue6_bench_test.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 | bench-refresh | The compiled Go test helper executes the real Cobra and native Codex adapter path against synthetic loopback TLS with one request per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/issue5_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 
 ## Measurement limits
@@ -83,6 +83,14 @@ The report preserves the scope and provenance uncertainty and does not claim ful
 
 The `go test -bench -benchmem` artifact is the source for in-process allocations and bytes per operation.
 
+`BenchmarkExecuteCacheHit` runs `cli.Execute` with the production runtime adapter and auto cache policy against a normally seeded user cache, reporting allocations and zero requests per operation without an arbitrary allocation ceiling.
+
+The release-binary cache workload seeds one complete native-source observation before timing, uses invalid OAuth JSON whose file metadata binds that seed, and records ten scalar cache hits plus one separately counted JSON provenance process.
+
+The provenance process verifies the original observation timestamp, fresh state, historical account binding, and selected value without entering a latency summary.
+
+Cache-hit samples retain first-process and warm-filesystem labels, exact streams and hashes, subprocess and request counts, and a separate p50/p95 summary under the full-process Cobra source.
+
 `BenchmarkExecuteCodexControlledRefresh` also reports the observed requests per operation through the real in-process adapter.
 
 Controlled helper-process elapsed time includes the Go test runtime, fixture TLS, metrics recording, and teardown.
@@ -99,7 +107,9 @@ Hosted CI timings are trends and are not a certification of the Apple Silicon fu
 
 The driver does not apply the cache-read objective to startup or failure workloads.
 
-The cache-read p95 objective remains unmeasured until the issue #6 release-binary benchmark integration records the eligible cache workload.
+The eligible release-binary cache-hit p95 objective is 10 ms on the declared Apple Silicon reference host.
+
+The benchmark gates that objective only on Darwin arm64 and reports other hosts as trend evidence without changing the threshold.
 
 Full-process startup and failure p95 values are retained as hosted trend evidence and do not gate the benchmark.
 
