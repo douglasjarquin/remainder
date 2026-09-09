@@ -4,8 +4,8 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-The source implements read-only Codex and Claude file providers, plus help, version, unavailable-provider behavior, and typed evidence output.
-The released v0.1.0 artifact supports Codex; the Claude source increment has controlled fixture verification and no successful native canary yet.
+The source implements read-only Codex, Claude, and Grok file providers, plus help, version, unavailable-provider behavior, and typed evidence output.
+The released v0.1.0 artifact supports Codex; the Claude and Grok source increments have controlled fixture verification and no successful native canary yet.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
 It does not log in, refresh credentials, switch accounts, invoke another CLI, or make a generative request.
@@ -14,6 +14,10 @@ Use `--provider claude --profile default` for the single selected `$CLAUDE_CONFI
 On a cache miss, Claude collection verifies the account through the profile endpoint before reading quota.
 It preserves session, weekly, model, and separate paid usage windows; see [Claude file collection](docs/features/claude.md) for selectors and source limits.
 An absent or expired file returns unavailable; there is no Keychain or refresh fallback.
+
+Use `--provider grok --profile default` for the selected Grok consumer file context.
+Shared and product percentages remain separate from prepaid credits, and account identity stays unknown.
+See [Grok file collection](docs/features/grok.md) for selectors, source limits, and mixed reports.
 
 ## Build and verify
 
@@ -37,8 +41,8 @@ Run `mise run benchmark` after building to emit preserved JSON Lines full-proces
 The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
 
 Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and selected native adapter against loopback TLS with synthetic authentication.
-Run `scripts/benchmark.sh bin/remainder --provider claude` for Claude refresh and cache measurements; the default provider is Codex.
-Each Codex sample makes one counted request; each Claude sample makes a profile request followed by a usage request.
+Run `scripts/benchmark.sh bin/remainder --provider claude` or `scripts/benchmark.sh bin/remainder --provider grok` for provider-specific refresh and cache measurements; the default provider is Codex.
+Each Codex or Grok sample makes one counted request; each Claude sample makes a profile request followed by a usage request.
 Helper-process elapsed time and the sum of request times to response headers have separate p50/p95 summaries.
 The helper measurement includes test-runtime and metrics overhead and does not measure release-binary refresh or the live provider endpoint.
 The in-process refresh benchmark reports allocations and requests per operation.
@@ -68,7 +72,7 @@ The `o200k_base` measurement is an offline Codex-family comparison encoding and 
 
 `remainder --version` writes the release or source identity to stdout and exits successfully.
 
-An invocation without a provider writes an honest unavailable message to stderr and exits nonzero.
+An invocation without a provider selection or `--all` writes an honest unavailable message to stderr and exits nonzero.
 
 Use `remainder --provider codex --profile default` for the selected native Codex context.
 The `default` profile label means the single `CODEX_HOME` context selected by the process environment; Remainder does not scan or discover other profiles.
@@ -97,7 +101,7 @@ The default `--cache auto --max-age 5s` policy reuses an eligible complete provi
 Use `--cache off` for a bounded live read, `--cache only` to refuse a miss without credential parsing or network access, `--refresh` to require an observation newer than the request's starting generation, and `--stale-on-error` to allow an expired observation only after a transient refresh failure.
 Forced requests that overlap can share the same newer observation; a forced request that starts after that observation was recorded requires another refresh.
 Transient failures use a one-second local retry delay when the provider supplies no valid deadline, and provider retry deadlines are capped at one minute so a cached failure cannot create a permanent local lockout.
-Cached observations retain their original `observed_at` and label the last-observed account identity as historical.
+Cached observations retain their original `observed_at`; previously verified account identity becomes historical, while unknown identity remains unknown.
 Cache records live under the operating system user cache directory at `remainder/v1/<binding-hash>/`, use restrictive permissions and atomic replacement, and contain no credential or raw auth path.
 
 Exit 0 means the selected evidence is usable, including zero, exhausted, and unlimited values.
@@ -111,7 +115,11 @@ The selected native macOS route passed two authorized read-only observations on 
 Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, and the [release-readiness record](docs/release-readiness.md) consolidates the completed cross-process, correctness, and performance gates.
 The [v0.1.0 release](https://github.com/douglasjarquin/remainder/releases/tag/v0.1.0) has verified downloaded Codex executables; this does not certify later provider source changes.
 
-Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
+Use `--all` to read the fixed default Codex, Claude, and Grok contexts concurrently.
+It cannot be combined with provider, profile, or account flags and does not discover profiles.
+Mixed JSON contains separate observations and provider-scoped failures; compact output remains one line.
+A provider failure preserves other usable observations with exit 3; no usable observations produces exit 1 and empty stdout.
+Fresh cached observations that exceed max-age while waiting for another provider are excluded at assembly without changing their timestamps or requesting a second refresh.
 
 ## Ownership
 

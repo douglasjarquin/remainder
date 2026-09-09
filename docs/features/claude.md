@@ -7,9 +7,9 @@ This source increment does not change the released v0.1.0 Codex artifact or cert
 ## Selection and identity
 
 Use `remainder --provider claude --profile default --format json` to inspect the selected observation.
-The `default` profile means the single `CLAUDE_CONFIG_DIR` context selected by the process environment, or `~/.claude` when the override is unset.
+The `default` profile means the single `CLAUDE_CONFIG_DIR` context selected by the process environment, or `$HOME/.claude` when the override is unset.
 An explicitly empty override does not select the current directory or a fallback.
-The source reads only `.credentials.json` and never invokes Keychain, another CLI, login, or refresh.
+The source reads only the selected credential file and never invokes Keychain, another CLI, login, or refresh.
 
 A cache miss first calls the Claude profile endpoint and requires `account.uuid`.
 The observation account ID is `account.uuid@organization.uuid` when an organization UUID is supplied, otherwise `account.uuid`.
