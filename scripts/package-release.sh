@@ -90,6 +90,7 @@ CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" GOPROXY=off GOTOOLCHAIN=lo
 	-ldflags="-s -w -X main.version=$version" \
 	-o "$bundle/remainder" ./cmd/remainder
 copy_regular_source ATTRIBUTIONS.md "$bundle/ATTRIBUTIONS.md"
+copy_regular_source LICENSE "$bundle/LICENSE"
 copy_regular_source docs/provider-sources.md "$bundle/docs/provider-sources.md"
 copy_regular_source docs/release.md "$bundle/docs/release.md"
 copy_regular_source skills/remainder/SKILL.md "$bundle/skills/remainder/SKILL.md"
@@ -114,9 +115,8 @@ cat >"$bundle/ASSET_MANIFEST.json" <<EOF
   "source_date": "$source_date",
   "go_version": "$go_version",
   "cgo_enabled": false,
-  "license_decision": "pending",
-  "readiness_document": "$readiness_status",
-  "publication_status": "blocked"
+  "license": "MIT",
+  "readiness_document": "$readiness_status"
 }
 EOF
 

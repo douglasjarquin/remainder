@@ -54,11 +54,11 @@ The final candidate still requires the independent root rerun on its exact full 
 - [ ] Re-run supported macOS and Linux checks and the 12-process concurrency workloads on the exact final source SHA.
 - [ ] Inspect the final module and executable dependency records, dependency notices, and CGO setting for unexpected runtime requirements.
 - [ ] For issue #14, install the downloaded release executable into an isolated environment and prove it runs without a separately installed Go or Cobra runtime.
-- [ ] Preserve the pending owner license decision, positive attribution, human merge, and independent final-SHA verification.
+- [ ] Preserve the adopted MIT license, positive attribution, human merge, and independent final-SHA verification.
 
 ## Limitations
 
-No public release artifact exists in this readiness slice, so downloaded-binary installation and packaging remain pending issue #14.
-The MIT text in `LICENSE_PROPOSAL.md` is still a proposal and has not been adopted.
+This local candidate is not a public release artifact, so downloaded-binary installation and packaging remain pending issue #14.
+The repository adopts the MIT license in `LICENSE`.
 The source canary did not instrument transport request count, and it makes no claim about untested provider routes or future source behavior.
 The comparator, tokenizer, and direct-file instruction trial are developer evidence rather than runtime dependencies or native skill discovery.

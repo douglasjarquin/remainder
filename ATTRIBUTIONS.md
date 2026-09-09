@@ -2,8 +2,7 @@
 
 Remainder is an independent implementation.
 
-The proposed project MIT license remains in LICENSE_PROPOSAL.md for owner review.
-Nothing in this file adopts that proposal as Remainder's license.
+Remainder is licensed under the MIT License in [LICENSE](LICENSE).
 
 The roadmap and product direction were informed by the positive prior work in [quota-axi](https://github.com/kunchenguid/quota-axi).
 

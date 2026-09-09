@@ -90,6 +90,7 @@ cat >"$expected_files" <<EOF
 $archive_base/
 $archive_base/ASSET_MANIFEST.json
 $archive_base/ATTRIBUTIONS.md
+$archive_base/LICENSE
 $archive_base/docs/
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
@@ -113,12 +114,13 @@ extract_dir="$test_root/extract"
 mkdir -p "$extract_dir"
 tar -xzf "$archive" -C "$extract_dir"
 binary="$extract_dir/$archive_base/remainder"
+cmp "$repository_root/LICENSE" "$extract_dir/$archive_base/LICENSE"
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOOS=$native_goos" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOARCH=arm64" >/dev/null
-grep -F '"publication_status": "blocked"' "$qa_manifest" >/dev/null
-grep -F '"license_decision": "pending"' "$qa_manifest" >/dev/null
+grep -F '"publication_status": "pending_final_release_verification"' "$qa_manifest" >/dev/null
+grep -F '"license": "MIT"' "$qa_manifest" >/dev/null
 if test -f "$repository_root/docs/release-readiness.md"; then
 	grep -F '"readiness_integration": "included"' "$qa_manifest" >/dev/null
 else
