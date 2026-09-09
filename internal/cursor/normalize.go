@@ -55,7 +55,7 @@ func percentWindow(id evidence.WindowID, used *sourceNumber, start, end *sourceT
 	usedValue := unknownValue()
 	remainingValue := unknownValue()
 	if used != nil {
-		value := min(max(float64(*used), 0), 100)
+		value := min(max(used.value, 0), 100)
 		usedValue = numericValue(value)
 		remainingValue = numericValue(100 - value)
 	}
@@ -80,10 +80,10 @@ func spendWindow(spend *spendLimitUsage, start, end *sourceTime) (evidence.Windo
 	for _, source := range fields {
 		value := unknownValue()
 		if source.value != nil {
-			if float64(*source.value) < 0 || math.IsInf(float64(*source.value), 0) || math.IsNaN(float64(*source.value)) {
+			if source.value.value < 0 || math.IsInf(source.value.value, 0) || math.IsNaN(source.value.value) {
 				return evidence.Window{}, fmtInvalidResponse("Cursor spend limit contains an invalid amount")
 			}
-			value = numericValue(float64(*source.value))
+			value = numericTextValue(source.value.raw, source.value.value)
 		}
 		limits = append(limits, evidence.Limit{ID: "spend_limit_" + source.name, Field: source.field, Value: value})
 	}
@@ -123,13 +123,19 @@ func appendCycle(limits []evidence.Limit, id string, start, end *sourceTime) []e
 	}
 	if start != nil && end != nil && end.After(start.Time) {
 		duration := end.Sub(start.Time)
-		limits = append(limits, evidence.Limit{ID: id + "_duration", Field: evidence.FieldDuration, Value: unknownValue(), Duration: &duration})
+		if start.Add(duration).Equal(end.Time) {
+			limits = append(limits, evidence.Limit{ID: id + "_duration", Field: evidence.FieldDuration, Value: unknownValue(), Duration: &duration})
+		}
 	}
 	return limits
 }
 
 func numericValue(value float64) evidence.Value {
-	number := evidence.JSONNumber(strconv.FormatFloat(value, 'f', -1, 64))
+	return numericTextValue(strconv.FormatFloat(value, 'f', -1, 64), value)
+}
+
+func numericTextValue(raw string, value float64) evidence.Value {
+	number := evidence.JSONNumber(raw)
 	state := evidence.ValueDefined
 	if value == 0 {
 		state = evidence.ValueZero

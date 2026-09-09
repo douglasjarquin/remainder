@@ -37,12 +37,12 @@ var (
 
 type Options struct {
 	AuthFile string
+	Endpoint string
+	Client   *http.Client
+	Timeout  time.Duration
+	Now      func() time.Time
 
-	endpoint string
-	client   *http.Client
-	timeout  time.Duration
-	now      func() time.Time
-	goos     string
+	goos string
 }
 
 type Adapter struct {
@@ -78,17 +78,17 @@ func defaultWithRuntime(goos string, getenv func(string) (string, bool)) Adapter
 }
 
 func New(options Options) Adapter {
-	client := options.client
+	client := options.Client
 	if client == nil {
 		client = &http.Client{}
 	}
 	clientCopy := *client
 	clientCopy.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	timeout := options.timeout
+	timeout := options.Timeout
 	if timeout <= 0 {
 		timeout = defaultTimeout
 	}
-	now := options.now
+	now := options.Now
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
@@ -96,7 +96,7 @@ func New(options Options) Adapter {
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	endpoint := options.endpoint
+	endpoint := options.Endpoint
 	if endpoint == "" {
 		endpoint = defaultEndpoint
 	}
@@ -123,7 +123,8 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	if err := a.validateRequest(ctx, request); err != nil {
 		return evidence.Observation{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, a.timeout)
+	callerCtx := ctx
+	ctx, cancel := context.WithTimeout(callerCtx, a.timeout)
 	defer cancel()
 	token, err := readAccessToken(a.authFile, a.now())
 	if err != nil {
@@ -137,35 +138,43 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	if err != nil {
 		return evidence.Observation{}, collectionError(err)
 	}
+	observedAt := a.now()
 
 	var plan planResponse
 	var sand sandResponse
 	failures := make([]evidence.Failure, 0, 2)
-	if body, rpcErr := a.postRPC(ctx, token, "GetPlanInfo"); rpcErr != nil {
+	if body, rpcErr := a.postRPC(ctx, token, "GetPlanInfo"); callerCtx.Err() != nil {
+		return evidence.Observation{}, callerCtx.Err()
+	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "plan", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &plan); decodeErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "plan", Message: "Cursor plan response is malformed JSON"})
 	}
-	if body, rpcErr := a.postRPC(ctx, token, "GetSandUsageStatus"); rpcErr != nil {
+	if body, rpcErr := a.postRPC(ctx, token, "GetSandUsageStatus"); callerCtx.Err() != nil {
+		return evidence.Observation{}, callerCtx.Err()
+	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "grok_bot", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &sand); decodeErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "grok_bot", Message: "Cursor Grok Bot response is malformed JSON"})
 	}
-	return normalize(usage, plan, sand, failures, a.now())
+	if err := callerCtx.Err(); err != nil {
+		return evidence.Observation{}, err
+	}
+	return normalize(usage, plan, sand, failures, observedAt)
 }
 
 func (a Adapter) validateRequest(ctx context.Context, request evidence.Request) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if a.goos != "linux" {
-		return collectionError(ErrUnsupported)
-	}
 	if request.Provider != "cursor" || request.Profile != "default" || request.All {
 		return fmt.Errorf("%w: Cursor CLI file source requires --provider cursor --profile default", evidence.ErrInvalidSelection)
 	}
 	if request.Account != "" {
 		return evidence.ErrWrongAccount
+	}
+	if a.goos != "linux" {
+		return collectionError(ErrUnsupported)
 	}
 	if a.pathErr != nil {
 		return collectionError(a.pathErr)
@@ -214,7 +223,7 @@ func (a Adapter) postRPC(ctx context.Context, token, method string) ([]byte, err
 	return body, nil
 }
 
-func Failure(err error) (cache.FailureKind, time.Time) {
+func (Adapter) Failure(err error) (cache.FailureKind, time.Time) {
 	if err == nil {
 		return cache.FailureNone, time.Time{}
 	}

@@ -46,7 +46,7 @@ func testAdapter(t *testing.T, server *httptest.Server) Adapter {
 		endpoint = server.URL
 		client = server.Client()
 	}
-	return New(Options{AuthFile: writeAuth(t, `synthetic-secret`), endpoint: endpoint, client: client, now: func() time.Time { return fixtureNow }, timeout: time.Second, goos: "linux"})
+	return New(Options{AuthFile: writeAuth(t, `synthetic-secret`), Endpoint: endpoint, Client: client, Now: func() time.Time { return fixtureNow }, Timeout: time.Second, goos: "linux"})
 }
 
 func cursorRequest() evidence.Request {

@@ -30,7 +30,6 @@ func TestAdapterObserve_normalizesIndependentCursorMeters(t *testing.T) {
 
 	// When
 	observation, err := adapter.Observe(t.Context(), cursorRequest())
-
 	// Then
 	if err != nil {
 		t.Fatalf("Observe() error = %v", err)
@@ -130,7 +129,7 @@ func TestAdapterObserve_rejectsInvalidSelectionsBeforeAccess(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Given
 			transport := &countingTransport{}
-			adapter := New(Options{AuthFile: filepath.Join(t.TempDir(), "missing"), client: &http.Client{Transport: transport}, goos: "linux"})
+			adapter := New(Options{AuthFile: filepath.Join(t.TempDir(), "missing"), Client: &http.Client{Transport: transport}, goos: "linux"})
 
 			// When
 			_, err := adapter.Observe(t.Context(), test.request)
@@ -179,7 +178,7 @@ func TestAdapterObserve_boundsAndClassifiesFailures(t *testing.T) {
 
 			// When
 			_, err := testAdapter(t, server).Observe(t.Context(), cursorRequest())
-			kind, retryAt := Failure(err)
+			kind, retryAt := testAdapter(t, server).Failure(err)
 
 			// Then
 			if err == nil || kind != test.wantKind || !retryAt.Equal(test.wantRetry) || !strings.Contains(err.Error(), test.wantPhrase) || strings.Contains(err.Error(), "synthetic-secret") {
@@ -224,14 +223,14 @@ func TestAdapterObserve_refusesRedirectAndHonorsCancellation(t *testing.T) {
 		release := make(chan struct{})
 		server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-release }))
 		defer server.Close()
-		adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), endpoint: server.URL, client: server.Client(), timeout: 20 * time.Millisecond, now: func() time.Time { return fixtureNow }, goos: "linux"})
+		adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), Endpoint: server.URL, Client: server.Client(), Timeout: 20 * time.Millisecond, Now: func() time.Time { return fixtureNow }, goos: "linux"})
 
 		// When
 		_, err := adapter.Observe(t.Context(), cursorRequest())
 		close(release)
 
 		// Then
-		kind, _ := Failure(err)
+		kind, _ := adapter.Failure(err)
 		if !errors.Is(err, context.DeadlineExceeded) || kind != cache.FailureTransient {
 			t.Fatalf("error/kind = %v/%s, want bounded transient deadline", err, kind)
 		}

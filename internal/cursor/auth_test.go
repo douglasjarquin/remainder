@@ -96,7 +96,7 @@ func TestAdapterAuth_rejectsUnsafeOrInvalidFiles(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Given
-			adapter := New(Options{AuthFile: test.setup(t), endpoint: "http://127.0.0.1:1", client: http.DefaultClient, goos: "linux", now: func() time.Time { return fixtureNow }})
+			adapter := New(Options{AuthFile: test.setup(t), Endpoint: "http://127.0.0.1:1", Client: http.DefaultClient, goos: "linux", Now: func() time.Time { return fixtureNow }})
 
 			// When
 			_, err := adapter.Observe(t.Context(), cursorRequest())
@@ -117,11 +117,10 @@ func TestAdapterObserve_acceptsOpaqueTokenWithoutInventingExpiry(t *testing.T) {
 		"GetSandUsageStatus":    {body: `{}`},
 	})
 	defer server.Close()
-	adapter := New(Options{AuthFile: writeAuth(t, "opaque-token"), endpoint: server.URL, client: server.Client(), goos: "linux", now: func() time.Time { return fixtureNow }})
+	adapter := New(Options{AuthFile: writeAuth(t, "opaque-token"), Endpoint: server.URL, Client: server.Client(), goos: "linux", Now: func() time.Time { return fixtureNow }})
 
 	// When
 	_, err := adapter.Observe(t.Context(), cursorRequest())
-
 	// Then
 	if err != nil {
 		t.Fatalf("Observe() error = %v", err)
@@ -131,7 +130,7 @@ func TestAdapterObserve_acceptsOpaqueTokenWithoutInventingExpiry(t *testing.T) {
 func TestAdapterUnsupportedOS_refusesBeforeFileOrHTTPAccess(t *testing.T) {
 	// Given
 	transport := &countingTransport{}
-	adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), client: &http.Client{Transport: transport}, goos: "darwin"})
+	adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), Client: &http.Client{Transport: transport}, goos: "darwin"})
 
 	// When
 	_, observeErr := adapter.Observe(t.Context(), cursorRequest())
@@ -160,7 +159,8 @@ func TestAdapterCacheBinding_usesMetadataOnly(t *testing.T) {
 	}
 }
 
-func TestFailure_classifiesSelectionAndCancellation(t *testing.T) {
+func TestAdapterFailure_classifiesSelectionAndCancellation(t *testing.T) {
+	adapter := Adapter{}
 	tests := []struct {
 		name string
 		err  error
@@ -172,9 +172,35 @@ func TestFailure_classifiesSelectionAndCancellation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			kind, _ := Failure(test.err)
+			kind, _ := adapter.Failure(test.err)
 			if kind != test.want {
-				t.Fatalf("Failure() = %s, want %s", kind, test.want)
+				t.Fatalf("Adapter.Failure() = %s, want %s", kind, test.want)
+			}
+		})
+	}
+}
+
+func TestAuthFileMetadata_rejectsUnownedAndUnstableFiles(t *testing.T) {
+	// Given
+	uid := os.Getuid()
+	before := syntheticAuthFileInfo{size: 20, modified: fixtureNow, stat: syscall.Stat_t{Uid: uint32(uid), Dev: 1, Ino: 2}}
+	tests := []struct {
+		name  string
+		after syntheticAuthFileInfo
+	}{
+		{name: "unowned", after: syntheticAuthFileInfo{size: 20, modified: fixtureNow, stat: syscall.Stat_t{Uid: uint32(uid + 1), Dev: 1, Ino: 2}}},
+		{name: "different file", after: syntheticAuthFileInfo{size: 20, modified: fixtureNow, stat: syscall.Stat_t{Uid: uint32(uid), Dev: 1, Ino: 3}}},
+		{name: "changed size", after: syntheticAuthFileInfo{size: 19, modified: fixtureNow, stat: syscall.Stat_t{Uid: uint32(uid), Dev: 1, Ino: 2}}},
+		{name: "changed modification time", after: syntheticAuthFileInfo{size: 20, modified: fixtureNow.Add(time.Second), stat: syscall.Stat_t{Uid: uint32(uid), Dev: 1, Ino: 2}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// When
+			stable := authFileStable(before, test.after, 20, uid)
+
+			// Then
+			if stable {
+				t.Fatal("authFileStable() accepted unsafe metadata")
 			}
 		})
 	}
@@ -192,3 +218,16 @@ func writeRawAuth(t *testing.T, body string) string {
 func contextCanceled() error {
 	return fmt.Errorf("wrapped: %w", context.Canceled)
 }
+
+type syntheticAuthFileInfo struct {
+	size     int64
+	modified time.Time
+	stat     syscall.Stat_t
+}
+
+func (i syntheticAuthFileInfo) Name() string       { return "auth.json" }
+func (i syntheticAuthFileInfo) Size() int64        { return i.size }
+func (i syntheticAuthFileInfo) Mode() os.FileMode  { return 0o600 }
+func (i syntheticAuthFileInfo) ModTime() time.Time { return i.modified }
+func (i syntheticAuthFileInfo) IsDir() bool        { return false }
+func (i syntheticAuthFileInfo) Sys() any           { return &i.stat }

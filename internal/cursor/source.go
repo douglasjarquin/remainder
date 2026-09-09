@@ -1,6 +1,7 @@
 package cursor
 
 import (
+	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -49,27 +50,36 @@ type sandResponse struct {
 	NextResetTimestampUTCSnake         *sourceTime   `json:"next_reset_timestamp_utc"`
 }
 
-type sourceNumber float64
+type sourceNumber struct {
+	raw   string
+	value float64
+}
 
 func (n *sourceNumber) UnmarshalJSON(data []byte) error {
-	var value float64
-	if len(data) > 0 && data[0] == '"' {
-		var raw string
-		if err := json.Unmarshal(data, &raw); err != nil {
+	raw := strings.TrimSpace(string(data))
+	if raw == "" || raw == "null" {
+		*n = sourceNumber{}
+		return nil
+	}
+	if raw[0] == '"' {
+		var text string
+		if err := json.Unmarshal(data, &text); err != nil {
 			return err
 		}
-		parsed, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
-		if err != nil {
-			return err
-		}
-		value = parsed
-	} else if err := json.Unmarshal(data, &value); err != nil {
-		return err
+		raw = strings.TrimSpace(text)
+	}
+	encoded := jsontext.Value(raw)
+	if !encoded.IsValid() || encoded.Kind() != '0' {
+		return errors.New("number must use JSON decimal syntax")
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return errors.New("number must be finite")
 	}
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return errors.New("number must be finite")
 	}
-	*n = sourceNumber(value)
+	*n = sourceNumber{raw: raw, value: value}
 	return nil
 }
 

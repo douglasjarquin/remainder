@@ -56,8 +56,11 @@ func inspectAuthFile(path string) (os.FileInfo, error) {
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%w: Cursor CLI authentication file is not a regular file", ErrInvalidAuth)
 	}
-	if info.Size() > maxAuthBytes {
+	if info.Size() < 0 || info.Size() > maxAuthBytes {
 		return nil, fmt.Errorf("%w: Cursor CLI authentication file is too large", ErrInvalidAuth)
+	}
+	if !authFileOwnedBy(info, os.Getuid()) {
+		return nil, fmt.Errorf("%w: Cursor CLI authentication file is not owned by the current user", ErrInvalidAuth)
 	}
 	return info, nil
 }
@@ -77,8 +80,8 @@ func readAccessToken(path string, now time.Time) (string, error) {
 		return "", fmt.Errorf("%w: Cursor CLI authentication file cannot be opened safely", ErrInvalidAuth)
 	}
 	defer file.Close()
-	after, err := file.Stat()
-	if err != nil || !after.Mode().IsRegular() || !os.SameFile(before, after) {
+	opened, err := file.Stat()
+	if err != nil || !authFileSameMetadata(before, opened, os.Getuid()) {
 		return "", fmt.Errorf("%w: Cursor CLI authentication file changed during safe open", ErrInvalidAuth)
 	}
 	body, err := io.ReadAll(io.LimitReader(file, maxAuthBytes+1))
@@ -87,6 +90,10 @@ func readAccessToken(path string, now time.Time) (string, error) {
 	}
 	if len(body) > maxAuthBytes {
 		return "", fmt.Errorf("%w: Cursor CLI authentication file is too large", ErrInvalidAuth)
+	}
+	final, err := file.Stat()
+	if err != nil || !authFileStable(opened, final, len(body), os.Getuid()) {
+		return "", fmt.Errorf("%w: Cursor CLI authentication file changed during safe read", ErrInvalidAuth)
 	}
 	var raw authFile
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -100,6 +107,23 @@ func readAccessToken(path string, now time.Time) (string, error) {
 		return "", fmt.Errorf("%w: Cursor CLI access token is expired", ErrInvalidAuth)
 	}
 	return token, nil
+}
+
+func authFileOwnedBy(info os.FileInfo, uid int) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return ok && stat.Uid == uint32(uid)
+}
+
+func authFileSameMetadata(before, after os.FileInfo, uid int) bool {
+	return after.Mode().IsRegular() &&
+		authFileOwnedBy(after, uid) &&
+		os.SameFile(before, after) &&
+		after.Size() == before.Size() &&
+		after.ModTime().Equal(before.ModTime())
+}
+
+func authFileStable(before, after os.FileInfo, bytesRead, uid int) bool {
+	return authFileSameMetadata(before, after, uid) && after.Size() == int64(bytesRead)
 }
 
 func expiredJWT(token string, now time.Time) bool {
