@@ -218,6 +218,20 @@ func TestAdapterObserve_boundsSources(t *testing.T) {
 			t.Fatalf("Observe() error = %v, calls = %d, want immediate mismatch refusal", err, calls)
 		}
 	})
+
+	t.Run("normalization failure does not fall back", func(t *testing.T) {
+		calls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			calls++
+			fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":101}}}`)
+		}))
+		defer server.Close()
+		adapter := New(Options{AuthFile: writeTestAuth(t), Endpoints: []string{server.URL + "/first", server.URL + "/second"}, Client: server.Client(), Timeout: time.Second})
+		_, err := adapter.Observe(t.Context(), evidence.Request{Provider: "codex", Profile: "default"})
+		if err == nil || calls != 1 || !strings.Contains(err.Error(), "percentage") {
+			t.Fatalf("Observe() error = %v, calls = %d, want original normalization failure", err, calls)
+		}
+	})
 }
 
 func newTestAdapter(t *testing.T, client *http.Client, endpoints []string) Adapter {

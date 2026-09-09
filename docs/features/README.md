@@ -11,7 +11,7 @@ The issue #4 baseline is tracked in [performance baseline](performance-baseline.
 | `--help` and `--version` | Implemented | CLI tests and empty-home manual transcript in issue #2 evidence |
 | Honest unavailable-provider result | Implemented | CLI test and default invocation return a nonzero exit without a fake report |
 | Provider source feasibility | Codex file shape proved; native endpoint canary unrun | [Provider source matrix](../provider-sources.md); the source-built route still requires an authorized read-only canary before release support is claimed |
-| Provider collection | Codex implemented; live support unverified | Bounded selected auth read, two native usage endpoints, normalization, and controlled HTTP/TLS tests in issue #5 |
+| Provider collection | Codex implemented; live support unverified | Bounded selected auth read, current native usage endpoint, normalization, and controlled HTTP/TLS tests in issue #5 |
 | Compact, JSON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issue #3 |
 | Cache and refresh ownership | Planned | Issues #6 and #7 define these boundaries |
 | Supported macOS/Linux verification | Implemented | `.github/workflows/ci.yml` uses macOS 14 and Ubuntu 24.04 |

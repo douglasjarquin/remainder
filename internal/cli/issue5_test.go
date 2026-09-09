@@ -57,6 +57,24 @@ func TestCodexProcessEntryPoint_readsControlledSource(t *testing.T) {
 	}
 }
 
+func TestExecuteWithCodexAdapter_rendersWeeklyPrimaryWithUnknownShortWindow(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":20,"limit_window_seconds":604800},"secondary_window":null},"additional_rate_limits":[{"metered_feature":"test-model","rate_limit":{"primary_window":{"used_percent":25,"limit_window_seconds":18000},"secondary_window":{"used_percent":50,"limit_window_seconds":604800}}}],"credits":{"balance":"7"}}`)
+	}))
+	defer server.Close()
+	adapter := codex.New(codex.Options{AuthFile: writeCLIAuth(t), Endpoints: []string{server.URL}, Client: server.Client(), Timeout: time.Second})
+	var stdout, stderr bytes.Buffer
+	code := ExecuteWithAdapter(t.Context(), []string{"value", "--provider", "codex", "--profile", "default", "--window", "weekly", "--field", "remaining"}, &stdout, &stderr, "test", adapter)
+	if code != 0 || stdout.String() != "80\n" || stderr.Len() != 0 {
+		t.Fatalf("weekly scalar: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	code = ExecuteWithAdapter(t.Context(), []string{"--provider", "codex", "--profile", "default", "--format", "json"}, &stdout, &stderr, "test", adapter)
+	if code != 0 || !strings.Contains(stdout.String(), `"id":"five_hour","scope":"account","unit":"percent","limits":[{"id":"five_hour_remaining","field":"remaining","state":"unknown"}]`) || stderr.Len() != 0 {
+		t.Fatalf("JSON report: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestExecuteWithCodexAdapter_preservesUnknownAndRuntimeExitCodes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":40,"limit_window_seconds":18000}}}`)

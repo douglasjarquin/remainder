@@ -22,7 +22,6 @@ const (
 
 var defaultEndpoints = []string{
 	"https://chatgpt.com/backend-api/wham/usage",
-	"https://chatgpt.com/backend-api/codex/usage",
 }
 
 var errAccountMismatch = errors.New("Codex quota account mismatch")
@@ -155,7 +154,7 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	}
 	observation, err := normalize(raw, credentials.accountID, a.now())
 	if err != nil {
-		return evidence.Observation{}, !errors.Is(err, errAccountMismatch), err
+		return evidence.Observation{}, false, err
 	}
 	return observation, false, nil
 }

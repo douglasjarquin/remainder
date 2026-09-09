@@ -85,21 +85,31 @@ func appendRateWindows(windows []evidence.Window, limit *rateLimit, prefix strin
 	if secondary == nil {
 		secondary = limit.Secondary
 	}
-	for index, window := range []*usageWindow{primary, secondary} {
-		fallback := "five_hour"
-		if index == 1 {
-			fallback = "weekly"
-		}
+	rawWindows := [2]*usageWindow{primary, secondary}
+	fallbacks := [2]string{"five_hour", "weekly"}
+	var parsed [2]*evidence.Window
+	for index, window := range rawWindows {
 		if window == nil {
-			id := prefix + fallback
-			windows = append(windows, evidence.Window{ID: evidence.WindowID(id), Scope: scope, Unit: "percent", Limits: []evidence.Limit{{ID: id + "_remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueUnknown}}}})
 			continue
 		}
-		parsed, err := normalizeWindow(window, prefix, fallback, scope, now)
+		value, err := normalizeWindow(window, prefix, fallbacks[index], scope, now)
 		if err != nil {
 			return nil, err
 		}
-		windows = append(windows, parsed)
+		parsed[index] = &value
+	}
+	for index, window := range parsed {
+		if window != nil {
+			windows = append(windows, *window)
+			continue
+		}
+		id := prefix + fallbacks[index]
+		for _, present := range parsed {
+			if present != nil && string(present.ID) == id {
+				id = prefix + fallbacks[1-index]
+			}
+		}
+		windows = append(windows, evidence.Window{ID: evidence.WindowID(id), Scope: scope, Unit: "percent", Limits: []evidence.Limit{{ID: id + "_remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueUnknown}}}})
 	}
 	return windows, nil
 }
