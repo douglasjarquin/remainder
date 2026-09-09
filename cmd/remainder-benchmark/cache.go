@@ -38,8 +38,11 @@ func runCacheHit(ctx context.Context, binary, provider string, samples int, obse
 	if samples < 1 {
 		return result, benchmark.ErrNoSamples
 	}
-	if provider != "codex" && provider != "claude" && provider != "grok" {
-		return result, errors.New("cache-hit provider must be codex, claude, or grok")
+	if provider == "cursor" && runtime.GOOS != "linux" {
+		return result, errors.New("Cursor benchmark is supported only on Linux")
+	}
+	if provider != "codex" && provider != "claude" && provider != "grok" && provider != "cursor" {
+		return result, errors.New("cache-hit provider must be codex, claude, grok, or Cursor on Linux")
 	}
 	if observationAge < 0 || maxAge < 0 {
 		return result, errors.New("cache-hit ages must not be negative")
@@ -89,6 +92,9 @@ func runCacheHit(ctx context.Context, binary, provider string, samples int, obse
 	}
 	authName, authBody := cacheHitAuth(provider)
 	authPath := filepath.Join(sourceHome, authName)
+	if err := os.MkdirAll(filepath.Dir(authPath), 0o700); err != nil {
+		return result, fmt.Errorf("create cache-hit auth directory: %w", err)
+	}
 	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
 		return result, fmt.Errorf("write cache-hit auth metadata: %w", err)
 	}
@@ -156,6 +162,7 @@ func runCacheHitSample(ctx context.Context, binary, workload string, args []stri
 		"CODEX_HOME=" + sourceHome,
 		"CLAUDE_CONFIG_DIR=" + sourceHome,
 		"GROK_HOME=" + sourceHome,
+		"XDG_CONFIG_HOME=" + sourceHome,
 		"XDG_CACHE_HOME=" + xdgCacheHome,
 		"TMPDIR=" + tmp,
 	}

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -44,8 +45,11 @@ func runControlledRefresh(helper, provider string, samples int, tokenizer *token
 }
 
 func runControlledRefreshWithFault(helper, provider string, samples int, tokenizer *tokenizerClient, fault controlledRefreshFault) (result controlledRefreshResult, resultErr error) {
-	if provider != "codex" && provider != "claude" && provider != "grok" {
-		return result, fmt.Errorf("controlled refresh provider must be codex, claude, or grok")
+	if provider == "cursor" && runtime.GOOS != "linux" {
+		return result, errors.New("Cursor benchmark is supported only on Linux")
+	}
+	if provider != "codex" && provider != "claude" && provider != "grok" && provider != "cursor" {
+		return result, fmt.Errorf("controlled refresh provider must be codex, claude, grok, or Cursor on Linux")
 	}
 	info, err := os.Stat(helper)
 	if err != nil {
@@ -78,6 +82,8 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 		authBody = []byte(`{"claudeAiOauth":{"accessToken":"synthetic-secret"}}`)
 	} else if provider == "grok" {
 		authBody = []byte(`{"grok.com":{"key":"synthetic-secret"}}`)
+	} else if provider == "cursor" {
+		authBody = []byte(`{"accessToken":"synthetic-secret"}`)
 	}
 	authPath := filepath.Join(root, authName)
 	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
@@ -108,6 +114,9 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 		beforeRequests := validator.requests.Load()
 		beforeProfile := validator.profileRequests.Load()
 		beforeUsage := validator.usageRequests.Load()
+		beforeCursorUsage := validator.cursorUsageRequests.Load()
+		beforeCursorPlan := validator.cursorPlanRequests.Load()
+		beforeCursorSand := validator.cursorSandRequests.Load()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		command := exec.CommandContext(ctx, helper, args...)
 		command.Env = []string{
@@ -115,6 +124,7 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 			"CODEX_HOME=" + codeHome,
 			"CLAUDE_CONFIG_DIR=" + codeHome,
 			"GROK_HOME=" + codeHome,
+			"CURSOR_CLI_CONFIG=" + authPath,
 			"TMPDIR=" + tmp,
 			"REMAINDER_ISSUE5_HELPER=1",
 			"REMAINDER_ISSUE5_PROVIDER=" + provider,
@@ -123,6 +133,7 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 			"REMAINDER_ISSUE5_PROFILE_ENDPOINT=" + server.URL + "/profile",
 			"REMAINDER_ISSUE5_USAGE_ENDPOINT=" + server.URL + "/usage",
 			"REMAINDER_ISSUE5_GROK_ENDPOINT=" + server.URL,
+			"REMAINDER_ISSUE5_CURSOR_ENDPOINT=" + server.URL,
 			"REMAINDER_ISSUE5_CA=" + caPath,
 			"REMAINDER_ISSUE5_METRICS=" + metricsPath,
 		}
@@ -148,7 +159,7 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 			return controlledRefreshResult{}, fmt.Errorf("controlled sample %d metrics: %w", n, err)
 		}
 		delta := validator.requests.Load() - beforeRequests
-		requestErr := errors.Join(validator.failure(), validator.countFailure(provider, beforeRequests, beforeProfile, beforeUsage))
+		requestErr := errors.Join(validator.failure(), validator.countFailure(provider, beforeRequests, beforeProfile, beforeUsage, beforeCursorUsage, beforeCursorPlan, beforeCursorSand))
 		if err := validateControlledRefresh(provider, exitCode, stdout.String(), stderr.String(), elapsedNS, delta, metrics, requestErr); err != nil {
 			return controlledRefreshResult{}, fmt.Errorf("controlled sample %d: %w", n, err)
 		}
@@ -220,6 +231,8 @@ func validateControlledRefresh(provider string, exitCode int, stdout, stderr str
 	wantRequests := int64(1)
 	if provider == "claude" {
 		wantRequests = 2
+	} else if provider == "cursor" {
+		wantRequests = 3
 	}
 	if requestDelta != wantRequests || metrics.RequestCount != wantRequests || metrics.RequestCount != requestDelta {
 		return fmt.Errorf("request count: parent=%d helper=%d", requestDelta, metrics.RequestCount)
