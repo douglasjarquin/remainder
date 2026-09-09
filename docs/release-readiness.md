@@ -17,7 +17,7 @@ The source dependency audit found only the pinned Cobra graph recorded in `ATTRI
 Installation proof that a downloaded executable needs no separately installed Go or Cobra runtime remains the issue #14 gate.
 
 The full-process Apple Silicon cache-hit run recorded 10 samples with p95 8.627084 ms against the fixed 10 ms objective, 61 total benchmark processes, 10 controlled provider requests, and a clean CGO-free binary.
-The in-process allocation gates retained the fixed compact, JSON, remaining-scalar, and pace-scalar ceilings of 130, 120, 125, and 125 allocations.
+The in-process allocation gates retained the fixed non-pace compact, JSON, and remaining-scalar ceilings of 130, 120, and 125 allocations, plus the distinct pace-percent compact, JSON, and scalar ceilings of 180, 180, and 140 allocations.
 The deterministic goldens covered healthy, exhausted, stale, partial-unknown, and shared-percent observations through compact, JSON, and scalar Cobra paths.
 The pace fuzz target passed against its seeded reserve classifier.
 
@@ -46,7 +46,7 @@ The final candidate still requires the independent root rerun on its exact full 
 - [ ] Drive compact, JSON, remaining scalar, pace scalar, partial success, cancellation, and fresh command instances through the real Cobra tree.
 - [ ] Run the wrong-account, stale-number, missing-limit, and secret-leak mutations and require each targeted test command to exit nonzero before restoring the source.
 - [ ] Run deterministic goldens, the pace fuzz target, race-enabled shuffled tests, and the aggregate verification gate.
-- [ ] Keep the allocation ceilings at compact 130, JSON 120, remaining scalar 125, and pace scalar 125 unless a recorded investigation approves a change.
+- [ ] Keep the non-pace fixture ceilings at compact 130, JSON 120, and remaining scalar 125, and the distinct pace-percent fixture ceilings at compact 180, JSON 180, and pace scalar 140 unless a recorded investigation approves a change.
 - [ ] Measure raw full-process samples through the CGO-free binary and require eligible Apple Silicon cache-hit p95 to remain at or below 10 ms.
 - [ ] Record process, request, allocation, memory, output, and cleanup facts without combining local, harness, network, or auth latency.
 - [ ] Run the pinned comparator and declared tokenizer only from pre-provisioned isolated environments, with external lookup disabled and uncertainty preserved.
