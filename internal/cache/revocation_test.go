@@ -21,9 +21,10 @@ func TestStore_RevocationRemainsStickyUntilSuccessfulRefresh(t *testing.T) {
 			t.Run(string(invalidation)+"_then_"+string(followUp), func(t *testing.T) {
 				// Given
 				now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+				clock := now
 				originalObservedAt := now.Add(-time.Minute)
 				binding := testBinding()
-				store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+				store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return clock }})
 				if _, err := store.Put(t.Context(), binding, testObservation(originalObservedAt)); err != nil {
 					t.Fatal(err)
 				}
@@ -53,7 +54,10 @@ func TestStore_RevocationRemainsStickyUntilSuccessfulRefresh(t *testing.T) {
 					t.Fatalf("cached-only error = %v, want unavailable", err)
 				}
 
-				recoveredAt := now
+				if followUp == cache.FailureTransient {
+					clock = now.Add(time.Second)
+				}
+				recoveredAt := clock
 				recovered, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 					return cache.FetchResult{Observation: testObservation(recoveredAt)}
 				})
