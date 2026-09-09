@@ -111,8 +111,9 @@ type flagValues struct {
 
 func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func() time.Time) *cobra.Command {
 	state := &struct {
-		values      flagValues
-		root, value cobra.Command
+		values                 flagValues
+		rootVersion, valueHelp bool
+		root, value            cobra.Command
 	}{}
 	values := &state.values
 	root := &state.root
@@ -149,7 +150,6 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 	flags.BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
 	flags.BoolVar(&values.allowKeychainPrompt, "allow-keychain-prompt", false, "allow macOS Cursor collection to prompt for Keychain access")
 	flags.BoolVar(&values.all, "all", false, "read every supported provider's default profile")
-
 	value := &state.value
 	*value = cobra.Command{
 		Use:   "value",
@@ -185,7 +185,11 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 		},
 	}
 	value.Flags().StringVar(&values.field, "field", "", "exact value field")
+	value.Flags().BoolVarP(&state.valueHelp, "help", "h", false, "help for value")
 	root.AddCommand(value)
+	if version != "" {
+		root.Flags().BoolVarP(&state.rootVersion, "version", "v", false, "version for remainder")
+	}
 	return root
 }
 
