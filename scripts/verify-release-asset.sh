@@ -73,6 +73,7 @@ cat >"$expected" <<EOF
 $archive_base/
 $archive_base/ASSET_MANIFEST.json
 $archive_base/ATTRIBUTIONS.md
+$archive_base/LICENSE
 $archive_base/docs/
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
@@ -182,12 +183,12 @@ cat >"$output_manifest" <<EOF
     "asset_manifest": "passed"
   },
   "runtime_path_excluded": ["go", "node", "python", "jq", "sum", "herdr"],
-  "license_decision": "pending",
+  "license": "MIT",
   "readiness_integration": "$readiness_status",
-  "publication_status": "blocked",
+  "publication_status": "pending_final_release_verification",
   "limitations": [
     "This is a local pre-publication candidate, not a GitHub download or public release.",
-    "Public publication remains blocked until the owner adopts or replaces LICENSE_PROPOSAL.md.",
+    "The MIT license is adopted; publication is pending final release verification.",
     "The root session must independently verify the integrated issue 13 readiness on the final release candidate before publication.",
     "Packaged data outputs, cache faults, interruption, coexistence, startup timing, and the authorized live Codex canary remain final root-owned release gates.",
     "No live provider canary, global installation, mise GitHub install, upload, tag, or release was performed."

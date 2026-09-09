@@ -1,13 +1,13 @@
 # Release artifacts
 
 Remainder release candidates are built from a clean source revision with Go 1.27.1, `CGO_ENABLED=0`, `GOPROXY=off`, trimmed paths, and an embedded release version.
-The archive carries the executable, the standalone Codex skill, the provider source record, release instructions, dependency attributions with verbatim required license texts, and a machine-readable source manifest.
+The archive carries the executable, the MIT license, the standalone Codex skill, the provider source record, release instructions, dependency attributions with verbatim required license texts, and a machine-readable source manifest.
 `SHA256SUMS` verifies archive integrity when it is obtained from a trusted approved release source.
 
-No public Remainder release exists yet.
-`LICENSE_PROPOSAL.md` is an owner decision record and has not been adopted as the project's license.
+Remainder is licensed under the [MIT License](../LICENSE).
+This local candidate is not a public release.
 The issue 13 Codex readiness result is integrated.
-Public publication remains blocked until the owner chooses a license and the final release candidate is independently verified against that readiness result.
+Publication remains pending independent final release verification against that readiness result.
 
 ## Candidate construction
 
@@ -22,9 +22,9 @@ It currently accepts macOS ARM64 and Linux ARM64 hosts, and refuses other hosts 
 It emits one `.tar.gz` archive, `SHA256SUMS`, and an `.asset-qa.json` pre-publication report.
 The report records the actual source revision, archive digest, runtime-path exclusions, checks that executed, publication blockers, and checks deliberately left to the final release gate.
 
-## Future approved standalone installation
+## Approved standalone installation
 
-After an approved release exists, download the archive and `SHA256SUMS` from that release's immutable asset URLs into a temporary directory.
+Download an approved release archive and its `SHA256SUMS` file from that release's immutable asset URLs into a temporary directory.
 Verify the checksum there before extracting:
 
 ```sh
@@ -41,11 +41,11 @@ Keep versions in separate directories, for example `~/.local/opt/remainder/v0.1.
 Switching that pointer does not terminate an in-flight process.
 No earlier Remainder version exists for first-release rollback; retain the existing `quota-axi --provider codex --no-credential-refresh` command until the consumer migration is separately approved.
 
-## Future approved mise configuration
+## Approved mise configuration
 
 The installed mise 2026.9.3 has no `remainder` registry shorthand.
-After the GitHub release exists, mise's GitHub backend can use the explicit `github:douglasjarquin/remainder` tool identifier pinned to `v0.1.0`, with an asset pattern selecting the current operating-system and architecture archive and checksum verification configured against the published `SHA256SUMS` asset.
-Create that configuration only after substituting the actual approved release asset names and immutable release URLs.
-No mise GitHub install has been executed because there is no public Remainder release to download.
+For an approved GitHub release, mise's GitHub backend can use the explicit `github:douglasjarquin/remainder` tool identifier pinned to `v0.1.0`, with an asset pattern selecting the current operating-system and architecture archive and checksum verification configured against the published `SHA256SUMS` asset.
+Create that configuration only after substituting the approved release asset names and immutable release URLs.
+This local candidate does not claim a mise GitHub installation.
 
 The GitHub backend behavior and options are documented in the official [mise GitHub backend documentation](https://mise.jdx.dev/dev-tools/backends/github.html).
