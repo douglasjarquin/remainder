@@ -28,6 +28,22 @@ func defaultRuntimeAdapter() runtimeAdapter {
 	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), grok: grok.Default(), cursor: cursor.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
 }
 
+func authorizeKeychainPrompt(adapter Adapter, allowed bool) Adapter {
+	if !allowed {
+		return adapter
+	}
+	runtime, ok := adapter.(runtimeAdapter)
+	if !ok {
+		return adapter
+	}
+	cursorAdapter, ok := runtime.cursor.(cursor.Adapter)
+	if !ok {
+		return adapter
+	}
+	runtime.cursor = cursorAdapter.WithKeychainPrompt()
+	return runtime
+}
+
 func (a runtimeAdapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
 	if request.Provider == "" {
 		return unavailableAdapter{}.Observe(ctx, request)

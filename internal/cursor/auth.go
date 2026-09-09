@@ -43,57 +43,36 @@ func defaultAuthPath(getenv func(string) (string, bool)) (string, error) {
 }
 
 func inspectAuthFile(path string) (os.FileInfo, error) {
+	return inspectOwnedRegularFile(path, "Cursor CLI authentication file")
+}
+
+func inspectOwnedRegularFile(path, description string) (os.FileInfo, error) {
 	if path == "" {
-		return nil, fmt.Errorf("%w: authentication file path is empty", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s path is empty", ErrInvalidAuth, description)
 	}
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("%w: Cursor CLI authentication file is missing", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s is missing", ErrInvalidAuth, description)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: Cursor CLI authentication file cannot be inspected", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s cannot be inspected", ErrInvalidAuth, description)
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%w: Cursor CLI authentication file is not a regular file", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s is not a regular file", ErrInvalidAuth, description)
 	}
 	if info.Size() < 0 || info.Size() > maxAuthBytes {
-		return nil, fmt.Errorf("%w: Cursor CLI authentication file is too large", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s is too large", ErrInvalidAuth, description)
 	}
 	if !authFileOwnedBy(info, os.Getuid()) {
-		return nil, fmt.Errorf("%w: Cursor CLI authentication file is not owned by the current user", ErrInvalidAuth)
+		return nil, fmt.Errorf("%w: %s is not owned by the current user", ErrInvalidAuth, description)
 	}
 	return info, nil
 }
 
 func readAccessToken(path string, now time.Time) (string, error) {
-	before, err := inspectAuthFile(path)
+	body, _, err := readOwnedRegularFile(path, "Cursor CLI authentication file")
 	if err != nil {
 		return "", err
-	}
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return "", fmt.Errorf("%w: Cursor CLI authentication file cannot be opened safely", ErrInvalidAuth)
-	}
-	file := os.NewFile(uintptr(fd), path)
-	if file == nil {
-		syscall.Close(fd)
-		return "", fmt.Errorf("%w: Cursor CLI authentication file cannot be opened safely", ErrInvalidAuth)
-	}
-	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !authFileSameMetadata(before, opened, os.Getuid()) {
-		return "", fmt.Errorf("%w: Cursor CLI authentication file changed during safe open", ErrInvalidAuth)
-	}
-	body, err := io.ReadAll(io.LimitReader(file, maxAuthBytes+1))
-	if err != nil {
-		return "", fmt.Errorf("%w: Cursor CLI authentication file cannot be read", ErrInvalidAuth)
-	}
-	if len(body) > maxAuthBytes {
-		return "", fmt.Errorf("%w: Cursor CLI authentication file is too large", ErrInvalidAuth)
-	}
-	final, err := file.Stat()
-	if err != nil || !authFileStable(opened, final, len(body), os.Getuid()) {
-		return "", fmt.Errorf("%w: Cursor CLI authentication file changed during safe read", ErrInvalidAuth)
 	}
 	var raw authFile
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -107,6 +86,39 @@ func readAccessToken(path string, now time.Time) (string, error) {
 		return "", fmt.Errorf("%w: Cursor CLI access token is expired", ErrInvalidAuth)
 	}
 	return token, nil
+}
+
+func readOwnedRegularFile(path, description string) ([]byte, os.FileInfo, error) {
+	before, err := inspectOwnedRegularFile(path, description)
+	if err != nil {
+		return nil, nil, err
+	}
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %s cannot be opened safely", ErrInvalidAuth, description)
+	}
+	file := os.NewFile(uintptr(fd), path)
+	if file == nil {
+		syscall.Close(fd)
+		return nil, nil, fmt.Errorf("%w: %s cannot be opened safely", ErrInvalidAuth, description)
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !authFileSameMetadata(before, opened, os.Getuid()) {
+		return nil, nil, fmt.Errorf("%w: %s changed during safe open", ErrInvalidAuth, description)
+	}
+	body, err := io.ReadAll(io.LimitReader(file, maxAuthBytes+1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %s cannot be read", ErrInvalidAuth, description)
+	}
+	if len(body) > maxAuthBytes {
+		return nil, nil, fmt.Errorf("%w: %s is too large", ErrInvalidAuth, description)
+	}
+	final, err := file.Stat()
+	if err != nil || !authFileStable(opened, final, len(body), os.Getuid()) {
+		return nil, nil, fmt.Errorf("%w: %s changed during safe read", ErrInvalidAuth, description)
+	}
+	return body, final, nil
 }
 
 func authFileOwnedBy(info os.FileInfo, uid int) bool {

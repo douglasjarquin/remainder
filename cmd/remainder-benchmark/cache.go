@@ -38,11 +38,8 @@ func runCacheHit(ctx context.Context, binary, provider string, samples int, obse
 	if samples < 1 {
 		return result, benchmark.ErrNoSamples
 	}
-	if provider == "cursor" && runtime.GOOS != "linux" {
-		return result, errors.New("Cursor benchmark is supported only on Linux")
-	}
 	if provider != "codex" && provider != "claude" && provider != "grok" && provider != "cursor" {
-		return result, errors.New("cache-hit provider must be codex, claude, grok, or Cursor on Linux")
+		return result, errors.New("cache-hit provider must be codex, claude, grok, or cursor")
 	}
 	if observationAge < 0 || maxAge < 0 {
 		return result, errors.New("cache-hit ages must not be negative")
@@ -157,7 +154,8 @@ func runCacheHit(ctx context.Context, binary, provider string, samples int, obse
 
 func runCacheHitSample(ctx context.Context, binary, workload string, args []string, number int, home, sourceHome, xdgCacheHome, tmp string, tokenizer *tokenizerClient) (sample, error) {
 	command := exec.CommandContext(ctx, binary, args...)
-	command.Env = []string{
+	cursorConfigName, _ := cacheHitAuth("cursor")
+	environment := []string{
 		"HOME=" + home,
 		"CODEX_HOME=" + sourceHome,
 		"CLAUDE_CONFIG_DIR=" + sourceHome,
@@ -165,7 +163,9 @@ func runCacheHitSample(ctx context.Context, binary, workload string, args []stri
 		"XDG_CONFIG_HOME=" + sourceHome,
 		"XDG_CACHE_HOME=" + xdgCacheHome,
 		"TMPDIR=" + tmp,
+		"CURSOR_CLI_CONFIG=" + filepath.Join(sourceHome, cursorConfigName),
 	}
+	command.Env = environment
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
@@ -19,6 +21,9 @@ func cacheHitAuth(provider string) (string, []byte) {
 		return ".credentials.json", []byte("{")
 	}
 	if provider == "cursor" {
+		if runtime.GOOS == "darwin" {
+			return filepath.Join("cursor", "cli-config.json"), cursorBenchmarkConfig()
+		}
 		return filepath.Join("cursor", "auth.json"), []byte("{")
 	}
 	return "auth.json", []byte("{")
@@ -27,7 +32,11 @@ func cacheHitAuth(provider string) (string, []byte) {
 func cacheHitSeed(ctx context.Context, provider, authPath string, observedAt time.Time) (cache.Binding, evidence.Observation, string, error) {
 	request := evidence.Request{Provider: evidence.Provider(provider), Profile: "default"}
 	if provider == "cursor" {
-		binding, err := cursor.New(cursor.Options{AuthFile: authPath}).CacheBinding(ctx, request)
+		options := cursor.Options{AuthFile: authPath}
+		if runtime.GOOS == "darwin" {
+			options = cursor.Options{ConfigFile: authPath, KeychainReader: cursorCacheKeychainReader}
+		}
+		binding, err := cursor.New(options).CacheBinding(ctx, request)
 		if err != nil {
 			return cache.Binding{}, evidence.Observation{}, "", fmt.Errorf("derive cache-hit binding: %w", err)
 		}
@@ -93,6 +102,14 @@ func cacheHitSeed(ctx context.Context, provider, authPath string, observedAt tim
 			Limits: []evidence.Limit{{ID: "five_hour_remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}}},
 		}},
 	}, "five_hour", nil
+}
+
+func cursorBenchmarkConfig() []byte {
+	return []byte(`{"authInfo":{"email":"benchmark@example.test","userId":"cursor-benchmark"}}`)
+}
+
+func cursorCacheKeychainReader(context.Context) (string, error) {
+	return "", errors.New("cache benchmark must not read Keychain")
 }
 
 func cacheHitIdentityBinding(provider string) evidence.IdentityBinding {

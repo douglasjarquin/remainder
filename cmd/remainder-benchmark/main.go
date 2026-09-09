@@ -23,7 +23,7 @@ const (
 func main() {
 	binary := flag.String("binary", "./bin/remainder", "compiled remainder binary to measure")
 	helper := flag.String("controlled-refresh-helper", "", "compiled internal/cli test helper for controlled refresh measurements")
-	provider := flag.String("provider", "codex", "provider for controlled refresh and release-binary cache measurements: codex, claude, grok, or Cursor on Linux")
+	provider := flag.String("provider", "codex", "provider for controlled refresh and release-binary cache measurements: codex, claude, grok, or cursor")
 	samples := flag.Int("samples", 10, "samples per workload")
 	tokenizerPython := flag.String("tokenizer-python", "", "optional Python executable with tiktoken installed")
 	comparators := flag.Bool("comparators", false, "run controlled preinstalled quota-axi and Pinchos consumer probes")

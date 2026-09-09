@@ -127,10 +127,10 @@ func TestAdapterObserve_acceptsOpaqueTokenWithoutInventingExpiry(t *testing.T) {
 	}
 }
 
-func TestAdapterUnsupportedOS_refusesBeforeFileOrHTTPAccess(t *testing.T) {
+func TestAdapterUnsupportedOS_refusesWindowsBeforeFileOrHTTPAccess(t *testing.T) {
 	// Given
 	transport := &countingTransport{}
-	adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), Client: &http.Client{Transport: transport}, goos: "darwin"})
+	adapter := New(Options{AuthFile: writeAuth(t, "synthetic-secret"), Client: &http.Client{Transport: transport}, goos: "windows"})
 
 	// When
 	_, observeErr := adapter.Observe(t.Context(), cursorRequest())

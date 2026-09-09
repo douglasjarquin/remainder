@@ -2,16 +2,13 @@ package cursor
 
 import (
 	"context"
-	"crypto/sha256"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
@@ -34,23 +31,28 @@ var (
 )
 
 type Options struct {
-	AuthFile string
-	Endpoint string
-	Client   *http.Client
-	Timeout  time.Duration
-	Now      func() time.Time
+	AuthFile       string
+	ConfigFile     string
+	KeychainReader func(context.Context) (string, error)
+	Endpoint       string
+	Client         *http.Client
+	Timeout        time.Duration
+	Now            func() time.Time
 
 	goos string
 }
 
 type Adapter struct {
-	authFile string
-	pathErr  error
-	endpoint string
-	client   *http.Client
-	timeout  time.Duration
-	now      func() time.Time
-	goos     string
+	authFile            string
+	configFile          string
+	pathErr             error
+	keychainReader      func(context.Context) (string, error)
+	allowKeychainPrompt bool
+	endpoint            string
+	client              *http.Client
+	timeout             time.Duration
+	now                 func() time.Time
+	goos                string
 }
 
 type RetryError struct{ RetryAt time.Time }
@@ -69,8 +71,14 @@ func Default() Adapter {
 }
 
 func defaultWithRuntime(goos string, getenv func(string) (string, bool)) Adapter {
-	path, err := defaultAuthPath(getenv)
-	adapter := New(Options{AuthFile: path, goos: goos})
+	options := Options{goos: goos}
+	var err error
+	if goos == "darwin" {
+		options.ConfigFile, err = defaultMacConfigPath(getenv)
+	} else {
+		options.AuthFile, err = defaultAuthPath(getenv)
+	}
+	adapter := New(options)
 	adapter.pathErr = err
 	return adapter
 }
@@ -98,23 +106,16 @@ func New(options Options) Adapter {
 	if endpoint == "" {
 		endpoint = defaultEndpoint
 	}
-	return Adapter{authFile: options.AuthFile, endpoint: endpoint, client: &clientCopy, timeout: timeout, now: now, goos: goos}
+	keychainReader := options.KeychainReader
+	if keychainReader == nil {
+		keychainReader = readMacKeychain
+	}
+	return Adapter{authFile: options.AuthFile, configFile: options.ConfigFile, keychainReader: keychainReader, endpoint: endpoint, client: &clientCopy, timeout: timeout, now: now, goos: goos}
 }
 
-func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (cache.Binding, error) {
-	if err := a.validateRequest(ctx, request); err != nil {
-		return cache.Binding{}, err
-	}
-	info, err := inspectAuthFile(a.authFile)
-	if err != nil {
-		return cache.Binding{}, collectionError(err)
-	}
-	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d", filepath.Clean(a.authFile), info.Size(), info.ModTime().UnixNano(), info.Mode())
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		identity += fmt.Sprintf("\x00%d\x00%d", stat.Dev, stat.Ino)
-	}
-	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
-	return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_file_http", SourceName: "cursor_cli_auth_json", CredentialFingerprint: fingerprint}, nil
+func (a Adapter) WithKeychainPrompt() Adapter {
+	a.allowKeychainPrompt = true
+	return a
 }
 
 func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
@@ -124,8 +125,23 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	callerCtx := ctx
 	ctx, cancel := context.WithTimeout(callerCtx, a.timeout)
 	defer cancel()
-	token, err := readAccessToken(a.authFile, a.now())
+	var token string
+	var source evidence.SourceIdentity
+	var err error
+	if a.goos == "darwin" {
+		if !a.allowKeychainPrompt {
+			return evidence.Observation{}, collectionError(ErrKeychainPromptRequired)
+		}
+		token, err = a.readMacAccessToken(ctx)
+		source = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "cursor_cli_keychain"}
+	} else {
+		token, err = readAccessToken(a.authFile, a.now())
+		source = evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}
+	}
 	if err != nil {
+		if callerErr := callerCtx.Err(); callerErr != nil {
+			return evidence.Observation{}, callerErr
+		}
 		return evidence.Observation{}, collectionError(err)
 	}
 	usageBody, err := a.postRPC(ctx, token, "GetCurrentPeriodUsage")
@@ -162,7 +178,7 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	if err := callerCtx.Err(); err != nil {
 		return evidence.Observation{}, err
 	}
-	return normalize(usage, plan, sand, failures, observedAt)
+	return normalize(usage, plan, sand, failures, observedAt, source)
 }
 
 func (a Adapter) validateRequest(ctx context.Context, request evidence.Request) error {
@@ -175,13 +191,16 @@ func (a Adapter) validateRequest(ctx context.Context, request evidence.Request) 
 	if request.Account != "" {
 		return evidence.ErrWrongAccount
 	}
-	if a.goos != "linux" {
+	if a.goos != "linux" && a.goos != "darwin" {
 		return collectionError(ErrUnsupported)
 	}
 	if a.pathErr != nil {
 		return collectionError(a.pathErr)
 	}
-	if a.authFile == "" {
+	if a.goos == "darwin" && a.configFile == "" {
+		return collectionError(fmt.Errorf("%w: configuration file path is empty", ErrInvalidAuth))
+	}
+	if a.goos == "linux" && a.authFile == "" {
 		return collectionError(fmt.Errorf("%w: authentication file path is empty", ErrInvalidAuth))
 	}
 	return nil

@@ -26,7 +26,7 @@ var allRequests = []evidence.Request{
 }
 
 func init() {
-	if runtime.GOOS == "linux" {
+	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
 		allRequests = append(allRequests, evidence.Request{Provider: "cursor", Profile: "default"})
 	}
 }
