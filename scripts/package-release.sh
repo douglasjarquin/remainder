@@ -46,8 +46,16 @@ if test -n "$(git status --porcelain)" && test "${REMAINDER_ALLOW_DIRTY:-0}" != 
 fi
 
 case "$(uname -s):$(uname -m)" in
-	Darwin:arm64) target=darwin_arm64 ;;
-	Linux:arm64 | Linux:aarch64) target=linux_arm64 ;;
+	Darwin:arm64)
+		target=darwin_arm64
+		target_os=darwin
+		target_arch=arm64
+		;;
+	Linux:arm64 | Linux:aarch64)
+		target=linux_arm64
+		target_os=linux
+		target_arch=arm64
+		;;
 	*)
 		printf 'package-release: unsupported build host: %s %s\n' "$(uname -s)" "$(uname -m)" >&2
 		exit 1
@@ -77,7 +85,8 @@ trap cleanup EXIT HUP INT TERM
 bundle="$build_root/$archive_base"
 
 mkdir -p "$bundle/docs" "$bundle/skills/remainder/references"
-CGO_ENABLED=0 GOPROXY=off GOTOOLCHAIN=local go build -buildvcs=true -trimpath \
+CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" GOPROXY=off GOTOOLCHAIN=local \
+	go build -buildvcs=true -trimpath \
 	-ldflags="-s -w -X main.version=$version" \
 	-o "$bundle/remainder" ./cmd/remainder
 copy_regular_source ATTRIBUTIONS.md "$bundle/ATTRIBUTIONS.md"

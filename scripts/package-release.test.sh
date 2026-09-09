@@ -26,6 +26,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 output_dir="$test_root/dist"
+git -C "$repository_root" check-ignore -q dist/remainder_v0.1.0_darwin_arm64.tar.gz
 if REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1 "$output_dir" >/dev/null 2>&1; then
 	printf '%s\n' 'package-release-test: malformed version was accepted' >&2
 	exit 1
@@ -43,7 +44,8 @@ if PATH="$fake_bin:$PATH" REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/pack
 	exit 1
 fi
 
-REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
+GOOS=linux GOARCH=amd64 REMAINDER_ALLOW_DIRTY=1 \
+	"$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
 
 archive="$output_dir/remainder_v0.1.0_darwin_arm64.tar.gz"
 checksums="$output_dir/SHA256SUMS"
@@ -85,6 +87,8 @@ tar -xzf "$archive" -C "$extract_dir"
 binary="$extract_dir/remainder_v0.1.0_darwin_arm64/remainder"
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
+go version -m "$binary" | grep -F "build$(printf '\t')GOOS=darwin" >/dev/null
+go version -m "$binary" | grep -F "build$(printf '\t')GOARCH=arm64" >/dev/null
 grep -F '"publication_status": "blocked"' "$qa_manifest" >/dev/null
 grep -F '"license_decision": "pending"' "$qa_manifest" >/dev/null
 if test -f "$repository_root/docs/release-readiness.md"; then

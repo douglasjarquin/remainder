@@ -25,8 +25,16 @@ output_manifest=$4
 archive_name=$(basename -- "$archive")
 archive_base=${archive_name%.tar.gz}
 case "$archive_base" in
-	remainder_v[0-9]*.[0-9]*.[0-9]*_darwin_arm64) target=darwin_arm64 ;;
-	remainder_v[0-9]*.[0-9]*.[0-9]*_linux_arm64) target=linux_arm64 ;;
+	remainder_v[0-9]*.[0-9]*.[0-9]*_darwin_arm64)
+		target=darwin_arm64
+		expected_goos=darwin
+		expected_goarch=arm64
+		;;
+	remainder_v[0-9]*.[0-9]*.[0-9]*_linux_arm64)
+		target=linux_arm64
+		expected_goos=linux
+		expected_goarch=arm64
+		;;
 	*)
 		printf 'verify-release-asset: unsupported archive name: %s\n' "$archive_name" >&2
 		exit 2
@@ -131,8 +139,15 @@ build_metadata="$qa_root/build-metadata.txt"
 go version -m "$binary" >"$build_metadata"
 grep -F "vcs.revision=$source_revision" "$build_metadata" >/dev/null
 grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" "$build_metadata" >/dev/null
+grep -F ': go1.27.1' "$build_metadata" >/dev/null
+grep -F "build$(printf '\t')CGO_ENABLED=0" "$build_metadata" >/dev/null
+grep -F "build$(printf '\t')GOOS=$expected_goos" "$build_metadata" >/dev/null
+grep -F "build$(printf '\t')GOARCH=$expected_goarch" "$build_metadata" >/dev/null
 grep -F "\"source_revision\": \"$source_revision\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F "\"version\": \"$version\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
+grep -F "\"target\": \"$target\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
+grep -F '"go_version": "go1.27.1"' "$bundle/ASSET_MANIFEST.json" >/dev/null
+grep -F '"cgo_enabled": false' "$bundle/ASSET_MANIFEST.json" >/dev/null
 
 readiness_status=pending
 if test -f "$bundle/docs/release-readiness.md"; then
@@ -159,6 +174,9 @@ cat >"$output_manifest" <<EOF
     "error_exit_and_no_usage_dump": "passed",
     "version_output": "passed",
     "embedded_source_revision": "passed",
+    "embedded_target": "passed",
+    "embedded_go_version": "passed",
+    "embedded_cgo_disabled": "passed",
     "asset_manifest": "passed"
   },
   "runtime_path_excluded": ["go", "node", "python", "jq", "sum", "herdr"],
