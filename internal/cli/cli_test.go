@@ -66,13 +66,13 @@ func TestExecuteRejectsUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestExecuteRefusesQuotaUntilProviderExists(t *testing.T) {
+func TestExecuteRequiresProviderSelectionForQuota(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Execute(context.Background(), nil, &stdout, &stderr, "v0.1.0")
 	if code == 0 {
 		t.Fatal("Execute() exit code = 0, want unavailable-provider failure")
 	}
-	if !bytes.Contains(stderr.Bytes(), []byte("no provider is implemented")) {
+	if !bytes.Contains(stderr.Bytes(), []byte("quota is unavailable; select a supported provider")) {
 		t.Fatalf("stderr = %q, want unavailable-provider message", stderr.String())
 	}
 	if stdout.Len() != 0 {

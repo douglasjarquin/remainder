@@ -36,6 +36,7 @@ func TestCacheBindingIsolation(t *testing.T) {
 }
 
 func TestFailureClassification(t *testing.T) {
+	adapter := Default()
 	retryAt := time.Date(2026, 9, 9, 14, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name      string
@@ -45,7 +46,7 @@ func TestFailureClassification(t *testing.T) {
 	}{{"none", nil, cache.FailureNone, time.Time{}}, {"revoked", ErrAuthorizationRejected, cache.FailureRevoked, time.Time{}}, {"account mismatch", ErrAccountMismatch, cache.FailureAccountMismatch, time.Time{}}, {"evidence account mismatch", evidence.ErrWrongAccount, cache.FailureAccountMismatch, time.Time{}}, {"transient", ErrTransient, cache.FailureTransient, time.Time{}}, {"retry", &RetryError{RetryAt: retryAt}, cache.FailureTransient, retryAt}, {"permanent", errors.New("bad local source"), cache.FailurePermanent, time.Time{}}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			kind, retry := Failure(tt.err)
+			kind, retry := adapter.Failure(tt.err)
 			if kind != tt.want || !retry.Equal(tt.wantRetry) {
 				t.Fatalf("Failure(%v) = %q, %v", tt.err, kind, retry)
 			}

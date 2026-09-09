@@ -229,7 +229,7 @@ func parseRetryAfter(value string, now time.Time) time.Time {
 	return time.Time{}
 }
 
-func Failure(err error) (cache.FailureKind, time.Time) {
+func (a Adapter) Failure(err error) (cache.FailureKind, time.Time) {
 	switch {
 	case err == nil:
 		return cache.FailureNone, time.Time{}
