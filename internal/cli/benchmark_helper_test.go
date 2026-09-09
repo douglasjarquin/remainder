@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -76,7 +77,13 @@ func runIssue5Helper() int {
 	case "grok":
 		adapter = grok.New(grok.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoint: os.Getenv("REMAINDER_ISSUE5_GROK_ENDPOINT"), Client: client, Timeout: time.Second, Now: fixedNow})
 	case "cursor":
-		adapter = cursor.New(cursor.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoint: os.Getenv("REMAINDER_ISSUE5_CURSOR_ENDPOINT"), Client: client, Timeout: time.Second, Now: fixedNow})
+		options := cursor.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoint: os.Getenv("REMAINDER_ISSUE5_CURSOR_ENDPOINT"), Client: client, Timeout: time.Second, Now: fixedNow}
+		if runtime.GOOS == "darwin" {
+			options = cursor.Options{ConfigFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), KeychainReader: func(context.Context) (string, error) { return "synthetic-secret", nil }, Endpoint: os.Getenv("REMAINDER_ISSUE5_CURSOR_ENDPOINT"), Client: client, Timeout: time.Second, Now: fixedNow}
+			adapter = cursor.New(options).WithKeychainPrompt()
+		} else {
+			adapter = cursor.New(options)
+		}
 	default:
 		fmt.Fprintln(os.Stderr, "remainder benchmark helper: invalid provider")
 		return 1

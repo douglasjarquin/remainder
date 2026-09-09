@@ -45,11 +45,8 @@ func runControlledRefresh(helper, provider string, samples int, tokenizer *token
 }
 
 func runControlledRefreshWithFault(helper, provider string, samples int, tokenizer *tokenizerClient, fault controlledRefreshFault) (result controlledRefreshResult, resultErr error) {
-	if provider == "cursor" && runtime.GOOS != "linux" {
-		return result, errors.New("Cursor benchmark is supported only on Linux")
-	}
 	if provider != "codex" && provider != "claude" && provider != "grok" && provider != "cursor" {
-		return result, fmt.Errorf("controlled refresh provider must be codex, claude, grok, or Cursor on Linux")
+		return result, fmt.Errorf("controlled refresh provider must be codex, claude, grok, or cursor")
 	}
 	info, err := os.Stat(helper)
 	if err != nil {
@@ -83,7 +80,12 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 	} else if provider == "grok" {
 		authBody = []byte(`{"grok.com":{"key":"synthetic-secret"}}`)
 	} else if provider == "cursor" {
-		authBody = []byte(`{"accessToken":"synthetic-secret"}`)
+		if runtime.GOOS == "darwin" {
+			authName = "cursor-cli-config.json"
+			authBody = cursorBenchmarkConfig()
+		} else {
+			authBody = []byte(`{"accessToken":"synthetic-secret"}`)
+		}
 	}
 	authPath := filepath.Join(root, authName)
 	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
