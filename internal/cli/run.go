@@ -52,11 +52,11 @@ func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, versi
 }
 
 func ExecuteWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
-	return executeWithAdapterAt(ctx, args, stdout, stderr, version, time.Now().UTC(), adapter)
+	return executeWithAdapterClock(ctx, args, stdout, stderr, version, utcNow, adapter)
 }
 
 func executeWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
-	return executeWithAdapterAt(ctx, args, stdout, stderr, version, time.Now().UTC(), adapter)
+	return executeWithAdapterClock(ctx, args, stdout, stderr, version, utcNow, adapter)
 }
 
 func ExecuteWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.Writer, version string, now time.Time, adapter Adapter) int {
@@ -64,6 +64,10 @@ func ExecuteWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.
 }
 
 func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.Writer, version string, now time.Time, adapter Adapter) int {
+	return executeWithAdapterClock(ctx, args, stdout, stderr, version, func() time.Time { return now }, adapter)
+}
+
+func executeWithAdapterClock(ctx context.Context, args []string, stdout, stderr io.Writer, version string, now func() time.Time, adapter Adapter) int {
 	if ctx.Err() != nil {
 		fmt.Fprintln(stderr, "remainder: interrupted")
 		return 130
@@ -98,7 +102,7 @@ type flagValues struct {
 	refresh, staleOnError, all                                                 bool
 }
 
-func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time.Time) *cobra.Command {
+func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func() time.Time) *cobra.Command {
 	var values flagValues
 	root := &cobra.Command{
 		Use:           "remainder",
@@ -151,6 +155,9 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 			}
 			if observation.Outcome == evidence.OutcomeUnavailable {
 				return ErrUnavailable
+			}
+			if opts.field == evidence.FieldPace {
+				observation = evidence.WithPace(observation, now())
 			}
 			output, err := evidence.SelectValue(observation, request, opts.freshness)
 			if err != nil {
@@ -207,7 +214,7 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), cachePolicy: policy, cacheSet: cacheSet, all: all}, nil
 }
 
-func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time) error {
+func runReport(cmd *cobra.Command, adapter Adapter, opts options, now func() time.Time) error {
 	observation, err := observe(cmd, adapter, evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, Freshness: opts.freshness, All: opts.all}, opts.cachePolicy, opts.cacheSet)
 	if err != nil {
 		return err
@@ -218,6 +225,8 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time)
 	if opts.freshness == evidence.FreshOnly && observation.Freshness != evidence.FreshFresh {
 		return evidence.ErrStale
 	}
+	evaluatedAt := now()
+	observation = evidence.WithPace(observation, evaluatedAt)
 	observation, err = observation.ForRequest(evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, All: opts.all})
 	if err != nil {
 		return err
@@ -231,7 +240,7 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time)
 			return fmt.Errorf("write JSON: %w", err)
 		}
 	} else {
-		output, err := evidence.RenderCompact(observation, now)
+		output, err := evidence.RenderCompact(observation, evaluatedAt)
 		if err != nil {
 			return err
 		}

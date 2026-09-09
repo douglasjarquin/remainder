@@ -47,7 +47,11 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 			}
 			limitParts = append(limitParts, part)
 		}
-		windowParts = append(windowParts, safeToken(string(window.ID))+"/"+safeToken(string(window.Scope))+":"+strings.Join(limitParts, ","))
+		part := safeToken(string(window.ID)) + "/" + safeToken(string(window.Scope)) + ":" + strings.Join(limitParts, ",")
+		if window.Pace != nil {
+			part += " " + formatPace(*window.Pace, safeToken(window.Unit))
+		}
+		windowParts = append(windowParts, part)
 	}
 	parts = append(parts, "windows="+strings.Join(windowParts, ";"))
 	if len(observation.Failures) > 0 {
@@ -58,6 +62,36 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 		parts = append(parts, "failures="+strings.Join(failures, ","))
 	}
 	return strings.Join(parts, " "), nil
+}
+
+func formatPace(pace Pace, unit string) string {
+	parts := []string{
+		"pace=" + safeToken(string(pace.Status)),
+		"pace_calculation=" + safeToken(pace.Calculation),
+		"pace_calculated_at=" + pace.CalculatedAt.Format(time.RFC3339Nano),
+		"pace_observed_at=" + pace.Inputs.ObservedAt.Format(time.RFC3339Nano),
+		"pace_remaining=" + formatPaceValue(pace.Inputs.Remaining, unit),
+	}
+	if pace.Reason != "" {
+		parts = append(parts, "pace_reason="+safeToken(pace.Reason))
+	}
+	if pace.Inputs.ResetAt != nil {
+		parts = append(parts, "pace_reset="+pace.Inputs.ResetAt.Format(time.RFC3339Nano))
+	}
+	if pace.Inputs.Duration != nil {
+		parts = append(parts, "pace_duration="+pace.Inputs.Duration.String())
+	}
+	if pace.TimeRemainingPercent != nil {
+		parts = append(parts, "pace_time_remaining="+pace.TimeRemainingPercent.String()+"percent")
+	}
+	if pace.ReservePercentPoints != nil {
+		parts = append(parts, "pace_reserve="+pace.ReservePercentPoints.String()+"percentage_points")
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatPaceValue(value Value, unit string) string {
+	return formatValue(Limit{Value: value}, unit)
 }
 
 func safeToken(value string) string {
@@ -106,6 +140,24 @@ type jsonWindow struct {
 	Scope  Scope       `json:"scope"`
 	Unit   string      `json:"unit"`
 	Limits []jsonLimit `json:"limits"`
+	Pace   *jsonPace   `json:"pace,omitempty"`
+}
+
+type jsonPace struct {
+	Status               PaceStatus     `json:"status"`
+	Reason               string         `json:"reason,omitempty"`
+	Calculation          string         `json:"calculation"`
+	CalculatedAt         string         `json:"calculated_at"`
+	Inputs               jsonPaceInputs `json:"inputs"`
+	TimeRemainingPercent *json.Number   `json:"time_remaining_percent,omitempty"`
+	ReservePercentPoints *json.Number   `json:"reserve_percent_points,omitempty"`
+}
+
+type jsonPaceInputs struct {
+	ObservedAt string  `json:"observed_at"`
+	Remaining  Value   `json:"remaining"`
+	ResetAt    *string `json:"reset_at,omitempty"`
+	Duration   *string `json:"duration,omitempty"`
 }
 
 type jsonLimit struct {
@@ -154,7 +206,31 @@ func RenderJSON(observation Observation) ([]byte, error) {
 			}
 			parsed.Limits = append(parsed.Limits, item)
 		}
+		if window.Pace != nil {
+			parsed.Pace = renderJSONPace(*window.Pace)
+		}
 		result.Windows = append(result.Windows, parsed)
 	}
 	return json.Marshal(result)
+}
+
+func renderJSONPace(pace Pace) *jsonPace {
+	result := &jsonPace{
+		Status:               pace.Status,
+		Reason:               pace.Reason,
+		Calculation:          pace.Calculation,
+		CalculatedAt:         pace.CalculatedAt.Format(time.RFC3339Nano),
+		Inputs:               jsonPaceInputs{ObservedAt: pace.Inputs.ObservedAt.Format(time.RFC3339Nano), Remaining: pace.Inputs.Remaining},
+		TimeRemainingPercent: pace.TimeRemainingPercent,
+		ReservePercentPoints: pace.ReservePercentPoints,
+	}
+	if pace.Inputs.ResetAt != nil {
+		value := pace.Inputs.ResetAt.Format(time.RFC3339Nano)
+		result.Inputs.ResetAt = &value
+	}
+	if pace.Inputs.Duration != nil {
+		value := pace.Inputs.Duration.String()
+		result.Inputs.Duration = &value
+	}
+	return result
 }

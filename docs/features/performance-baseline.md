@@ -19,7 +19,7 @@ Separate count, p50, p95, mean, and dispersion summaries preserve both timing bo
 
 The report preserves environment and build metadata, binary size, raw samples, and per-workload count, minimum, maximum, p50, p95, mean, and dispersion.
 
-The deterministic fixture corpus, its fixed rendering clock, and its SHA-256 are included in the metadata so repeated measurements can be tied to the exact input.
+The deterministic fixture corpus in `internal/benchmark/benchmark.go`, its fixed rendering clock, and its SHA-256 are included in the metadata so repeated measurements can be tied to the exact input.
 
 The fixture corpus emits healthy, exhausted, stale, partial-unknown, and shared-percent observations through compact, JSON, and scalar Cobra paths.
 
@@ -48,7 +48,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-cli | The compiled Cobra entrypoint measures help, version, unavailable, and invalid-freshness output with expected exit codes and exact output regression checks. | automated `scripts/benchmark.sh` and `cmd/remainder-benchmark/main.go` | `artifacts/benchmark-cli.jsonl` |
 | bench-renderers | Compact, JSON, and scalar fixture output stays observable across healthy, exhausted, stale, and partial-unknown states while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` and the benchmark driver | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` |
 | bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
-| bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
+| bench-budgets | Seeded compact, JSON, remaining-scalar, and pace-scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | A normally seeded complete observation is read through the actual release binary and in-process runtime adapter with invalid OAuth JSON proving eligible hits avoid credential parsing and provider requests. | automated `cmd/remainder-benchmark/cache_test.go` and `internal/cli/issue6_bench_test.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 | bench-refresh | The compiled Go test helper executes the real Cobra and native Codex adapter path against synthetic loopback TLS with one request per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/issue5_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 | bench-coalescing | Release processes record one provider request per overlapping response generation, bounded 429 reuse, contention latency, memory, and exact child/proof-call counts. | manual explicit developer acceptance through `cmd/remainder-benchmark --coalescing-acceptance` | `.omo/evidence/issue7/green/coalescing-acceptance.json` |

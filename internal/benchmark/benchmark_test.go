@@ -32,7 +32,7 @@ func TestSummarizeRejectsEmptySamples(t *testing.T) {
 }
 
 func TestFixtureHashIsStable(t *testing.T) {
-	const want = "566a4234a1a7fe2bd3ccad498fd3620e53701d2a3027e3ebf73a112287e8f60f"
+	const want = "eadac2d82be444394253e39881baae3637a60fd9b3322fbd498e815dcea47b33"
 	if got := FixtureHash(); got != want {
 		t.Fatalf("FixtureHash() = %q, want %q", got, want)
 	}
