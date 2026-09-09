@@ -20,6 +20,7 @@ const (
 
 func main() {
 	binary := flag.String("binary", "./bin/remainder", "compiled remainder binary to measure")
+	helper := flag.String("controlled-refresh-helper", "", "compiled internal/cli test helper for controlled refresh measurements")
 	samples := flag.Int("samples", 10, "samples per workload")
 	tokenizerPython := flag.String("tokenizer-python", "", "optional Python executable with tiktoken installed")
 	comparators := flag.Bool("comparators", false, "run controlled preinstalled quota-axi and Pinchos consumer probes")
@@ -35,6 +36,13 @@ func main() {
 	}
 	if info.Mode().Perm()&0o111 == 0 {
 		fatalf("benchmark binary is not executable: %s", *binary)
+	}
+	if *helper == "" {
+		fatalf("controlled refresh helper is required")
+	}
+	controlled, err := runControlledRefresh(*helper, *samples, nil)
+	if err != nil {
+		fatalf("controlled refresh: %v", err)
 	}
 
 	workloads := []workload{
@@ -75,7 +83,9 @@ func main() {
 		GOMAXPROCS:             runtime.GOMAXPROCS(0),
 		Host:                   host,
 		Build:                  buildInfo,
+		HelperBuild:            controlled.HelperBuild,
 		SizeBytes:              info.Size(),
+		HelperSizeBytes:        controlled.HelperSize,
 		SamplesPerWorkload:     *samples,
 		Workloads:              workloadNames,
 		Tokenizer:              tokenizerInfo,
@@ -84,9 +94,9 @@ func main() {
 		FixtureSHA256:          benchmark.FixtureHash(),
 		TokenApplicability:     "o200k_base is an offline Codex-family comparison encoding; model-specific tokenizer certification remains outside this baseline",
 		CacheWorkload:          "unimplemented pending issue #6",
-		RefreshWorkload:        "unimplemented pending issue #5",
-		ObservedSubprocesses:   len(workloads) * *samples,
-		ObservedRequests:       0,
+		RefreshWorkload:        "controlled compiled test helper through Cobra and native Codex adapter",
+		ObservedSubprocesses:   (len(workloads) + 1) * *samples,
+		ObservedRequests:       controlled.RequestCount,
 		AllocationsMeasurement: "go test -bench -benchmem output in artifacts/benchmark-in-process.txt",
 		P95ObjectiveNS:         appleSiliconP95ObjectiveNS,
 		P95ObjectiveScope:      "eligible cache reads on the declared Apple Silicon host; cache is unimplemented pending issue #6",
@@ -132,6 +142,11 @@ func main() {
 			byWorkload[item.Name] = append(byWorkload[item.Name], result.ElapsedNS)
 		}
 	}
+	for _, result := range controlled.Samples {
+		writeJSON(result)
+	}
+	writeJSON(controlled.ProcessSummary)
+	writeJSON(controlled.RequestSummary)
 
 	summaries := make(map[string]benchmark.Summary, len(byWorkload))
 	for name, samples := range byWorkload {

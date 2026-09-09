@@ -4,9 +4,15 @@ Status: implemented for the available local Cobra CLI and deterministic test fix
 
 The baseline is a small developer measurement path rather than a benchmark service.
 
-`mise run benchmark` builds the release-like binary, runs `go test -bench -benchmem` for in-process CLI allocations, and runs `scripts/benchmark.sh` for full-process measurements.
+`mise run benchmark` builds the release-like binary, runs `go test -bench -benchmem` for in-process CLI allocations, and runs `scripts/benchmark.sh` for release startup and controlled refresh measurements.
 
 The full-process driver starts the compiled binary once per sample and records the exact arguments, exit code, stdout, stderr, output byte counts, optional model-token counts, output hashes, elapsed time, filesystem-cache label, subprocess count, and request count.
+
+The controlled refresh driver compiles a Go test helper once, invokes the actual Cobra execution seam with an injected native Codex adapter, and sends one request per sample to a synthetic loopback TLS server.
+
+Each controlled sample records total helper-process elapsed time and controlled TLS round-trip time as separate fields.
+
+Separate count, p50, p95, mean, and dispersion summaries preserve both timing boundaries.
 
 The report preserves environment and build metadata, binary size, raw samples, and per-workload count, minimum, maximum, p50, p95, mean, and dispersion.
 
@@ -20,7 +26,9 @@ Scalar records are explicitly labeled as selected-value projections and are not 
 
 The first sample is labeled `first-process` and later samples are labeled `warm-filesystem`.
 
-The normal benchmark does not purge a cache or access credentials, network, telemetry, or a provider.
+The normal benchmark does not purge a cache or access live credentials, external network, telemetry, or a provider.
+
+The controlled fixture uses fixed synthetic credentials, an explicit owned CA, and an owned metrics sidecar.
 
 The optional comparator invokes quota-axi only inside its synthetic fetch harness and writes only to an owned temporary cache that it verifies and removes.
 
@@ -35,7 +43,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | Eligible-cache reads are unimplemented pending issue #6. | manual not-applicable: cache is not implemented in this release | issue #6 |
-| bench-refresh | Controlled loopback refresh is unimplemented pending issue #5. | manual not-applicable: provider refresh is not implemented in this release | issue #5 |
+| bench-refresh | The compiled Go test helper executes the real Cobra and native Codex adapter path against synthetic loopback TLS with one request per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/issue5_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 
 ## Measurement limits
 
@@ -70,6 +78,18 @@ Remainder's profile, historical account binding, source, outcome, and value stat
 The report preserves the scope and provenance uncertainty and does not claim full-payload equality or interchange token and percentage units.
 
 The `go test -bench -benchmem` artifact is the source for in-process allocations and bytes per operation.
+
+`BenchmarkExecuteCodexControlledRefresh` also reports the observed requests per operation through the real in-process adapter.
+
+Controlled helper-process elapsed time includes the Go test runtime, fixture TLS, metrics recording, and teardown.
+
+Controlled TLS round-trip time includes loopback transport and server work through receipt of the response headers.
+
+The adapter's response-body read and normalization remain inside the full helper-process elapsed time rather than the controlled TLS round-trip field.
+
+These measurements are not timings from the release binary and are not timings from a provider endpoint.
+
+The controlled process and request p95 summaries are written to `artifacts/benchmark-cli.jsonl`, while allocation metrics are written to `artifacts/benchmark-in-process.txt`.
 
 Hosted CI timings are trends and are not a certification of the Apple Silicon full-process p95 objective.
 
