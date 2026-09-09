@@ -66,7 +66,8 @@ func (v *controlledRequestValidator) serveClaude(w http.ResponseWriter, r *http.
 func (v *controlledRequestValidator) validateAndWrite(w http.ResponseWriter, r *http.Request, checks []struct {
 	valid   bool
 	failure string
-}, body string) {
+}, body string,
+) {
 	if !v.validate(w, checks) {
 		return
 	}
@@ -76,7 +77,8 @@ func (v *controlledRequestValidator) validateAndWrite(w http.ResponseWriter, r *
 func (v *controlledRequestValidator) validate(w http.ResponseWriter, checks []struct {
 	valid   bool
 	failure string
-}) bool {
+},
+) bool {
 	for _, check := range checks {
 		if !check.valid {
 			v.mu.Lock()

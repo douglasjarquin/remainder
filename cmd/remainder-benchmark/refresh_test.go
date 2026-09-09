@@ -26,7 +26,6 @@ func TestControlledRefreshRun_recordsProviderSamplesAndSummaries(t *testing.T) {
 
 			// When
 			result, err := runControlledRefresh(helper, test.provider, samples, nil)
-
 			// Then
 			if err != nil {
 				t.Fatal(err)
