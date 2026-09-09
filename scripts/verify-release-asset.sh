@@ -56,6 +56,11 @@ listing="$qa_root/archive-files.txt"
 expected="$qa_root/expected-files.txt"
 tar -tzf "$archive" | LC_ALL=C sort >"$listing"
 
+if ! tar -tvzf "$archive" | awk '$1 !~ /^[-d]/ { exit 1 }'; then
+	printf '%s\n' 'verify-release-asset: archive contains a non-regular file or non-directory entry' >&2
+	exit 1
+fi
+
 cat >"$expected" <<EOF
 $archive_base/
 $archive_base/ASSET_MANIFEST.json
@@ -76,8 +81,8 @@ if tar -tzf "$archive" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
 	printf '%s\n' 'verify-release-asset: unsafe archive path' >&2
 	exit 1
 fi
-if tar -tzf "$archive" | grep -Fx "$archive_base/docs/codex-readiness.md" >/dev/null; then
-	printf '%s\n' "$archive_base/docs/codex-readiness.md" >>"$expected"
+if tar -tzf "$archive" | grep -Fx "$archive_base/docs/release-readiness.md" >/dev/null; then
+	printf '%s\n' "$archive_base/docs/release-readiness.md" >>"$expected"
 fi
 LC_ALL=C sort -o "$expected" "$expected"
 diff -u "$expected" "$listing"
@@ -130,7 +135,7 @@ grep -F "\"source_revision\": \"$source_revision\"" "$bundle/ASSET_MANIFEST.json
 grep -F "\"version\": \"$version\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 
 readiness_status=pending
-if test -f "$bundle/docs/codex-readiness.md"; then
+if test -f "$bundle/docs/release-readiness.md"; then
 	readiness_status=included
 fi
 archive_sha256=$actual_sha256

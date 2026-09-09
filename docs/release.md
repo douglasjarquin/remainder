@@ -2,7 +2,7 @@
 
 Remainder release candidates are built from a clean source revision with Go 1.27.1, `CGO_ENABLED=0`, `GOPROXY=off`, trimmed paths, and an embedded release version.
 The archive carries the executable, the standalone Codex skill, the provider source record, release instructions, dependency attributions with verbatim required license texts, and a machine-readable source manifest.
-`SHA256SUMS` authenticates the downloaded archive bytes after an approved release publishes them.
+`SHA256SUMS` verifies archive integrity when it is obtained from a trusted approved release source.
 
 No public Remainder release exists yet.
 `LICENSE_PROPOSAL.md` is an owner decision record and has not been adopted as the project's license.

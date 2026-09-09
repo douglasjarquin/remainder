@@ -30,6 +30,19 @@ if REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1 "$
 	printf '%s\n' 'package-release-test: malformed version was accepted' >&2
 	exit 1
 fi
+
+fake_bin="$test_root/fake-bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/go" <<'EOF'
+#!/bin/sh
+printf '%s\n' 'go version go1.26.9 test/arm64'
+EOF
+chmod +x "$fake_bin/go"
+if PATH="$fake_bin:$PATH" REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir" >/dev/null 2>&1; then
+	printf '%s\n' 'package-release-test: wrong Go version was accepted' >&2
+	exit 1
+fi
+
 REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
 
 archive="$output_dir/remainder_v0.1.0_darwin_arm64.tar.gz"
@@ -59,6 +72,10 @@ remainder_v0.1.0_darwin_arm64/skills/remainder/references/examples.md
 remainder_v0.1.0_darwin_arm64/skills/remainder/references/installation.md
 remainder_v0.1.0_darwin_arm64/skills/remainder/references/interpretation.md
 EOF
+if test -f "$repository_root/docs/release-readiness.md"; then
+	printf '%s\n' 'remainder_v0.1.0_darwin_arm64/docs/release-readiness.md' >>"$expected_files"
+fi
+LC_ALL=C sort -o "$expected_files" "$expected_files"
 tar -tzf "$archive" | LC_ALL=C sort >"$actual_files"
 diff -u "$expected_files" "$actual_files"
 
@@ -70,6 +87,37 @@ test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/rem
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
 grep -F '"publication_status": "blocked"' "$qa_manifest" >/dev/null
 grep -F '"license_decision": "pending"' "$qa_manifest" >/dev/null
-grep -F '"readiness_integration": "pending"' "$qa_manifest" >/dev/null
+if test -f "$repository_root/docs/release-readiness.md"; then
+	grep -F '"readiness_integration": "included"' "$qa_manifest" >/dev/null
+else
+	grep -F '"readiness_integration": "pending"' "$qa_manifest" >/dev/null
+fi
+
+crafted_root="$test_root/crafted"
+mkdir -p "$crafted_root"
+tar -xzf "$archive" -C "$crafted_root"
+crafted_bundle="$crafted_root/remainder_v0.1.0_darwin_arm64"
+outside_marker="$test_root/outside-allowlist.txt"
+printf '%s\n' 'outside bundle' >"$outside_marker"
+if command -v trash >/dev/null 2>&1; then
+	trash "$crafted_bundle/ATTRIBUTIONS.md"
+else
+	gio trash "$crafted_bundle/ATTRIBUTIONS.md"
+fi
+ln -s "$outside_marker" "$crafted_bundle/ATTRIBUTIONS.md"
+crafted_archive="$test_root/remainder_v0.1.0_darwin_arm64.tar.gz"
+COPYFILE_DISABLE=1 tar -C "$crafted_root" -cf - remainder_v0.1.0_darwin_arm64 | gzip -n >"$crafted_archive"
+crafted_checksums="$test_root/SHA256SUMS"
+if command -v shasum >/dev/null 2>&1; then
+	(cd "$test_root" && shasum -a 256 remainder_v0.1.0_darwin_arm64.tar.gz >SHA256SUMS)
+else
+	(cd "$test_root" && sha256sum remainder_v0.1.0_darwin_arm64.tar.gz >SHA256SUMS)
+fi
+if "$repository_root/scripts/verify-release-asset.sh" "$crafted_archive" "$crafted_checksums" \
+	"$(git -C "$repository_root" rev-parse HEAD)" "$test_root/crafted-qa.json" >/dev/null 2>&1; then
+	printf '%s\n' 'package-release-test: archive symlink was accepted' >&2
+	exit 1
+fi
+test ! -e "$test_root/crafted-qa.json"
 
 printf '%s\n' 'package release contract passed'

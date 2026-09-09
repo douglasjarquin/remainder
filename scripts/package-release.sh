@@ -18,6 +18,16 @@ sha256_file() {
 	fi
 }
 
+copy_regular_source() {
+	source_path=$1
+	destination_path=$2
+	if test ! -f "$source_path" || test -L "$source_path"; then
+		printf 'package-release: source input must be a regular file: %s\n' "$source_path" >&2
+		exit 1
+	fi
+	cp "$source_path" "$destination_path"
+}
+
 test "$#" -ge 1 && test "$#" -le 2 || usage
 
 version=$1
@@ -46,7 +56,11 @@ esac
 
 source_revision=$(git rev-parse HEAD)
 source_date=$(git show -s --format=%cI HEAD)
-go_version=$(go version | awk '{print $3}')
+go_version=$(GOTOOLCHAIN=local go version | awk '{print $3}')
+if test "$go_version" != go1.27.1; then
+	printf 'package-release: Go 1.27.1 is required; found %s\n' "$go_version" >&2
+	exit 1
+fi
 archive_base="remainder_${version}_${target}"
 archive_name="$archive_base.tar.gz"
 build_root=$(mktemp -d "${TMPDIR:-/tmp}/remainder-package.XXXXXX")
@@ -62,18 +76,21 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 bundle="$build_root/$archive_base"
 
-mkdir -p "$bundle/docs" "$bundle/skills"
-CGO_ENABLED=0 GOPROXY=off go build -buildvcs=true -trimpath \
+mkdir -p "$bundle/docs" "$bundle/skills/remainder/references"
+CGO_ENABLED=0 GOPROXY=off GOTOOLCHAIN=local go build -buildvcs=true -trimpath \
 	-ldflags="-s -w -X main.version=$version" \
 	-o "$bundle/remainder" ./cmd/remainder
-cp ATTRIBUTIONS.md "$bundle/ATTRIBUTIONS.md"
-cp docs/provider-sources.md "$bundle/docs/provider-sources.md"
-cp docs/release.md "$bundle/docs/release.md"
-cp -R skills/remainder "$bundle/skills/remainder"
+copy_regular_source ATTRIBUTIONS.md "$bundle/ATTRIBUTIONS.md"
+copy_regular_source docs/provider-sources.md "$bundle/docs/provider-sources.md"
+copy_regular_source docs/release.md "$bundle/docs/release.md"
+copy_regular_source skills/remainder/SKILL.md "$bundle/skills/remainder/SKILL.md"
+copy_regular_source skills/remainder/references/examples.md "$bundle/skills/remainder/references/examples.md"
+copy_regular_source skills/remainder/references/installation.md "$bundle/skills/remainder/references/installation.md"
+copy_regular_source skills/remainder/references/interpretation.md "$bundle/skills/remainder/references/interpretation.md"
 
 readiness_status=pending
-if test -f docs/codex-readiness.md; then
-	cp docs/codex-readiness.md "$bundle/docs/codex-readiness.md"
+if test -e docs/release-readiness.md || test -L docs/release-readiness.md; then
+	copy_regular_source docs/release-readiness.md "$bundle/docs/release-readiness.md"
 	readiness_status=included
 fi
 
