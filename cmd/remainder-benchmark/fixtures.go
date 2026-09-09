@@ -136,7 +136,7 @@ func validateOutput(item workload, result sample) string {
 			return "version output mismatch"
 		}
 	case "failure-unavailable":
-		if result.Stdout != "" || result.Stderr != "remainder: no provider is implemented; quota is unavailable\n" {
+		if result.Stdout != "" || result.Stderr != "remainder: quota is unavailable; select a supported provider\n" {
 			return "unavailable error output mismatch"
 		}
 	case "failure-invalid-freshness":

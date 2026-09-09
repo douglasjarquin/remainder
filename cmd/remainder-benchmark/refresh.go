@@ -7,20 +7,20 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
 )
 
-const controlledRefreshSource = "compiled-test-helper-cobra-entrypoint"
+const (
+	controlledRefreshSource       = "compiled-test-helper-cobra-entrypoint"
+	controlledRefreshTimingSource = "controlled-loopback-tls-round-trip-sum"
+)
 
 type controlledRefreshMetrics struct {
 	SchemaVersion            string `json:"schema_version"`
@@ -39,55 +39,14 @@ type controlledRefreshResult struct {
 
 type controlledRefreshFault func(string, *atomic.Int64) error
 
-type controlledRequestValidator struct {
-	requests atomic.Int64
-	mu       sync.Mutex
-	failures []string
+func runControlledRefresh(helper, provider string, samples int, tokenizer *tokenizerClient) (controlledRefreshResult, error) {
+	return runControlledRefreshWithFault(helper, provider, samples, tokenizer, nil)
 }
 
-func (v *controlledRequestValidator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	v.requests.Add(1)
-	checks := []struct {
-		valid   bool
-		failure string
-	}{
-		{r.Method == http.MethodGet, "method mismatch"},
-		{r.URL.Path == "/backend-api/wham/usage", "path mismatch"},
-		{r.Header.Get("Authorization") == "Bearer synthetic-secret", "authorization header mismatch"},
-		{r.Header.Get("ChatGPT-Account-Id") == "acct-test", "account header mismatch"},
-		{r.Header.Get("Accept") == "application/json", "accept header mismatch"},
+func runControlledRefreshWithFault(helper, provider string, samples int, tokenizer *tokenizerClient, fault controlledRefreshFault) (result controlledRefreshResult, resultErr error) {
+	if provider != "codex" && provider != "claude" && provider != "grok" {
+		return result, fmt.Errorf("controlled refresh provider must be codex, claude, or grok")
 	}
-	for _, check := range checks {
-		if !check.valid {
-			v.mu.Lock()
-			v.failures = append(v.failures, check.failure)
-			v.mu.Unlock()
-		}
-	}
-	v.mu.Lock()
-	failed := len(v.failures) > 0
-	v.mu.Unlock()
-	if failed {
-		http.Error(w, "invalid controlled request", http.StatusBadRequest)
-		return
-	}
-	fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":40,"limit_window_seconds":18000}}}`)
-}
-
-func (v *controlledRequestValidator) failure() error {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if len(v.failures) == 0 {
-		return nil
-	}
-	return fmt.Errorf("controlled request: %s", strings.Join(v.failures, ", "))
-}
-
-func runControlledRefresh(helper string, samples int, tokenizer *tokenizerClient) (controlledRefreshResult, error) {
-	return runControlledRefreshWithFault(helper, samples, tokenizer, nil)
-}
-
-func runControlledRefreshWithFault(helper string, samples int, tokenizer *tokenizerClient, fault controlledRefreshFault) (result controlledRefreshResult, resultErr error) {
 	info, err := os.Stat(helper)
 	if err != nil {
 		return result, fmt.Errorf("stat controlled helper: %w", err)
@@ -109,11 +68,19 @@ func runControlledRefreshWithFault(helper string, samples int, tokenizer *tokeni
 		}
 	}()
 
-	validator := &controlledRequestValidator{}
+	validator := &controlledRequestValidator{provider: provider}
 	server := httptest.NewTLSServer(validator)
 	defer server.Close()
-	authPath := filepath.Join(root, "auth.json")
-	if err := os.WriteFile(authPath, []byte(`{"tokens":{"access_token":"synthetic-secret","account_id":"acct-test"}}`), 0o600); err != nil {
+	authName := "auth.json"
+	authBody := []byte(`{"tokens":{"access_token":"synthetic-secret","account_id":"acct-test"}}`)
+	if provider == "claude" {
+		authName = ".credentials.json"
+		authBody = []byte(`{"claudeAiOauth":{"accessToken":"synthetic-secret"}}`)
+	} else if provider == "grok" {
+		authBody = []byte(`{"grok.com":{"key":"synthetic-secret"}}`)
+	}
+	authPath := filepath.Join(root, authName)
+	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
 		return result, fmt.Errorf("write controlled auth: %w", err)
 	}
 	caPath := filepath.Join(root, "ca.pem")
@@ -138,16 +105,24 @@ func runControlledRefreshWithFault(helper string, samples int, tokenizer *tokeni
 	args := []string{"-test.run=^TestIssue5HelperProcess$"}
 	for n := 1; n <= samples; n++ {
 		metricsPath := filepath.Join(root, fmt.Sprintf("metrics-%d.json", n))
-		before := validator.requests.Load()
+		beforeRequests := validator.requests.Load()
+		beforeProfile := validator.profileRequests.Load()
+		beforeUsage := validator.usageRequests.Load()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		command := exec.CommandContext(ctx, helper, args...)
 		command.Env = []string{
 			"HOME=" + home,
 			"CODEX_HOME=" + codeHome,
+			"CLAUDE_CONFIG_DIR=" + codeHome,
+			"GROK_HOME=" + codeHome,
 			"TMPDIR=" + tmp,
 			"REMAINDER_ISSUE5_HELPER=1",
+			"REMAINDER_ISSUE5_PROVIDER=" + provider,
 			"REMAINDER_ISSUE5_AUTH=" + authPath,
 			"REMAINDER_ISSUE5_ENDPOINT=" + server.URL + "/backend-api/wham/usage",
+			"REMAINDER_ISSUE5_PROFILE_ENDPOINT=" + server.URL + "/profile",
+			"REMAINDER_ISSUE5_USAGE_ENDPOINT=" + server.URL + "/usage",
+			"REMAINDER_ISSUE5_GROK_ENDPOINT=" + server.URL,
 			"REMAINDER_ISSUE5_CA=" + caPath,
 			"REMAINDER_ISSUE5_METRICS=" + metricsPath,
 		}
@@ -172,8 +147,9 @@ func runControlledRefreshWithFault(helper string, samples int, tokenizer *tokeni
 		if err != nil {
 			return controlledRefreshResult{}, fmt.Errorf("controlled sample %d metrics: %w", n, err)
 		}
-		delta := validator.requests.Load() - before
-		if err := validateControlledRefresh(exitCode, stdout.String(), stderr.String(), elapsedNS, delta, metrics, validator.failure()); err != nil {
+		delta := validator.requests.Load() - beforeRequests
+		requestErr := errors.Join(validator.failure(), validator.countFailure(provider, beforeRequests, beforeProfile, beforeUsage))
+		if err := validateControlledRefresh(provider, exitCode, stdout.String(), stderr.String(), elapsedNS, delta, metrics, requestErr); err != nil {
 			return controlledRefreshResult{}, fmt.Errorf("controlled sample %d: %w", n, err)
 		}
 		stdoutTokens, err := countTokens(tokenizer, stdout.String())
@@ -204,7 +180,7 @@ func runControlledRefreshWithFault(helper string, samples int, tokenizer *tokeni
 		return controlledRefreshResult{}, fmt.Errorf("summarize controlled TLS round trip: %w", err)
 	}
 	result.ProcessSummary = summary{Kind: "summary", Source: controlledRefreshSource, Workloads: map[string]benchmark.Summary{"controlled-refresh": processSummary}}
-	result.RequestSummary = requestTimingSummary{Kind: "request-timing-summary", Source: "controlled-loopback-tls-round-trip", Workload: "controlled-refresh", Timing: requestSummary}
+	result.RequestSummary = requestTimingSummary{Kind: "request-timing-summary", Source: controlledRefreshTimingSource, Workload: "controlled-refresh", Timing: requestSummary}
 	result.RequestCount = int(validator.requests.Load())
 	return result, nil
 }
@@ -231,7 +207,7 @@ func readControlledRefreshMetrics(path string) (controlledRefreshMetrics, error)
 	return metrics, nil
 }
 
-func validateControlledRefresh(exitCode int, stdout, stderr string, elapsedNS, requestDelta int64, metrics controlledRefreshMetrics, requestErr error) error {
+func validateControlledRefresh(provider string, exitCode int, stdout, stderr string, elapsedNS, requestDelta int64, metrics controlledRefreshMetrics, requestErr error) error {
 	if requestErr != nil {
 		return requestErr
 	}
@@ -241,7 +217,11 @@ func validateControlledRefresh(exitCode int, stdout, stderr string, elapsedNS, r
 	if metrics.SchemaVersion != "v1" {
 		return fmt.Errorf("metrics schema %q", metrics.SchemaVersion)
 	}
-	if requestDelta != 1 || metrics.RequestCount != 1 || metrics.RequestCount != requestDelta {
+	wantRequests := int64(1)
+	if provider == "claude" {
+		wantRequests = 2
+	}
+	if requestDelta != wantRequests || metrics.RequestCount != wantRequests || metrics.RequestCount != requestDelta {
 		return fmt.Errorf("request count: parent=%d helper=%d", requestDelta, metrics.RequestCount)
 	}
 	if metrics.ControlledTLSRoundTripNS <= 0 || elapsedNS <= metrics.ControlledTLSRoundTripNS {

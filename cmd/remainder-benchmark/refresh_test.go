@@ -11,20 +11,39 @@ import (
 	"testing"
 )
 
-func TestControlledRefreshRun_recordsSamplesAndSummaries(t *testing.T) {
+func TestControlledRefreshRun_recordsProviderSamplesAndSummaries(t *testing.T) {
 	helper := buildControlledRefreshHelper(t)
+	for _, test := range []struct {
+		provider string
+		requests int
+	}{
+		{provider: "codex", requests: 1},
+		{provider: "claude", requests: 2},
+		{provider: "grok", requests: 1},
+	} {
+		t.Run(test.provider, func(t *testing.T) {
+			// Given
+			const samples = 2
 
-	result, err := runControlledRefresh(helper, 2, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Samples) != 2 || result.RequestCount != 2 || result.ProcessSummary.Workloads["controlled-refresh"].Count != 2 || result.RequestSummary.Timing.Count != 2 {
-		t.Fatalf("controlled result = %+v", result)
-	}
-	for _, value := range result.Samples {
-		if value.Source != controlledRefreshSource || value.ExitCode != 0 || value.Stdout != "60\n" || value.Stderr != "" || value.SubprocessCount != 1 || value.RequestCount != 1 || value.ElapsedNS <= value.ControlledTLSRoundTripNS || value.ControlledTLSRoundTripNS <= 0 {
-			t.Fatalf("controlled sample = %+v", value)
-		}
+			// When
+			result, err := runControlledRefresh(helper, test.provider, samples, nil)
+			// Then
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Samples) != samples || result.RequestCount != samples*test.requests || result.ProcessSummary.Workloads["controlled-refresh"].Count != samples || result.RequestSummary.Timing.Count != samples || result.RequestSummary.Source != controlledRefreshTimingSource {
+				t.Fatalf("controlled result = %+v", result)
+			}
+			for _, value := range result.Samples {
+				if value.Source != controlledRefreshSource || value.ExitCode != 0 || value.Stdout != "60\n" || value.Stderr != "" || value.SubprocessCount != 1 || value.RequestCount != test.requests || value.ElapsedNS <= value.ControlledTLSRoundTripNS || value.ControlledTLSRoundTripNS <= 0 {
+					t.Fatalf("controlled sample = %+v", value)
+				}
+			}
+			if test.provider == "grok" {
+				value := result.Samples[0]
+				t.Logf("compiled Grok helper: samples=%d requests=%d scalar=%q process_ns=%d tls_round_trip_ns=%d", len(result.Samples), result.RequestCount, value.Stdout, value.ElapsedNS, value.ControlledTLSRoundTripNS)
+			}
+		})
 	}
 }
 
@@ -36,11 +55,17 @@ func TestControlledRefreshRun_rejectsCountOrMetricsMismatch(t *testing.T) {
 	}{
 		{name: "parent request count", fault: func(_ string, requests *atomic.Int64) error { requests.Add(1); return nil }},
 		{name: "missing metrics", fault: func(path string, _ *atomic.Int64) error { return os.Remove(path) }},
-		{name: "malformed metrics", fault: func(path string, _ *atomic.Int64) error { return os.WriteFile(path, []byte("not json"), 0o600) }},
+		{name: "malformed metrics output", fault: func(path string, _ *atomic.Int64) error { return os.WriteFile(path, []byte("not json"), 0o600) }},
+		{name: "metrics schema", fault: func(path string, _ *atomic.Int64) error {
+			return os.WriteFile(path, []byte(`{"schema_version":"v2","request_count":1,"controlled_tls_round_trip_ns":1}`), 0o600)
+		}},
+		{name: "metrics timing", fault: func(path string, _ *atomic.Int64) error {
+			return os.WriteFile(path, []byte(`{"schema_version":"v1","request_count":1,"controlled_tls_round_trip_ns":0}`), 0o600)
+		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result, err := runControlledRefreshWithFault(helper, 1, nil, test.fault)
+			result, err := runControlledRefreshWithFault(helper, "codex", 1, nil, test.fault)
 			if err == nil || len(result.Samples) != 0 || result.ProcessSummary.Kind != "" || result.RequestSummary.Kind != "" {
 				t.Fatalf("result = %+v, error = %v", result, err)
 			}
@@ -49,7 +74,7 @@ func TestControlledRefreshRun_rejectsCountOrMetricsMismatch(t *testing.T) {
 }
 
 func TestControlledRequestValidator_rejectsWrongHeaders(t *testing.T) {
-	validator := &controlledRequestValidator{}
+	validator := &controlledRequestValidator{provider: "codex"}
 	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://example.test/wrong", nil)
 	if err != nil {
 		t.Fatal(err)

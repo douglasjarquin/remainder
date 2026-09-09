@@ -15,7 +15,7 @@ import (
 const module = "github.com/douglasjarquin/remainder"
 
 var (
-	ErrUnavailable = errors.New("no provider is implemented; quota is unavailable")
+	ErrUnavailable = errors.New("quota is unavailable; select a supported provider")
 	ErrUsage       = errors.New("invalid command usage")
 	ErrPartial     = errors.New("partial evidence")
 )
@@ -79,6 +79,12 @@ func executeWithAdapterClock(ctx context.Context, args []string, stdout, stderr 
 			fmt.Fprintln(stderr, "remainder: interrupted")
 			return 130
 		}
+		if unavailable, ok := errors.AsType[*mixedUnavailableError](err); ok {
+			for _, failure := range unavailable.failures {
+				fmt.Fprintf(stderr, "remainder: %s/%s: %s\n", failure.Provider, failure.Profile, failure.Message)
+			}
+			return 1
+		}
 		fmt.Fprintf(stderr, "remainder: %s\n", err)
 		switch {
 		case errors.Is(err, ErrUnavailable), errors.Is(err, cache.ErrUnavailable), errors.Is(err, cache.ErrLockTimeout), errors.Is(err, cache.ErrBackoff), errors.Is(err, context.DeadlineExceeded), errors.Is(err, evidence.ErrProviderUnavailable):
@@ -134,7 +140,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 	root.PersistentFlags().DurationVar(&values.maxAge, "max-age", 5*time.Second, "maximum cache observation age")
 	root.PersistentFlags().BoolVar(&values.refresh, "refresh", false, "require an observation newer than this request's starting generation")
 	root.PersistentFlags().BoolVar(&values.staleOnError, "stale-on-error", false, "return stale evidence after a transient refresh failure")
-	root.PersistentFlags().BoolVar(&values.all, "all", false, "read all configured sources")
+	root.PersistentFlags().BoolVar(&values.all, "all", false, "read codex/default, claude/default, and grok/default")
 
 	value := &cobra.Command{
 		Use:   "value",
@@ -189,6 +195,9 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 		return options{}, fmt.Errorf("%w: unsupported freshness %q", ErrUsage, freshness)
 	}
 	all := values.all
+	if valueCommand && all {
+		return options{}, fmt.Errorf("%w: value cannot use --all", ErrUsage)
+	}
 	field := ""
 	if valueCommand {
 		field = values.field
@@ -197,9 +206,6 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 		}
 		if provider == "" || profile == "" || window == "" {
 			return options{}, fmt.Errorf("%w: value requires --provider, --profile, and --window", ErrUsage)
-		}
-		if all {
-			return options{}, fmt.Errorf("%w: value cannot use --all", ErrUsage)
 		}
 	}
 	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: 5 * time.Second}
@@ -212,48 +218,4 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 		}
 	}
 	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), cachePolicy: policy, cacheSet: cacheSet, all: all}, nil
-}
-
-func runReport(cmd *cobra.Command, adapter Adapter, opts options, now func() time.Time) error {
-	observation, err := observe(cmd, adapter, evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, Freshness: opts.freshness, All: opts.all}, opts.cachePolicy, opts.cacheSet)
-	if err != nil {
-		return err
-	}
-	if observation.Outcome == evidence.OutcomeUnavailable {
-		return ErrUnavailable
-	}
-	if opts.freshness == evidence.FreshOnly && observation.Freshness != evidence.FreshFresh {
-		return evidence.ErrStale
-	}
-	evaluatedAt := now()
-	observation = evidence.WithPace(observation, evaluatedAt)
-	observation, err = observation.ForRequest(evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, All: opts.all})
-	if err != nil {
-		return err
-	}
-	if opts.format == "json" {
-		output, err := evidence.RenderJSON(observation)
-		if err != nil {
-			return err
-		}
-		if _, err := cmd.OutOrStdout().Write(append(output, '\n')); err != nil {
-			return fmt.Errorf("write JSON: %w", err)
-		}
-	} else {
-		output, err := evidence.RenderCompact(observation, evaluatedAt)
-		if err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(cmd.OutOrStdout(), output); err != nil {
-			return fmt.Errorf("write compact output: %w", err)
-		}
-	}
-	return partialError(observation)
-}
-
-func partialError(observation evidence.Observation) error {
-	if observation.Outcome == evidence.OutcomePartial {
-		return ErrPartial
-	}
-	return nil
 }

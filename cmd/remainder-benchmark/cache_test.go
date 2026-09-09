@@ -10,26 +10,31 @@ import (
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
 func TestCacheHitRun_recordsActualBinaryHit(t *testing.T) {
 	binary := buildCacheHitBinary(t)
 
-	result, err := runCacheHit(t.Context(), binary, 3, time.Second, time.Minute, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Samples) != 3 || result.Summary.Source != cacheHitSource || result.Summary.Workloads[cacheHitWorkload].Count != 3 || result.ObservedAt.IsZero() || result.Freshness != evidence.FreshFresh || result.IdentityBinding != evidence.IdentityHistorical || result.Account != "acct-benchmark" || result.ObservationAge != time.Second || result.MaxAge != time.Minute || result.Generation == "" || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
-		t.Fatalf("cache-hit result = %+v", result)
-	}
-	for _, value := range result.Samples {
-		if value.Source != cacheHitSource || value.ExitCode != 0 || value.Stdout != "42\n" || value.Stderr != "" || value.StdoutBytes != 3 || value.StderrBytes != 0 || value.SubprocessCount != 1 || value.RequestCount != 0 || value.ElapsedNS <= 0 || value.OutputStatus != "pass" {
-			t.Fatalf("cache-hit sample = %+v", value)
-		}
-	}
-	if result.Provenance.Workload != "cache-hit-provenance" || result.Provenance.ExitCode != 0 || result.Provenance.SubprocessCount != 1 || result.Provenance.RequestCount != 0 || result.Provenance.Stdout == "" || result.Provenance.Stderr != "" || result.Provenance.OutputStatus != "pass" {
-		t.Fatalf("cache-hit provenance = %+v", result.Provenance)
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			result, err := runCacheHit(t.Context(), binary, provider, 3, time.Second, time.Minute, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Samples) != 3 || result.Summary.Source != cacheHitSource || result.Summary.Workloads[cacheHitWorkload].Count != 3 || result.ObservedAt.IsZero() || result.Freshness != evidence.FreshFresh || result.IdentityBinding != evidence.IdentityHistorical || result.Account != "acct-benchmark" || result.ObservationAge != time.Second || result.MaxAge != time.Minute || result.Generation == "" || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
+				t.Fatalf("cache-hit result = %+v", result)
+			}
+			for _, value := range result.Samples {
+				if value.Source != cacheHitSource || value.ExitCode != 0 || value.Stdout != "42\n" || value.Stderr != "" || value.StdoutBytes != 3 || value.StderrBytes != 0 || value.SubprocessCount != 1 || value.RequestCount != 0 || value.ElapsedNS <= 0 || value.OutputStatus != "pass" {
+					t.Fatalf("cache-hit sample = %+v", value)
+				}
+			}
+			if result.Provenance.Workload != "cache-hit-provenance" || result.Provenance.ExitCode != 0 || result.Provenance.SubprocessCount != 1 || result.Provenance.RequestCount != 0 || result.Provenance.Stdout == "" || result.Provenance.Stderr != "" || result.Provenance.OutputStatus != "pass" {
+				t.Fatalf("cache-hit provenance = %+v", result.Provenance)
+			}
+		})
 	}
 }
 
@@ -46,12 +51,42 @@ func TestCacheHitObjective_appliesOnlyToAppleSilicon(t *testing.T) {
 func TestCacheHitRun_rejectsExpiredSeedWithoutReadingOAuth(t *testing.T) {
 	binary := buildCacheHitBinary(t)
 
-	result, err := runCacheHit(t.Context(), binary, 1, time.Hour, time.Second, nil)
+	result, err := runCacheHit(t.Context(), binary, "codex", 1, time.Hour, time.Second, nil)
 	if err == nil {
 		t.Fatal("expired cache hit unexpectedly passed")
 	}
 	if len(result.Samples) != 1 || result.Samples[0].ExitCode == 0 || result.Samples[0].Stdout != "" || result.Samples[0].RequestCount != 0 || !strings.Contains(result.Samples[0].Stderr, "authentication file is malformed") || result.SandboxCleanup != "removed-owned-temporary-sandbox" {
 		t.Fatalf("cache-hit result = %+v, error = %v", result, err)
+	}
+}
+
+func TestCacheHitSeed_grokPreservesCreditsAndUnknownIdentityOnReuse(t *testing.T) {
+	// Given
+	authName, authBody := cacheHitAuth("grok")
+	authPath := filepath.Join(t.TempDir(), authName)
+	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.September, 9, 16, 0, 0, 0, time.UTC)
+	binding, observation, window, err := cacheHitSeed(t.Context(), "grok", authPath, now.Add(-time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := cache.New(filepath.Join(t.TempDir(), "cache"), cache.Options{Now: func() time.Time { return now }})
+	if _, err := store.Put(t.Context(), binding, observation); err != nil {
+		t.Fatal(err)
+	}
+
+	// When
+	result, err := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeOnly, MaxAge: time.Minute}, nil)
+
+	// Then
+	if err != nil || !result.FromCache || binding.Provider != "grok" || binding.SourceKind != "native_file_http" || binding.SourceName != "grok_auth_json" || window != "credits" || result.Observation.Account.Binding != evidence.IdentityUnknown || result.Observation.Account.LastObserved != "" {
+		t.Fatalf("result=%+v binding=%+v window=%q error=%v", result, binding, window, err)
+	}
+	remaining, err := evidence.SelectValue(result.Observation, evidence.ValueRequest{Provider: "grok", Profile: "default", Window: "credits", Field: evidence.FieldRemaining}, evidence.FreshOnly)
+	if err != nil || remaining != "42\n" {
+		t.Fatalf("remaining=%q error=%v", remaining, err)
 	}
 }
 
@@ -98,7 +133,7 @@ func buildCacheHitBinary(t *testing.T) string {
 }
 
 func TestCacheHitRun_rejectsInvalidInput(t *testing.T) {
-	_, err := runCacheHit(t.Context(), "missing", 0, 0, 0, nil)
+	_, err := runCacheHit(t.Context(), "missing", "codex", 0, 0, 0, nil)
 	if !errors.Is(err, benchmark.ErrNoSamples) {
 		t.Fatalf("error = %v", err)
 	}
