@@ -1,13 +1,11 @@
 package cursor
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -145,6 +143,8 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	failures := make([]evidence.Failure, 0, 2)
 	if body, rpcErr := a.postRPC(ctx, token, "GetPlanInfo"); callerCtx.Err() != nil {
 		return evidence.Observation{}, callerCtx.Err()
+	} else if errors.Is(rpcErr, ErrRevoked) {
+		return evidence.Observation{}, collectionError(rpcErr)
 	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "plan", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &plan); decodeErr != nil {
@@ -152,6 +152,8 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	}
 	if body, rpcErr := a.postRPC(ctx, token, "GetSandUsageStatus"); callerCtx.Err() != nil {
 		return evidence.Observation{}, callerCtx.Err()
+	} else if errors.Is(rpcErr, ErrRevoked) {
+		return evidence.Observation{}, collectionError(rpcErr)
 	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "grok_bot", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &sand); decodeErr != nil {
@@ -183,44 +185,6 @@ func (a Adapter) validateRequest(ctx context.Context, request evidence.Request) 
 		return collectionError(fmt.Errorf("%w: authentication file path is empty", ErrInvalidAuth))
 	}
 	return nil
-}
-
-func (a Adapter) postRPC(ctx context.Context, token, method string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint+rpcPath(method), bytes.NewBufferString("{}"))
-	if err != nil {
-		return nil, fmt.Errorf("%w: Cursor quota endpoint is invalid", ErrInvalidResponse)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Connect-Protocol-Version", "1")
-	response, err := a.client.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("%w: Cursor quota request canceled or timed out: %w", ErrTransient, ctx.Err())
-		}
-		return nil, fmt.Errorf("%w: Cursor quota request failed", ErrTransient)
-	}
-	defer response.Body.Close()
-	switch response.StatusCode {
-	case http.StatusUnauthorized:
-		return nil, ErrRevoked
-	case http.StatusForbidden:
-		return nil, ErrForbidden
-	case http.StatusTooManyRequests:
-		return nil, &RetryError{RetryAt: parseRetryAfter(response.Header.Get("Retry-After"), a.now())}
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("%w: Cursor quota endpoint returned HTTP %d", ErrTransient, response.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("%w: Cursor quota response could not be read", ErrTransient)
-	}
-	if len(body) > maxResponseBytes {
-		return nil, fmt.Errorf("%w: Cursor quota response is too large", ErrInvalidResponse)
-	}
-	return body, nil
 }
 
 func (Adapter) Failure(err error) (cache.FailureKind, time.Time) {
