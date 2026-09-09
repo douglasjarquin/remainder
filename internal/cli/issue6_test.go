@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -190,6 +191,66 @@ func TestStore_WriteUnavailable_emitsOneSanitizedWarningWithLiveResult(t *testin
 	// Then
 	if code != 0 || stdout.Len() == 0 || strings.Count(stderr.String(), "remainder: warning:") != 1 || strings.Contains(stderr.String(), "/Users/") {
 		t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestExecute_CacheWaitTimeout_returnsUnavailableExit(t *testing.T) {
+	tests := []struct {
+		name        string
+		options     cache.Options
+		cancelAfter time.Duration
+		wantCode    int
+	}{
+		{name: "lock deadline", options: cache.Options{LockWait: 20 * time.Millisecond, OperationTimeout: time.Second}, wantCode: 1},
+		{name: "operation deadline", options: cache.Options{LockWait: time.Second, OperationTimeout: 20 * time.Millisecond}, wantCode: 1},
+		{name: "caller cancellation", options: cache.Options{LockWait: time.Second, OperationTimeout: time.Second}, cancelAfter: 20 * time.Millisecond, wantCode: 130},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Given
+			now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+			authPath := filepath.Join(t.TempDir(), "auth.json")
+			if err := os.WriteFile(authPath, []byte("malformed OAuth fixture"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			provider := codex.New(codex.Options{AuthFile: authPath, Now: func() time.Time { return now }})
+			binding, err := provider.CacheBinding(t.Context(), evidence.Request{Provider: "codex", Profile: "default"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.options.Now = func() time.Time { return now }
+			store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), test.options)
+			if _, err := store.Put(t.Context(), binding, cacheObservation(now.Add(-time.Minute))); err != nil {
+				t.Fatal(err)
+			}
+			lock, err := os.OpenFile(filepath.Join(filepath.Dir(store.SnapshotPath(binding)), "refresh.lock"), os.O_RDWR, 0o600)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer lock.Close()
+			if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+				t.Fatal(err)
+			}
+			defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+			adapter := runtimeAdapter{codex: provider, newStore: func() (*cache.Store, error) { return store, nil }}
+			ctx := t.Context()
+			if test.cancelAfter > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				defer cancel()
+				timer := time.AfterFunc(test.cancelAfter, cancel)
+				defer timer.Stop()
+			}
+
+			// When
+			var stdout, stderr bytes.Buffer
+			code := executeWithAdapterAt(ctx, []string{"--provider=codex", "--profile=default"}, &stdout, &stderr, "test", now, adapter)
+
+			// Then
+			if code != test.wantCode || stdout.Len() != 0 {
+				t.Fatalf("code = %d, stdout = %q, stderr = %q", code, stdout.String(), stderr.String())
+			}
+		})
 	}
 }
 
