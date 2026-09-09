@@ -22,9 +22,9 @@ The fixture corpus emits healthy, exhausted, stale, partial-unknown, and shared-
 
 Compact and JSON records share the declared required-facts comparison scope.
 
-The public cache policy adds four flags to every real Cobra command tree; the in-process compact, JSON, and scalar allocation ceilings include that command-construction cost.
-Without race instrumentation, the measured compact, JSON, and scalar allocation counts were 136, 124, and 139.
-With the canonical race-enabled test command, three runs observed compact at 139-140, JSON at 130-132, and scalar at 142 allocations; the proposed ceilings are 141, 133, and 143.
+The public cache policy adds four flags to every real Cobra command tree.
+Each command owns one typed flag-value structure, avoiding separate value allocations and redundant string conversions.
+The original compact, JSON, and scalar allocation ceilings remain 130, 120, and 125; a canonical race-enabled probe observed 126, 116, and 124 allocations, respectively.
 
 Scalar records are explicitly labeled as selected-value projections and are not claimed to be equivalent to the full observation.
 
