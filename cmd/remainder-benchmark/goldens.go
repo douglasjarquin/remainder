@@ -12,7 +12,7 @@ Available Commands:
 
 Flags:
       --account string     expected last-observed account
-      --all                read all configured sources
+      --all                read codex/default, claude/default, and grok/default
       --cache string       cache policy: auto, off, or only (default "auto")
       --format string      output format: compact or json (default "compact")
       --freshness string   freshness policy: any or fresh (default "any")
