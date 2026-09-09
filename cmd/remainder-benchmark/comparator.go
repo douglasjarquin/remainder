@@ -105,6 +105,9 @@ func comparatorFailures(comparators []comparator) []string {
 		if comparator.CacheSnapshot.Status != "fresh-snapshot-written" {
 			failures = append(failures, comparator.Name+" cache status "+comparator.CacheSnapshot.Status)
 		}
+		if comparator.SandboxCleanup != "removed-owned-temporary-sandbox" {
+			failures = append(failures, comparator.Name+" sandbox cleanup "+comparator.SandboxCleanup)
+		}
 	}
 	return failures
 }

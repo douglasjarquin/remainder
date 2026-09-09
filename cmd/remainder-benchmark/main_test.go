@@ -79,7 +79,7 @@ func TestComparatorOutputValidatorsRejectMissingOutputs(t *testing.T) {
 
 func TestComparatorFailuresRejectsSeededMismatch(t *testing.T) {
 	// Given: one comparator reports a seeded shared-fact mismatch.
-	comparators := []comparator{{Name: "quota-axi-compact", Status: "shared-facts-mismatch", CacheSnapshot: comparatorCache{Status: "fresh-snapshot-written"}}}
+	comparators := []comparator{{Name: "quota-axi-compact", Status: "shared-facts-mismatch", CacheSnapshot: comparatorCache{Status: "fresh-snapshot-written"}, SandboxCleanup: "removed-owned-temporary-sandbox"}}
 
 	// When: the benchmark evaluates comparator results.
 	failures := comparatorFailures(comparators)
@@ -87,5 +87,18 @@ func TestComparatorFailuresRejectsSeededMismatch(t *testing.T) {
 	// Then: the run has a concrete regression failure.
 	if len(failures) != 1 || !strings.Contains(failures[0], "shared-facts-mismatch") {
 		t.Fatalf("comparator failures = %v", failures)
+	}
+}
+
+func TestComparatorFailuresRequiresSandboxCleanup(t *testing.T) {
+	for _, cleanup := range []string{"failed: permission denied", "", "removed-owned-temporary-sandbox"} {
+		t.Run(cleanup, func(t *testing.T) {
+			comparators := []comparator{{Name: "quota-axi-compact", Status: "observed-shared-percent-subset", CacheSnapshot: comparatorCache{Status: "fresh-snapshot-written"}, SandboxCleanup: cleanup}}
+			failures := comparatorFailures(comparators)
+			wantFailure := cleanup != "removed-owned-temporary-sandbox"
+			if (len(failures) != 0) != wantFailure {
+				t.Fatalf("cleanup %q produced failures %v, want failure %t", cleanup, failures, wantFailure)
+			}
+		})
 	}
 }
