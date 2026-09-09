@@ -8,7 +8,7 @@ The baseline is a small developer measurement path rather than a benchmark servi
 
 The full-process driver starts the compiled binary once per sample and records the exact arguments, exit code, stdout, stderr, output byte counts, optional model-token counts, output hashes, elapsed time, filesystem-cache label, subprocess count, and request count.
 
-The controlled refresh driver compiles a Go test helper once, invokes the actual Cobra execution seam with the selected native adapter, and sends one Codex or Grok request, two Claude requests, or three Linux Cursor requests per sample to a synthetic loopback TLS server.
+The controlled refresh driver compiles a Go test helper once, invokes the actual Cobra execution seam with the selected native adapter, and sends one Codex or Grok request, two Claude requests, or three Cursor requests per sample to a synthetic loopback TLS server.
 
 The explicit coalescing acceptance mode runs at least 12 untagged release-binary processes against one expired cache through a synthetic `chatgpt.com` TLS fixture and an allowlisted loopback CONNECT proxy.
 It records actual subprocess and provider request counts, per-process maximum resident memory, and contention latency summaries for successful mixed projections, overlapping forced refreshes, a later forced refresh, and an empty-cache 429 burst.
@@ -27,7 +27,8 @@ Compact and JSON records share the declared required-facts comparison scope.
 
 The public cache policy adds four flags to every real Cobra command tree.
 Each command owns one typed flag-value structure, avoiding separate value allocations and redundant string conversions.
-The original compact, JSON, and scalar allocation ceilings remain 130, 120, and 125; a canonical race-enabled probe observed 126, 116, and 124 allocations, respectively.
+The original compact, JSON, and scalar allocation ceilings remain 130, 120, and 125.
+The two Cobra commands and their flag values share one allocation per invocation; command state is never shared between invocations.
 
 Scalar records are explicitly labeled as selected-value projections and are not claimed to be equivalent to the full observation.
 
@@ -50,7 +51,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, remaining-scalar, and pace-scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | A normally seeded complete observation is read through the actual release binary and in-process runtime adapter with invalid OAuth JSON proving eligible hits avoid credential parsing and provider requests. | automated `cmd/remainder-benchmark/cache_test.go` and `internal/cli/issue6_bench_test.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
-| bench-refresh | The compiled Go test helper executes Cobra and the selected native adapter against loopback TLS with one Codex or Grok request, two Claude requests, or three Linux Cursor requests per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/benchmark_helper_test.go`, `internal/cli/issue5_bench_test.go`, `internal/cli/claude_bench_test.go`, `internal/cli/grok_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
+| bench-refresh | The compiled Go test helper executes Cobra and the selected native adapter against loopback TLS with one Codex or Grok request, two Claude requests, or three Cursor requests per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/benchmark_helper_test.go`, `internal/cli/issue5_bench_test.go`, `internal/cli/claude_bench_test.go`, `internal/cli/grok_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 | bench-coalescing | Release processes record one provider request per overlapping response generation, bounded 429 reuse, contention latency, memory, and exact child/proof-call counts. | manual explicit developer acceptance through `cmd/remainder-benchmark --coalescing-acceptance` | `.omo/evidence/issue7/green/coalescing-acceptance.json` |
 
 ## Measurement limits
@@ -89,7 +90,9 @@ The `go test -bench -benchmem` artifact is the source for in-process allocations
 
 `BenchmarkExecuteCacheHit` runs `cli.Execute` with the production runtime adapter and auto cache policy against a normally seeded user cache, reporting allocations and zero requests per operation without an arbitrary allocation ceiling.
 
-The release-binary cache workload seeds one complete native-source observation before timing, uses invalid OAuth JSON whose file metadata binds that seed, and records ten scalar cache hits plus one separately counted JSON provenance process.
+The release-binary cache workload seeds one complete native-source observation before timing.
+File providers use invalid OAuth JSON whose metadata binds the seed; macOS Cursor uses a valid synthetic identity config and no Keychain permission.
+It records the configured number of scalar cache hits plus one separately counted JSON provenance process.
 
 The provenance process verifies the original observation timestamp, fresh state, historical identity for Codex/Claude or unchanged unknown identity for Grok/Cursor, and selected value without entering a latency summary.
 
@@ -114,7 +117,9 @@ The driver does not apply the cache-read objective to startup or failure workloa
 The eligible release-binary cache-hit p95 objective is 10 ms on the declared Apple Silicon reference host.
 
 The benchmark gates that objective only on Darwin arm64 and reports other hosts as trend evidence without changing the threshold.
-Cursor collection and its benchmark are Linux-only; those measurements do not certify the Darwin reference-host objective.
+Cursor measurements use the platform CLI source.
+The macOS controlled helper injects a synthetic Keychain reader; eligible cache measurements use the actual release-like binary without permission to invoke Keychain.
+Linux measurements do not certify the Darwin reference-host objective.
 
 Full-process startup and failure p95 values are retained as hosted trend evidence and do not gate the benchmark.
 

@@ -11,10 +11,10 @@ The issue #4 baseline is tracked in [performance baseline](performance-baseline.
 | `--help` and `--version` | Implemented | CLI tests and empty-home manual transcript in issue #2 evidence |
 | Honest unavailable-provider result | Implemented | CLI test and default invocation return a nonzero exit without a fake report |
 | Provider source feasibility | Selected native Codex route observed twice | [Provider source matrix](../provider-sources.md); two read-only native observations with matching verified binding; other provider labs remain unrun |
-| Provider collection | Codex native route verified; Claude, Grok, and Linux Cursor file implementations verified with controlled fixtures only | Bounded selected auth read, current native usage endpoint, normalization, and controlled HTTP/TLS tests in issue #5 |
+| Provider collection | Codex native route verified; Claude, Grok, and Cursor CLI implementations verified with controlled fixtures only | Bounded selected auth read, current native usage endpoint, normalization, and controlled HTTP/TLS tests in issue #5 |
 | Claude file collection | Implemented; native canary unverified | [Claude source, selectors, and fixture coverage](claude.md) |
 | Grok file collection and mixed reports | Implemented; native canary unverified | [Grok source, scopes, and mixed reports](grok.md) |
-| Cursor Linux file collection | Implemented; native canary unverified | [Cursor source, platform boundary, and fixture coverage](cursor.md) |
+| Cursor CLI collection | Implemented; native certification is source-specific | [Cursor source, platform boundary, and fixture coverage](cursor.md) |
 | Compact, JSON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issue #3 |
 | Codex remaining and pace semantics | Implemented | Per-window percentage pace with source-preserving inputs, exact scalar status, and all account/model/short constraints retained in issue #11 |
 | Cache and refresh ownership | Implemented | Issue #6 atomic observations and issue #7 cross-process success, forced-generation, and bounded failure coalescing use the same stable response lock |
