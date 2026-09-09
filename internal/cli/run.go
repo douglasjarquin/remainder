@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/douglasjarquin/remainder/internal/codex"
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/spf13/cobra"
 )
@@ -33,31 +33,22 @@ func (unavailableAdapter) Observe(ctx context.Context, _ evidence.Request) (evid
 	return evidence.Observation{}, ErrUnavailable
 }
 
-type runtimeAdapter struct {
-	codex codex.Adapter
-}
-
-func (a runtimeAdapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
-	if request.Provider == "" {
-		return unavailableAdapter{}.Observe(ctx, request)
-	}
-	return a.codex.Observe(ctx, request)
-}
-
 type options struct {
-	format    string
-	provider  evidence.Provider
-	profile   evidence.Profile
-	window    evidence.WindowID
-	scope     evidence.Scope
-	field     evidence.Field
-	account   string
-	freshness evidence.FreshnessPolicy
-	all       bool
+	format      string
+	provider    evidence.Provider
+	profile     evidence.Profile
+	window      evidence.WindowID
+	scope       evidence.Scope
+	field       evidence.Field
+	account     string
+	freshness   evidence.FreshnessPolicy
+	cachePolicy cache.Policy
+	cacheSet    bool
+	all         bool
 }
 
 func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, version string) int {
-	return executeWithAdapter(ctx, args, stdout, stderr, version, runtimeAdapter{codex: codex.Default()})
+	return executeWithAdapter(ctx, args, stdout, stderr, version, defaultRuntimeAdapter())
 }
 
 func ExecuteWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
@@ -86,7 +77,7 @@ func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.
 		}
 		fmt.Fprintf(stderr, "remainder: %s\n", err)
 		switch {
-		case errors.Is(err, ErrUnavailable), errors.Is(err, evidence.ErrProviderUnavailable):
+		case errors.Is(err, ErrUnavailable), errors.Is(err, cache.ErrUnavailable), errors.Is(err, evidence.ErrProviderUnavailable):
 			return 1
 		case errors.Is(err, ErrPartial):
 			return 3
@@ -128,6 +119,10 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 	root.PersistentFlags().String("scope", "", "exact scope selection")
 	root.PersistentFlags().String("account", "", "expected last-observed account")
 	root.PersistentFlags().String("freshness", string(evidence.FreshAny), "freshness policy: any or fresh")
+	root.PersistentFlags().String("cache", string(cache.ModeAuto), "cache policy: auto, off, or only")
+	root.PersistentFlags().Duration("max-age", 5*time.Second, "maximum cache observation age")
+	root.PersistentFlags().Bool("refresh", false, "require a newer cache generation")
+	root.PersistentFlags().Bool("stale-on-error", false, "return stale evidence after a transient refresh failure")
 	root.PersistentFlags().Bool("all", false, "read all configured sources")
 
 	value := &cobra.Command{
@@ -143,7 +138,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now time
 				return fmt.Errorf("%w: value does not support format %q", ErrUsage, opts.format)
 			}
 			request := evidence.ValueRequest{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account}
-			observation, err := adapter.Observe(cmd.Context(), evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account, Freshness: opts.freshness})
+			observation, err := observe(cmd, adapter, evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Field: opts.field, Account: opts.account, Freshness: opts.freshness}, opts.cachePolicy, opts.cacheSet)
 			if err != nil {
 				return err
 			}
@@ -217,11 +212,19 @@ func readOptions(cmd *cobra.Command, valueCommand bool) (options, error) {
 			return options{}, fmt.Errorf("%w: value cannot use --all", ErrUsage)
 		}
 	}
-	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), all: all}, nil
+	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: 5 * time.Second}
+	cacheSet := cmd.Flags().Changed("cache") || cmd.Flags().Changed("max-age") || cmd.Flags().Changed("refresh") || cmd.Flags().Changed("stale-on-error")
+	if cacheSet {
+		policy, err = readCachePolicy(cmd)
+		if err != nil {
+			return options{}, err
+		}
+	}
+	return options{format: format, provider: evidence.Provider(provider), profile: evidence.Profile(profile), window: evidence.WindowID(window), scope: evidence.Scope(scope), field: evidence.Field(field), account: account, freshness: evidence.FreshnessPolicy(freshness), cachePolicy: policy, cacheSet: cacheSet, all: all}, nil
 }
 
 func runReport(cmd *cobra.Command, adapter Adapter, opts options, now time.Time) error {
-	observation, err := adapter.Observe(cmd.Context(), evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, Freshness: opts.freshness, All: opts.all})
+	observation, err := observe(cmd, adapter, evidence.Request{Provider: opts.provider, Profile: opts.profile, Window: opts.window, Scope: opts.scope, Account: opts.account, Freshness: opts.freshness, All: opts.all}, opts.cachePolicy, opts.cacheSet)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,10 @@ The fixture corpus emits healthy, exhausted, stale, partial-unknown, and shared-
 
 Compact and JSON records share the declared required-facts comparison scope.
 
+The public cache policy adds four flags to every real Cobra command tree; the in-process compact, JSON, and scalar allocation ceilings include that command-construction cost.
+Without race instrumentation, the measured compact, JSON, and scalar allocation counts were 136, 124, and 139.
+With the canonical race-enabled test command, three runs observed compact at 139-140, JSON at 130-132, and scalar at 142 allocations; the proposed ceilings are 141, 133, and 143.
+
 Scalar records are explicitly labeled as selected-value projections and are not claimed to be equivalent to the full observation.
 
 The first sample is labeled `first-process` and later samples are labeled `warm-filesystem`.
@@ -34,7 +38,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-renderers | Compact, JSON, and scalar fixture output stays observable across healthy, exhausted, stale, and partial-unknown states while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` and the benchmark driver | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` |
 | bench-comparator | The optional pinned installed `quota-axi` compact command and its JSON output through the actual Pinchos `jq -r` consumer path run with a fixed synthetic response, sanitized homes, and a temporary cache. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
-| bench-cache | Eligible-cache reads are unimplemented pending issue #6. | manual not-applicable: cache is not implemented in this release | issue #6 |
+| bench-cache | Atomic eligible-cache reads are implemented; the actual release-binary workload is completed by the root-owned issue #6 benchmark integration. | automated `internal/cache/` and `internal/cli/issue6_test.go`; release measurement pending root integration | issue #6 |
 | bench-refresh | Controlled loopback refresh is unimplemented pending issue #5. | manual not-applicable: provider refresh is not implemented in this release | issue #5 |
 
 ## Measurement limits
@@ -75,7 +79,7 @@ Hosted CI timings are trends and are not a certification of the Apple Silicon fu
 
 The driver does not apply the cache-read objective to startup or failure workloads.
 
-The cache-read p95 objective remains unmeasured until issue #6 provides an eligible cache.
+The cache-read p95 objective remains unmeasured until the issue #6 release-binary benchmark integration records the eligible cache workload.
 
 Full-process startup and failure p95 values are retained as hosted trend evidence and do not gate the benchmark.
 

@@ -70,9 +70,9 @@ func TestBenchmarkFixtureAllocationBudgets(t *testing.T) {
 		args []string
 		max  float64
 	}{
-		{name: "compact", args: []string{"--format", "compact"}, max: 130},
-		{name: "json", args: []string{"--format", "json"}, max: 120},
-		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, max: 125},
+		{name: "compact", args: []string{"--format", "compact"}, max: 141},
+		{name: "json", args: []string{"--format", "json"}, max: 133},
+		{name: "scalar", args: []string{"value", "--provider", "codex", "--profile", "main", "--window", "weekly", "--field", "remaining"}, max: 143},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

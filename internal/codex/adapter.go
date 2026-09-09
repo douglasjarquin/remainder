@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"crypto/sha256"
 	json "encoding/json/v2"
 	"errors"
 	"fmt"
@@ -10,8 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -24,7 +27,11 @@ var defaultEndpoints = []string{
 	"https://chatgpt.com/backend-api/wham/usage",
 }
 
-var errAccountMismatch = errors.New("Codex quota account mismatch")
+var (
+	ErrAccountMismatch       = errors.New("Codex quota account mismatch")
+	ErrAuthorizationRejected = errors.New("Codex authentication was rejected")
+	ErrTransient             = errors.New("transient Codex quota failure")
+)
 
 type Options struct {
 	AuthFile  string
@@ -77,6 +84,28 @@ func New(options Options) Adapter {
 	return Adapter{authFile: options.AuthFile, endpoints: append([]string(nil), endpoints...), client: &clientCopy, timeout: timeout, now: now}
 }
 
+func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (cache.Binding, error) {
+	if request.Provider != "codex" || request.Profile != "default" || request.All {
+		return cache.Binding{}, fmt.Errorf("%w: Codex native source requires --provider codex --profile default", evidence.ErrInvalidSelection)
+	}
+	if err := ctx.Err(); err != nil {
+		return cache.Binding{}, err
+	}
+	info, err := os.Lstat(a.authFile)
+	if err != nil {
+		return cache.Binding{}, collectionError(errors.New("Codex authentication file cannot be inspected"))
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxAuthBytes {
+		return cache.Binding{}, collectionError(errors.New("Codex authentication file is not a bounded regular file"))
+	}
+	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d", filepath.Clean(a.authFile), info.Size(), info.ModTime().UnixNano(), info.Mode())
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		identity += fmt.Sprintf("\x00%d\x00%d", stat.Dev, stat.Ino)
+	}
+	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
+	return cache.Binding{Provider: "codex", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_file_http", SourceName: "codex_auth_json", CredentialFingerprint: fingerprint}, nil
+}
+
 func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
 	if request.Provider != "codex" || request.Profile != "default" || request.All {
 		return evidence.Observation{}, fmt.Errorf("%w: Codex native source requires --provider codex --profile default", evidence.ErrInvalidSelection)
@@ -122,35 +151,35 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	response, err := a.client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return evidence.Observation{}, false, fmt.Errorf("Codex quota request canceled or timed out: %w", ctx.Err())
+			return evidence.Observation{}, false, fmt.Errorf("%w: Codex quota request canceled or timed out: %w", ErrTransient, ctx.Err())
 		}
-		return evidence.Observation{}, true, errors.New("Codex quota request failed")
+		return evidence.Observation{}, true, fmt.Errorf("%w: Codex quota request failed", ErrTransient)
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return evidence.Observation{}, true, errors.New("Codex authentication was rejected")
+		return evidence.Observation{}, true, ErrAuthorizationRejected
 	case http.StatusTooManyRequests:
 		retryAfter := response.Header.Get("Retry-After")
 		if retryAfter == "" {
-			return evidence.Observation{}, false, errors.New("Codex quota endpoint is rate limited")
+			return evidence.Observation{}, false, fmt.Errorf("%w: Codex quota endpoint is rate limited", ErrTransient)
 		}
-		return evidence.Observation{}, false, fmt.Errorf("Codex quota endpoint is rate limited; retry after %s", safeRetryAfter(retryAfter))
+		return evidence.Observation{}, false, fmt.Errorf("%w: Codex quota endpoint is rate limited; retry after %s", ErrTransient, safeRetryAfter(retryAfter))
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return evidence.Observation{}, true, fmt.Errorf("Codex quota endpoint returned HTTP %d", response.StatusCode)
+		return evidence.Observation{}, true, fmt.Errorf("%w: Codex quota endpoint returned HTTP %d", ErrTransient, response.StatusCode)
 	}
 	limited := io.LimitReader(response.Body, maxResponseBytes+1)
 	body, err := io.ReadAll(limited)
 	if err != nil {
-		return evidence.Observation{}, true, errors.New("Codex quota response could not be read")
+		return evidence.Observation{}, true, fmt.Errorf("%w: Codex quota response could not be read", ErrTransient)
 	}
 	if len(body) > maxResponseBytes {
 		return evidence.Observation{}, false, errors.New("Codex quota response is too large")
 	}
 	var raw usageResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return evidence.Observation{}, true, errors.New("Codex quota response is malformed JSON")
+		return evidence.Observation{}, true, fmt.Errorf("%w: Codex quota response is malformed JSON", ErrTransient)
 	}
 	observation, err := normalize(raw, credentials.accountID, a.now())
 	if err != nil {

@@ -6,8 +6,8 @@ It is positioned as a personal-use tool for the maintainer's local quota evidenc
 
 This slice provides a native read-only Codex quota path plus honest help, version, unavailable-provider behavior, and the typed evidence output contract.
 
-An explicit `--provider codex --profile default` selection reads only `$CODEX_HOME/auth.json` or `~/.codex/auth.json`, then makes a bounded request to the Codex usage endpoint.
-It does not log in, refresh credentials, switch accounts, invoke another CLI, make a generative request, or write a cache.
+An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
+It does not log in, refresh credentials, switch accounts, invoke another CLI, or make a generative request.
 
 ## Build and verify
 
@@ -45,8 +45,6 @@ The comparison records the shared fresh Codex account/all-model weekly percentag
 
 It does not claim full-payload equality, interchangeable token and percentage units, a speed advantage, or native endpoint performance.
 
-Cache reads remain unimplemented pending issue #6.
-
 Without the optional tokenizer environment, token fields are explicitly unmeasured rather than word counts.
 
 The `o200k_base` measurement is an offline Codex-family comparison encoding and does not claim model-specific tokenizer parity.
@@ -72,6 +70,11 @@ Use `--format json` for the versioned JSON observation or `value --provider PROV
 
 Use `--freshness any` to allow stale evidence or `--freshness fresh` to reject stale and unknown freshness.
 
+The default `--cache auto --max-age 5s` policy reuses an eligible complete provider observation before selecting a report field or window.
+Use `--cache off` for a bounded live read, `--cache only` to refuse a miss without credential parsing or network access, `--refresh` to require a newer cache generation, and `--stale-on-error` to allow an expired observation only after a transient refresh failure.
+Cached observations retain their original `observed_at` and label the last-observed account identity as historical.
+Cache records live under the operating system user cache directory at `remainder/v1/<binding-hash>/`, use restrictive permissions and atomic replacement, and contain no credential or raw auth path.
+
 Exit 0 means the selected evidence is usable, including zero, exhausted, and unlimited values.
 
 Exit 1 means the observation is unavailable, exit 2 means invocation or selection is invalid, exit 3 means a partial observation was rendered, and exit 130 means interruption.
@@ -79,8 +82,7 @@ Exit 1 means the observation is unavailable, exit 2 means invocation or selectio
 The observation records last-observed account identity separately from freshness and credential binding.
 
 The selected native macOS route passed two authorized read-only observations on 2026-09-09, with matching verified account bindings and unchanged credential file metadata; see the [source evidence](docs/provider-sources.md).
-Controlled HTTP/TLS tests cover failure cases; cache, concurrency, and packaged-release gates remain separate.
-It does not access a cache.
+Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases; cross-process burst contention and packaged-release gates remain separate.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 
