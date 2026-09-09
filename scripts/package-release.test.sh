@@ -3,6 +3,23 @@
 set -eu
 
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+case "$(uname -s):$(uname -m)" in
+	Darwin:arm64)
+		target=darwin_arm64
+		native_goos=darwin
+		foreign_goos=linux
+		;;
+	Linux:arm64 | Linux:aarch64)
+		target=linux_arm64
+		native_goos=linux
+		foreign_goos=darwin
+		;;
+	*)
+		printf 'package-release-test: unsupported test host: %s %s\n' "$(uname -s)" "$(uname -m)" >&2
+		exit 1
+		;;
+esac
+archive_base="remainder_v0.1.0_${target}"
 verify_sha256sums() {
 	if command -v shasum >/dev/null 2>&1; then
 		shasum -a 256 -c "$1"
@@ -26,7 +43,7 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 output_dir="$test_root/dist"
-git -C "$repository_root" check-ignore -q dist/remainder_v0.1.0_darwin_arm64.tar.gz
+git -C "$repository_root" check-ignore -q "dist/$archive_base.tar.gz"
 if REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1 "$output_dir" >/dev/null 2>&1; then
 	printf '%s\n' 'package-release-test: malformed version was accepted' >&2
 	exit 1
@@ -44,12 +61,12 @@ if PATH="$fake_bin:$PATH" REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/pack
 	exit 1
 fi
 
-GOOS=linux GOARCH=amd64 REMAINDER_ALLOW_DIRTY=1 \
+GOOS="$foreign_goos" GOARCH=amd64 REMAINDER_ALLOW_DIRTY=1 \
 	"$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
 
-archive="$output_dir/remainder_v0.1.0_darwin_arm64.tar.gz"
+archive="$output_dir/$archive_base.tar.gz"
 checksums="$output_dir/SHA256SUMS"
-qa_manifest="$output_dir/remainder_v0.1.0_darwin_arm64.asset-qa.json"
+qa_manifest="$output_dir/$archive_base.asset-qa.json"
 
 test -s "$archive"
 test -s "$checksums"
@@ -58,24 +75,24 @@ test -s "$qa_manifest"
 
 expected_files="$test_root/expected-files.txt"
 actual_files="$test_root/actual-files.txt"
-cat >"$expected_files" <<'EOF'
-remainder_v0.1.0_darwin_arm64/
-remainder_v0.1.0_darwin_arm64/ASSET_MANIFEST.json
-remainder_v0.1.0_darwin_arm64/ATTRIBUTIONS.md
-remainder_v0.1.0_darwin_arm64/docs/
-remainder_v0.1.0_darwin_arm64/docs/provider-sources.md
-remainder_v0.1.0_darwin_arm64/docs/release.md
-remainder_v0.1.0_darwin_arm64/remainder
-remainder_v0.1.0_darwin_arm64/skills/
-remainder_v0.1.0_darwin_arm64/skills/remainder/
-remainder_v0.1.0_darwin_arm64/skills/remainder/SKILL.md
-remainder_v0.1.0_darwin_arm64/skills/remainder/references/
-remainder_v0.1.0_darwin_arm64/skills/remainder/references/examples.md
-remainder_v0.1.0_darwin_arm64/skills/remainder/references/installation.md
-remainder_v0.1.0_darwin_arm64/skills/remainder/references/interpretation.md
+cat >"$expected_files" <<EOF
+$archive_base/
+$archive_base/ASSET_MANIFEST.json
+$archive_base/ATTRIBUTIONS.md
+$archive_base/docs/
+$archive_base/docs/provider-sources.md
+$archive_base/docs/release.md
+$archive_base/remainder
+$archive_base/skills/
+$archive_base/skills/remainder/
+$archive_base/skills/remainder/SKILL.md
+$archive_base/skills/remainder/references/
+$archive_base/skills/remainder/references/examples.md
+$archive_base/skills/remainder/references/installation.md
+$archive_base/skills/remainder/references/interpretation.md
 EOF
 if test -f "$repository_root/docs/release-readiness.md"; then
-	printf '%s\n' 'remainder_v0.1.0_darwin_arm64/docs/release-readiness.md' >>"$expected_files"
+	printf '%s\n' "$archive_base/docs/release-readiness.md" >>"$expected_files"
 fi
 LC_ALL=C sort -o "$expected_files" "$expected_files"
 tar -tzf "$archive" | LC_ALL=C sort >"$actual_files"
@@ -84,10 +101,10 @@ diff -u "$expected_files" "$actual_files"
 extract_dir="$test_root/extract"
 mkdir -p "$extract_dir"
 tar -xzf "$archive" -C "$extract_dir"
-binary="$extract_dir/remainder_v0.1.0_darwin_arm64/remainder"
+binary="$extract_dir/$archive_base/remainder"
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
-go version -m "$binary" | grep -F "build$(printf '\t')GOOS=darwin" >/dev/null
+go version -m "$binary" | grep -F "build$(printf '\t')GOOS=$native_goos" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOARCH=arm64" >/dev/null
 grep -F '"publication_status": "blocked"' "$qa_manifest" >/dev/null
 grep -F '"license_decision": "pending"' "$qa_manifest" >/dev/null
@@ -100,7 +117,7 @@ fi
 crafted_root="$test_root/crafted"
 mkdir -p "$crafted_root"
 tar -xzf "$archive" -C "$crafted_root"
-crafted_bundle="$crafted_root/remainder_v0.1.0_darwin_arm64"
+crafted_bundle="$crafted_root/$archive_base"
 outside_marker="$test_root/outside-allowlist.txt"
 printf '%s\n' 'outside bundle' >"$outside_marker"
 if command -v trash >/dev/null 2>&1; then
@@ -109,13 +126,13 @@ else
 	gio trash "$crafted_bundle/ATTRIBUTIONS.md"
 fi
 ln -s "$outside_marker" "$crafted_bundle/ATTRIBUTIONS.md"
-crafted_archive="$test_root/remainder_v0.1.0_darwin_arm64.tar.gz"
-COPYFILE_DISABLE=1 tar -C "$crafted_root" -cf - remainder_v0.1.0_darwin_arm64 | gzip -n >"$crafted_archive"
+crafted_archive="$test_root/$archive_base.tar.gz"
+COPYFILE_DISABLE=1 tar -C "$crafted_root" -cf - "$archive_base" | gzip -n >"$crafted_archive"
 crafted_checksums="$test_root/SHA256SUMS"
 if command -v shasum >/dev/null 2>&1; then
-	(cd "$test_root" && shasum -a 256 remainder_v0.1.0_darwin_arm64.tar.gz >SHA256SUMS)
+	(cd "$test_root" && shasum -a 256 "$archive_base.tar.gz" >SHA256SUMS)
 else
-	(cd "$test_root" && sha256sum remainder_v0.1.0_darwin_arm64.tar.gz >SHA256SUMS)
+	(cd "$test_root" && sha256sum "$archive_base.tar.gz" >SHA256SUMS)
 fi
 if "$repository_root/scripts/verify-release-asset.sh" "$crafted_archive" "$crafted_checksums" \
 	"$(git -C "$repository_root" rev-parse HEAD)" "$test_root/crafted-qa.json" >/dev/null 2>&1; then
