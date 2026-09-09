@@ -40,7 +40,7 @@ fi
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 cd "$repository_root"
 
-if test -n "$(git status --porcelain)" && test "${REMAINDER_ALLOW_DIRTY:-0}" != 1; then
+if test -n "$(git status --porcelain)"; then
 	printf '%s\n' 'package-release: source checkout is dirty' >&2
 	exit 1
 fi

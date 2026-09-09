@@ -44,7 +44,7 @@ trap cleanup EXIT HUP INT TERM
 
 output_dir="$test_root/dist"
 git -C "$repository_root" check-ignore -q "dist/$archive_base.tar.gz"
-if REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1 "$output_dir" >/dev/null 2>&1; then
+if "$repository_root/scripts/package-release.sh" v0.1 "$output_dir" >/dev/null 2>&1; then
 	printf '%s\n' 'package-release-test: malformed version was accepted' >&2
 	exit 1
 fi
@@ -56,12 +56,23 @@ cat >"$fake_bin/go" <<'EOF'
 printf '%s\n' 'go version go1.26.9 test/arm64'
 EOF
 chmod +x "$fake_bin/go"
-if PATH="$fake_bin:$PATH" REMAINDER_ALLOW_DIRTY=1 "$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir" >/dev/null 2>&1; then
+if PATH="$fake_bin:$PATH" "$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir" >/dev/null 2>&1; then
 	printf '%s\n' 'package-release-test: wrong Go version was accepted' >&2
 	exit 1
 fi
 
-GOOS="$foreign_goos" GOARCH=amd64 REMAINDER_ALLOW_DIRTY=1 \
+dirty_repo="$test_root/dirty-repo"
+git clone --quiet --no-hardlinks "$repository_root" "$dirty_repo"
+git -C "$dirty_repo" checkout --quiet --detach "$(git -C "$repository_root" rev-parse HEAD)"
+printf '%s\n' 'DIRTY_PROVENANCE_MARKER' >>"$dirty_repo/docs/release.md"
+if REMAINDER_ALLOW_DIRTY=1 "$dirty_repo/scripts/package-release.sh" v0.1.0 "$test_root/dirty-dist" >"$test_root/dirty.stdout" 2>"$test_root/dirty.stderr"; then
+	printf '%s\n' 'package-release-test: dirty source was accepted' >&2
+	exit 1
+fi
+grep -F 'source checkout is dirty' "$test_root/dirty.stderr" >/dev/null
+test ! -e "$test_root/dirty-dist"
+
+GOOS="$foreign_goos" GOARCH=amd64 \
 	"$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
 
 archive="$output_dir/$archive_base.tar.gz"

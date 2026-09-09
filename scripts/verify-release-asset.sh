@@ -143,6 +143,7 @@ grep -F ': go1.27.1' "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')CGO_ENABLED=0" "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')GOOS=$expected_goos" "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')GOARCH=$expected_goarch" "$build_metadata" >/dev/null
+grep -F "build$(printf '\t')vcs.modified=false" "$build_metadata" >/dev/null
 grep -F "\"source_revision\": \"$source_revision\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F "\"version\": \"$version\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F "\"target\": \"$target\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
@@ -177,6 +178,7 @@ cat >"$output_manifest" <<EOF
     "embedded_target": "passed",
     "embedded_go_version": "passed",
     "embedded_cgo_disabled": "passed",
+    "embedded_clean_source": "passed",
     "asset_manifest": "passed"
   },
   "runtime_path_excluded": ["go", "node", "python", "jq", "sum", "herdr"],
