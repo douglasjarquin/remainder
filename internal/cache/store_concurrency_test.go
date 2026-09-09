@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,13 +50,18 @@ func TestStore_ConcurrentWrites_keepNewestCompleteObservation(t *testing.T) {
 func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 	// Given
 	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
-	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	allInitialReads := make(chan struct{})
+	var nowCalls atomic.Int64
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time {
+		if nowCalls.Add(1) == 3 {
+			close(allInitialReads)
+		}
+		return now
+	}})
 	binding := testBinding()
 	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Second))); err != nil {
 		t.Fatal(err)
 	}
-	started := make(chan struct{})
-	release := make(chan struct{})
 	var fetches int
 	var mutex sync.Mutex
 	results := make(chan cache.Result, 2)
@@ -68,19 +74,14 @@ func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 			result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 				mutex.Lock()
 				fetches++
-				if fetches == 1 {
-					close(started)
-				}
 				mutex.Unlock()
-				<-release
+				<-allInitialReads
 				return cache.FetchResult{Observation: testObservation(now)}
 			})
 			results <- result
 			errorsFound <- err
 		}()
 	}
-	<-started
-	close(release)
 	first, second := <-results, <-results
 
 	// Then
@@ -94,6 +95,68 @@ func TestStore_ForcedOverlap_reusesOneNewGeneration(t *testing.T) {
 	defer mutex.Unlock()
 	if fetches != 1 || first.Generation == "" || first.Generation != second.Generation {
 		t.Fatalf("fetches = %d, generations = %q/%q", fetches, first.Generation, second.Generation)
+	}
+}
+
+func TestStore_LaterForcedRequest_requiresAnotherGeneration(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	binding := testBinding()
+	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Second))); err != nil {
+		t.Fatal(err)
+	}
+	fetches := 0
+	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute, Refresh: true}
+	fetch := func(context.Context) cache.FetchResult {
+		fetches++
+		return cache.FetchResult{Observation: testObservation(now.Add(time.Duration(fetches) * time.Second))}
+	}
+
+	// When
+	first, firstErr := store.Resolve(t.Context(), binding, "", policy, fetch)
+	second, secondErr := store.Resolve(t.Context(), binding, "", policy, fetch)
+
+	// Then
+	if firstErr != nil || secondErr != nil || fetches != 2 || first.Generation == second.Generation || !second.Observation.ObservedAt.After(first.Observation.ObservedAt) {
+		t.Fatalf("first = %+v/%v, second = %+v/%v, fetches = %d", first, firstErr, second, secondErr, fetches)
+	}
+}
+
+func TestStore_SeparateBindings_doNotShareRefreshOwnership(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	firstBinding := testBinding()
+	secondBinding := testBinding()
+	secondBinding.CredentialFingerprint = "other-fingerprint"
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	firstDone := make(chan error, 1)
+
+	// When
+	go func() {
+		_, err := store.Resolve(t.Context(), firstBinding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
+			close(firstStarted)
+			<-releaseFirst
+			return cache.FetchResult{Observation: testObservation(now)}
+		})
+		firstDone <- err
+	}()
+	<-firstStarted
+	second, secondErr := store.Resolve(t.Context(), secondBinding, "acct-other", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}, func(context.Context) cache.FetchResult {
+		observation := testObservation(now)
+		observation.Account.LastObserved = "acct-other"
+		return cache.FetchResult{Observation: observation}
+	})
+	close(releaseFirst)
+
+	// Then
+	if secondErr != nil || second.Generation == "" || second.Observation.Account.LastObserved != "acct-other" {
+		t.Fatalf("second = %+v, error = %v", second, secondErr)
+	}
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
 	}
 }
 

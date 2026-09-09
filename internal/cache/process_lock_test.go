@@ -121,6 +121,48 @@ func TestStore_LockDeadline_boundsRefreshWithoutFetching(t *testing.T) {
 	}
 }
 
+func TestStore_CanceledWaiter_releasesOnlyItsResources(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }, LockWait: time.Second})
+	binding := testBinding()
+	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Minute))); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(filepath.Dir(store.SnapshotPath(binding)), "refresh.lock")
+	lock, err := os.OpenFile(lockPath, os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	fetches := 0
+
+	// When
+	_, err = store.Resolve(ctx, binding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second}, func(context.Context) cache.FetchResult {
+		fetches++
+		return cache.FetchResult{}
+	})
+	if unlockErr := syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); unlockErr != nil {
+		t.Fatal(unlockErr)
+	}
+	if closeErr := lock.Close(); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	result, retryErr := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second}, func(context.Context) cache.FetchResult {
+		fetches++
+		return cache.FetchResult{Observation: testObservation(now)}
+	})
+
+	// Then
+	if !errors.Is(err, context.Canceled) || retryErr != nil || result.Generation == "" || fetches != 1 {
+		t.Fatalf("canceled error = %v, retry = %+v/%v, fetches = %d", err, result, retryErr, fetches)
+	}
+}
+
 func TestCacheLockOwnerHelper(t *testing.T) {
 	if os.Getenv("REMAINDER_CACHE_LOCK_OWNER") != "1" {
 		return

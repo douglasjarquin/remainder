@@ -20,7 +20,7 @@ Flags:
       --max-age duration   maximum cache observation age (default 5s)
       --profile string     exact profile selection
       --provider string    exact provider selection
-      --refresh            require a newer cache generation
+      --refresh            require an observation newer than this request's starting generation
       --scope string       exact scope selection
       --stale-on-error     return stale evidence after a transient refresh failure
   -v, --version            version for remainder

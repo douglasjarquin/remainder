@@ -18,6 +18,7 @@ var (
 	ErrCorrupt          = errors.New("cache record is corrupt")
 	ErrUnknownSchema    = errors.New("cache record schema is unsupported")
 	ErrLockTimeout      = errors.New("cache refresh ownership wait timed out")
+	ErrBackoff          = errors.New("cache refresh is temporarily backed off")
 	ErrOlderObservation = errors.New("older observation cannot replace newer cache data")
 )
 
@@ -87,7 +88,20 @@ const (
 type FetchResult struct {
 	Observation evidence.Observation
 	Failure     FailureKind
+	RetryAt     time.Time
 	Err         error
+}
+
+type BackoffError struct {
+	RetryAt time.Time
+}
+
+func (e *BackoffError) Error() string {
+	return "cache refresh is backed off until " + e.RetryAt.UTC().Format(time.RFC3339)
+}
+
+func (e *BackoffError) Unwrap() error {
+	return ErrBackoff
 }
 
 type Result struct {
@@ -105,6 +119,8 @@ type Options struct {
 	Random           io.Reader
 	LockWait         time.Duration
 	OperationTimeout time.Duration
+	LocalBackoff     time.Duration
+	MaxBackoff       time.Duration
 }
 
 func (o Options) withDefaults() Options {
@@ -120,5 +136,12 @@ func (o Options) withDefaults() Options {
 	if o.OperationTimeout <= 0 {
 		o.OperationTimeout = 15 * time.Second
 	}
+	if o.LocalBackoff <= 0 {
+		o.LocalBackoff = time.Second
+	}
+	if o.MaxBackoff <= 0 {
+		o.MaxBackoff = time.Minute
+	}
+	o.LocalBackoff = min(o.LocalBackoff, o.MaxBackoff)
 	return o
 }

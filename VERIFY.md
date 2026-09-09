@@ -49,6 +49,11 @@ Controlled refresh uses a compiled test helper with synthetic auth and loopback 
 Neither timing certifies release-binary refresh or live provider latency.
 Eligible cache-hit timing uses the actual release-like binary with a seeded synthetic observation, zero provider requests, and a separately counted JSON provenance check.
 
+The issue #7 release-process acceptance workload is an explicit developer command rather than a canonical verification dependency.
+Build untagged CGO-free Linux ARM64 `cmd/remainder` and `cmd/remainder-benchmark` binaries, mount them read-only into the pinned Ubuntu 24.04 ARM64 image, and run the benchmark binary with `--binary /probe/remainder --coalescing-acceptance` under `--network none`, a writable `/tmp` tmpfs, and `--rm`.
+The runner creates only synthetic auth, an ephemeral CA with the `chatgpt.com` DNS SAN, a loopback TLS endpoint, and an allowlisted CONNECT proxy inside that owned container.
+It fails unless Sum/Pinchos applications are absent and the exact process, request, projection, account, observation, latency, and memory assertions pass.
+
 ## Scenarios
 
 The linked [feature map](docs/features/README.md) contains the automated Cobra and renderer scenarios.

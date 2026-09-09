@@ -10,6 +10,9 @@ The full-process driver starts the compiled binary once per sample and records t
 
 The controlled refresh driver compiles a Go test helper once, invokes the actual Cobra execution seam with an injected native Codex adapter, and sends one request per sample to a synthetic loopback TLS server.
 
+The explicit coalescing acceptance mode runs at least 12 untagged release-binary processes against one expired cache through a synthetic `chatgpt.com` TLS fixture and an allowlisted loopback CONNECT proxy.
+It records actual subprocess and provider request counts, per-process maximum resident memory, and contention latency summaries for successful mixed projections, overlapping forced refreshes, a later forced refresh, and an empty-cache 429 burst.
+
 Each controlled sample records total helper-process elapsed time and controlled TLS round-trip time as separate fields.
 
 Separate count, p50, p95, mean, and dispersion summaries preserve both timing boundaries.
@@ -48,6 +51,7 @@ The optional comparator invokes quota-axi only inside its synthetic fetch harnes
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | A normally seeded complete observation is read through the actual release binary and in-process runtime adapter with invalid OAuth JSON proving eligible hits avoid credential parsing and provider requests. | automated `cmd/remainder-benchmark/cache_test.go` and `internal/cli/issue6_bench_test.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
 | bench-refresh | The compiled Go test helper executes the real Cobra and native Codex adapter path against synthetic loopback TLS with one request per sample. | automated `scripts/benchmark.sh`, `internal/cli/issue5_test.go`, `internal/cli/issue5_bench_test.go`, and `cmd/remainder-benchmark/refresh.go` | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` - Implemented |
+| bench-coalescing | Release processes record one provider request per overlapping response generation, bounded 429 reuse, contention latency, memory, and exact child/proof-call counts. | manual explicit developer acceptance through `cmd/remainder-benchmark --coalescing-acceptance` | `.omo/evidence/issue7/green/coalescing-acceptance.json` |
 
 ## Measurement limits
 
