@@ -4,8 +4,8 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-The source implements read-only Codex, Claude, and Grok file providers, plus help, version, unavailable-provider behavior, and typed evidence output.
-The released v0.1.0 artifact supports Codex; the Claude and Grok source increments have controlled fixture verification and no successful native canary yet.
+The source implements read-only Codex, Claude, Grok, and Linux Cursor file providers, plus help, version, unavailable-provider behavior, and typed evidence output.
+The released v0.1.0 artifact supports Codex; the Claude, Grok, and Cursor source increments have controlled fixture verification and no successful native canary yet.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
 It does not log in, refresh credentials, switch accounts, invoke another CLI, or make a generative request.
@@ -18,6 +18,10 @@ An absent or expired file returns unavailable; there is no Keychain or refresh f
 Use `--provider grok --profile default` for the selected Grok consumer file context.
 Shared and product percentages remain separate from prepaid credits, and account identity stays unknown.
 See [Grok file collection](docs/features/grok.md) for selectors, source limits, and mixed reports.
+
+Use `--provider cursor --profile default` on Linux for the selected CLI auth file.
+Included percentages and spend amounts in cents remain separate, with unknown account identity.
+The macOS Keychain and editor SQLite routes are unsupported; see [Cursor file collection](docs/features/cursor.md).
 
 ## Build and verify
 
@@ -42,7 +46,8 @@ The benchmark records startup/help, version, unavailable, and invalid-freshness 
 
 Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and selected native adapter against loopback TLS with synthetic authentication.
 Run `scripts/benchmark.sh bin/remainder --provider claude` or `scripts/benchmark.sh bin/remainder --provider grok` for provider-specific refresh and cache measurements; the default provider is Codex.
-Each Codex or Grok sample makes one counted request; each Claude sample makes a profile request followed by a usage request.
+On Linux, use `scripts/benchmark.sh bin/remainder --provider cursor` for the Cursor file route.
+Each Codex or Grok sample makes one counted request; each Claude sample makes a profile request followed by a usage request, and each Linux Cursor sample makes three quota RPCs.
 Helper-process elapsed time and the sum of request times to response headers have separate p50/p95 summaries.
 The helper measurement includes test-runtime and metrics overhead and does not measure release-binary refresh or the live provider endpoint.
 The in-process refresh benchmark reports allocations and requests per operation.
@@ -115,7 +120,8 @@ The selected native macOS route passed two authorized read-only observations on 
 Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, and the [release-readiness record](docs/release-readiness.md) consolidates the completed cross-process, correctness, and performance gates.
 The [v0.1.0 release](https://github.com/douglasjarquin/remainder/releases/tag/v0.1.0) has verified downloaded Codex executables; this does not certify later provider source changes.
 
-Use `--all` to read the fixed default Codex, Claude, and Grok contexts concurrently.
+Use `--all` to read the fixed default Codex, Claude, and Grok contexts concurrently, followed by Cursor on Linux.
+The platform controls this fixed list; it does not inspect credentials to choose providers.
 It cannot be combined with provider, profile, or account flags and does not discover profiles.
 Mixed JSON contains separate observations and provider-scoped failures; compact output remains one line.
 A provider failure preserves other usable observations with exit 3; no usable observations produces exit 1 and empty stdout.

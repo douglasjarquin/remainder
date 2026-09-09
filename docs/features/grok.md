@@ -36,7 +36,7 @@ Source-supplied weekly or monthly start/reset pairs provide cycle provenance; ma
 
 ## Mixed reports
 
-`remainder --all --format json` reads the default Codex, Claude, and Grok contexts concurrently and emits them in that order.
+`remainder --all --format json` reads the default Codex, Claude, and Grok contexts concurrently and emits them in that order, followed by Cursor on Linux.
 It does not discover additional profiles.
 Do not combine `--all` with `--provider`, `--profile`, or `--account`.
 Window and scope filters apply separately to each provider.

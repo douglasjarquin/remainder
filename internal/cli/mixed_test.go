@@ -13,9 +13,10 @@ import (
 )
 
 type mixedFixtureAdapter struct {
-	results  []collectionResult
-	requests []evidence.Request
-	calls    int
+	results       []collectionResult
+	requests      []evidence.Request
+	calls         int
+	cursorFailure error
 }
 
 func (a *mixedFixtureAdapter) Observe(context.Context, evidence.Request) (evidence.Observation, error) {
@@ -25,7 +26,18 @@ func (a *mixedFixtureAdapter) Observe(context.Context, evidence.Request) (eviden
 func (a *mixedFixtureAdapter) ObserveAll(_ context.Context, requests []evidence.Request, _ cache.Policy) []collectionResult {
 	a.calls++
 	a.requests = append(a.requests, requests...)
-	return append([]collectionResult(nil), a.results...)
+	results := append([]collectionResult(nil), a.results...)
+	for _, request := range requests {
+		if request.Provider != "cursor" {
+			continue
+		}
+		result := collectionResult{Request: request, Result: cache.Result{Observation: providerObservation(fixedCLINow(), "cursor")}}
+		if a.cursorFailure != nil {
+			result.Err = a.cursorFailure
+		}
+		results = append(results, result)
+	}
+	return results
 }
 
 func TestExecuteAll_rejectsExplicitSelectorsBeforeCollection(t *testing.T) {
@@ -71,8 +83,13 @@ func TestExecuteAll_JSON_preservesProviderOrderAndSingleObservationWire(t *testi
 	if !strings.Contains(output, wantFailure) {
 		t.Fatalf("stdout=%q, want %q", output, wantFailure)
 	}
-	if len(adapter.requests) != 3 || adapter.requests[0].Provider != "codex" || adapter.requests[1].Provider != "claude" || adapter.requests[2].Provider != "grok" {
+	if len(adapter.requests) != len(allRequests) {
 		t.Fatalf("requests=%+v", adapter.requests)
+	}
+	for index, request := range adapter.requests {
+		if request.Provider != allRequests[index].Provider || request.Profile != allRequests[index].Profile {
+			t.Fatalf("requests=%+v", adapter.requests)
+		}
 	}
 }
 
@@ -109,7 +126,7 @@ func TestExecuteAll_appliesWindowAndScopePerProvider(t *testing.T) {
 
 	code := executeWithAdapterAt(t.Context(), []string{"--all", "--cache=off", "--window=weekly", "--scope=account", "--format=json"}, &stdout, &stderr, "test", now, adapter)
 
-	if code != 3 || strings.Count(stdout.String(), `"id":"weekly"`) != 2 || !strings.Contains(stdout.String(), `"provider":"claude","profile":"default","message":"requested quota evidence is unavailable"`) {
+	if code != 3 || strings.Count(stdout.String(), `"id":"weekly"`) != len(allRequests)-1 || !strings.Contains(stdout.String(), `"provider":"claude","profile":"default","message":"requested quota evidence is unavailable"`) {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	for _, request := range adapter.requests {
@@ -173,7 +190,7 @@ func TestExecuteAll_noUsableObservationsUsesDeterministicScopedStderr(t *testing
 		{Request: evidence.Request{Provider: "grok", Profile: "default"}, Err: errors.New("grok secret")},
 		{Request: evidence.Request{Provider: "codex", Profile: "default"}, Err: context.DeadlineExceeded},
 		{Request: evidence.Request{Provider: "claude", Profile: "default"}, Err: cache.ErrUnavailable},
-	}}
+	}, cursorFailure: errors.New("cursor unavailable")}
 	var stdout, stderr bytes.Buffer
 
 	code := executeWithAdapterAt(t.Context(), []string{"--all", "--cache=only"}, &stdout, &stderr, "test", fixedCLINow(), adapter)
@@ -181,6 +198,9 @@ func TestExecuteAll_noUsableObservationsUsesDeterministicScopedStderr(t *testing
 	want := "remainder: codex/default: quota collection timed out\n" +
 		"remainder: claude/default: cached quota evidence is unavailable\n" +
 		"remainder: grok/default: quota is unavailable\n"
+	if len(allRequests) == 4 {
+		want += "remainder: cursor/default: quota is unavailable\n"
+	}
 	if code != 1 || stdout.Len() != 0 || stderr.String() != want {
 		t.Fatalf("code=%d stdout=%q stderr=%q want=%q", code, stdout.String(), stderr.String(), want)
 	}
