@@ -59,7 +59,8 @@ The sanitized receipt is retained in the roadmap review checkout at `.artifacts/
 The initial native observation exposed a weekly-primary/null-secondary normalization defect.
 Synthetic adapter and Cobra regressions reproduced it before the fix, and genuine duplicate supplied windows still fail closed.
 The successful native observations establish this selected macOS source route; they do not certify other accounts, operating systems, or future source availability.
-Claude, Grok, and Cursor remain `unrun` and require their own authorized account and source-specific lab.
+Claude, Grok, and Cursor have no successful native quota canary yet.
+Their authorized file-only preflight is recorded below; fixture implementation does not replace source-specific live acceptance.
 The issue #13 release-readiness record consolidates the already delivered cache, cross-process refresh, output, performance, and direct example evidence.
 Downloaded executable installation and packaging remain the issue #14 gate.
 
@@ -70,3 +71,17 @@ That receipt remains separate from deterministic fixtures and from the earlier n
 
 Help, version, invalid input, and offline verification remain credential-free.
 Expired, rejected, changed-profile, redirect, and malformed-source behavior use synthetic auth files and controlled HTTP/TLS tests.
+
+## File-only provider preflight
+
+On 2026-09-09, the maintainer authorized bounded read-only canaries using existing default CLI credential files.
+The authorization excludes Keychain, browser cookies, SQLite, login, credential refresh, account changes, and generative calls.
+The selected default Claude credential file was absent.
+The selected default Grok auth file contained one consumer OIDC session for `auth.x.ai`, but that session was expired.
+Neither preflight made a provider HTTP request or changed authentication state.
+
+The additional source review uses `quota-axi@0.1.41`, tag `quota-axi-v0.1.41`, at commit `a19268827220e12e173067d11703e6ee36d5d88f`.
+Its [Cursor CLI credential helper](https://github.com/kunchenguid/quota-axi/blob/a19268827220e12e173067d11703e6ee36d5d88f/src/providers/cursor-cli-credential.ts) reads the access token from Keychain on macOS and from a CLI auth file on Linux.
+This reviewed implementation provides no proved macOS file-only token route.
+No Cursor credential file, editor database, or Keychain item was inspected during the preflight.
+These findings leave all three native quota canaries unverified and do not authorize a fallback credential route.
