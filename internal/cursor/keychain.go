@@ -24,9 +24,24 @@ type macConfig struct {
 }
 
 type macAuthInfo struct {
-	Email  string `json:"email"`
-	UserID string `json:"userId"`
-	AuthID string `json:"authId"`
+	Email  identityHint `json:"email"`
+	UserID identityHint `json:"userId"`
+	AuthID identityHint `json:"authId"`
+}
+
+type identityHint string
+
+func (h *identityHint) UnmarshalJSON(data []byte) error {
+	*h = ""
+	if len(data) == 0 || data[0] != '"' {
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(data, &text); err != nil {
+		return err
+	}
+	*h = identityHint(text)
+	return nil
 }
 
 type macConfigSnapshot struct {
@@ -58,11 +73,11 @@ func readMacConfig(path string) (macConfigSnapshot, error) {
 	if config.AuthInfo == nil {
 		return macConfigSnapshot{}, fmt.Errorf("%w: Cursor CLI configuration file lacks authInfo identity", ErrInvalidAuth)
 	}
-	userID := strings.TrimSpace(config.AuthInfo.UserID)
+	userID := strings.TrimSpace(string(config.AuthInfo.UserID))
 	if userID == "" {
-		userID = strings.TrimSpace(config.AuthInfo.AuthID)
+		userID = strings.TrimSpace(string(config.AuthInfo.AuthID))
 	}
-	email := strings.TrimSpace(config.AuthInfo.Email)
+	email := strings.TrimSpace(string(config.AuthInfo.Email))
 	if userID == "" && email == "" {
 		return macConfigSnapshot{}, fmt.Errorf("%w: Cursor CLI configuration file lacks authInfo identity", ErrInvalidAuth)
 	}
