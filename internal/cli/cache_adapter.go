@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
+	"github.com/douglasjarquin/remainder/internal/claude"
 	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/spf13/cobra"
@@ -14,25 +15,27 @@ import (
 
 type runtimeAdapter struct {
 	codex    codex.Adapter
+	claude   claude.Adapter
 	newStore func() (*cache.Store, error)
 }
 
 func defaultRuntimeAdapter() runtimeAdapter {
-	return runtimeAdapter{codex: codex.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
+	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
 }
 
 func (a runtimeAdapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
 	if request.Provider == "" {
 		return unavailableAdapter{}.Observe(ctx, request)
 	}
-	return a.codex.Observe(ctx, request)
+	return a.provider(request).Observe(ctx, request)
 }
 
 func (a runtimeAdapter) ObserveWithCache(ctx context.Context, request evidence.Request, policy cache.Policy) (cache.Result, error) {
 	if request.Provider == "" {
 		return cache.Result{}, ErrUnavailable
 	}
-	binding, err := a.codex.CacheBinding(ctx, request)
+	provider := a.provider(request)
+	binding, err := provider.CacheBinding(ctx, request)
 	if err != nil {
 		if errors.Is(err, evidence.ErrInvalidSelection) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return cache.Result{}, err
@@ -40,7 +43,7 @@ func (a runtimeAdapter) ObserveWithCache(ctx context.Context, request evidence.R
 		if policy.Mode == cache.ModeOnly {
 			return cache.Result{}, cache.ErrUnavailable
 		}
-		observation, fetchErr := a.codex.Observe(ctx, request)
+		observation, fetchErr := provider.Observe(ctx, request)
 		return cache.Result{Observation: observation}, fetchErr
 	}
 	store, err := a.newStore()
@@ -48,35 +51,27 @@ func (a runtimeAdapter) ObserveWithCache(ctx context.Context, request evidence.R
 		if policy.Mode == cache.ModeOnly {
 			return cache.Result{}, cache.ErrUnavailable
 		}
-		observation, fetchErr := a.codex.Observe(ctx, request)
+		observation, fetchErr := provider.Observe(ctx, request)
 		return cache.Result{Observation: observation, Warning: cache.WarningStorageUnavailable, CacheError: err}, fetchErr
 	}
 	return store.Resolve(ctx, binding, request.Account, policy, func(fetchContext context.Context) cache.FetchResult {
-		observation, fetchErr := a.codex.Observe(fetchContext, request)
-		return cache.FetchResult{Observation: observation, Failure: classifyFailure(fetchErr), RetryAt: retryAt(fetchErr), Err: fetchErr}
+		observation, fetchErr := provider.Observe(fetchContext, request)
+		failure, retryAt := provider.Failure(fetchErr)
+		return cache.FetchResult{Observation: observation, Failure: failure, RetryAt: retryAt, Err: fetchErr}
 	})
 }
 
-func retryAt(err error) time.Time {
-	if retry, ok := errors.AsType[*codex.RetryError](err); ok {
-		return retry.RetryAt
-	}
-	return time.Time{}
+type nativeAdapter interface {
+	Observe(context.Context, evidence.Request) (evidence.Observation, error)
+	CacheBinding(context.Context, evidence.Request) (cache.Binding, error)
+	Failure(error) (cache.FailureKind, time.Time)
 }
 
-func classifyFailure(err error) cache.FailureKind {
-	switch {
-	case err == nil:
-		return cache.FailureNone
-	case errors.Is(err, codex.ErrAuthorizationRejected):
-		return cache.FailureRevoked
-	case errors.Is(err, codex.ErrAccountMismatch), errors.Is(err, evidence.ErrWrongAccount):
-		return cache.FailureAccountMismatch
-	case errors.Is(err, codex.ErrTransient):
-		return cache.FailureTransient
-	default:
-		return cache.FailurePermanent
+func (a runtimeAdapter) provider(request evidence.Request) nativeAdapter {
+	if request.Provider == "claude" {
+		return a.claude
 	}
+	return a.codex
 }
 
 type cacheAdapter interface {
