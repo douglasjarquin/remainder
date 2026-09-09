@@ -15,4 +15,4 @@ The issue #4 baseline is tracked in [performance baseline](performance-baseline.
 | Compact, JSON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issue #3 |
 | Cache and refresh ownership | Planned | Issues #6 and #7 define these boundaries |
 | Supported macOS/Linux verification | Implemented | `.github/workflows/ci.yml` uses macOS 14 and Ubuntu 24.04 |
-| Startup, output, token, and allocation baseline | Implemented | `scripts/benchmark.sh`, `scripts/benchmark_tokens.py`, `cmd/remainder-benchmark/main.go`, and `internal/cli/cli_bench_test.go` record raw samples, equivalent-facts fixture comparisons, optional actual tokens, summaries, output, and allocations |
+| Startup, output, token, and allocation baseline | Partial | `scripts/benchmark.sh`, `scripts/benchmark_tokens.py`, `cmd/remainder-benchmark/main.go`, and `internal/cli/cli_bench_test.go` record raw samples, controlled fixture comparisons, optional actual tokens, summaries, output, and allocations; compact comparator acceptance awaits fixture-capable quota-axi input or the later provider/cache mapping |

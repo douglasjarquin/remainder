@@ -10,7 +10,7 @@ The full-process driver starts the compiled binary once per sample and records t
 
 The report preserves environment and build metadata, binary size, raw samples, and per-workload count, minimum, maximum, p50, p95, mean, and dispersion.
 
-The deterministic fixture corpus and its SHA-256 are included in the metadata so repeated measurements can be tied to the exact input.
+The deterministic fixture corpus, its fixed rendering clock, and its SHA-256 are included in the metadata so repeated measurements can be tied to the exact input.
 
 The fixture corpus emits healthy, exhausted, stale, and partial-unknown observations through compact, JSON, and scalar Cobra paths.
 
@@ -22,7 +22,7 @@ The first sample is labeled `first-process` and later samples are labeled `warm-
 
 The normal benchmark does not purge a cache or access credentials, network, telemetry, or a provider.
 
-The optional comparator performs one cache-only provider read with credential refresh disabled.
+The optional comparator does not invoke a provider or read a cache.
 
 ## Scenarios
 
@@ -32,7 +32,7 @@ The optional comparator performs one cache-only provider read with credential re
 | bench-tokenizer | The optional pinned `tiktoken` bridge measures actual `o200k_base` tokens offline and records its identity and applicability. | manual optional measurement through `scripts/benchmark_tokens.py` and `scripts/benchmark.sh` with `REMAINDER_TOKENIZER_PYTHON` | `artifacts/benchmark-cli.jsonl` |
 | bench-cli | The compiled Cobra entrypoint measures help, version, unavailable, and invalid-freshness output with expected exit codes and exact output regression checks. | automated `scripts/benchmark.sh` and `cmd/remainder-benchmark/main.go` | `artifacts/benchmark-cli.jsonl` |
 | bench-renderers | Compact, JSON, and scalar fixture output stays observable across healthy, exhausted, stale, and partial-unknown states while the CLI benchmark records in-process allocations. | automated `internal/cli/cli_bench_test.go` and the benchmark driver | `artifacts/benchmark-cli.jsonl` and `artifacts/benchmark-in-process.txt` |
-| bench-comparator | The optional pinned preinstalled `quota-axi` compact and JSON plus `jq -c` paths run once with `--no-credential-refresh`; cache-only results remain non-equivalent when freshness, scopes, and required facts are not controlled. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
+| bench-comparator | The optional pinned preinstalled `quota-axi` version and actual Pinchos JSON plus `jq -r` consumer path run against a controlled fixture; compact quota-axi equivalence remains explicitly unresolved without controlled offline input. | manual optional probe through `scripts/benchmark.sh` with `REMAINDER_BENCH_COMPARATORS=1` | `artifacts/benchmark-cli.jsonl` |
 | bench-budgets | Seeded compact, JSON, and scalar allocation budgets detect deterministic allocation regressions. | automated `internal/cli/cli_bench_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | bench-cache | Eligible-cache reads are unimplemented pending issue #6. | manual not-applicable: cache is not implemented in this release | issue #6 |
 | bench-refresh | Controlled loopback refresh is unimplemented pending issue #5. | manual not-applicable: provider refresh is not implemented in this release | issue #5 |
@@ -41,15 +41,17 @@ The optional comparator performs one cache-only provider read with credential re
 
 The normal Go verification path does not import or require a tokenizer package.
 
-For actual token measurements, provide an isolated Python environment with pinned `tiktoken` and run `scripts/benchmark.sh` with `REMAINDER_TOKENIZER_PYTHON`.
+For actual token measurements, provide an isolated Python environment with pinned `tiktoken`, provision the expected encoding data under `TIKTOKEN_CACHE_DIR`, and run `scripts/benchmark.sh` with `REMAINDER_TOKENIZER_PYTHON`.
+
+The tokenizer bridge verifies that provisioned data matches the expected encoding hash and fails closed on a cache miss or mismatch without downloading or writing data.
 
 The recorded `o200k_base` counts are applicable to the declared Codex-family comparison encoding, not a model-specific tokenizer certification.
 
 If the optional tokenizer is omitted, token fields are explicitly unmeasured rather than replaced with word counts.
 
-The optional quota-axi comparator is cache-only and uses no credential refresh.
+The optional comparator does not invoke a provider or read a cache.
 
-Its output is retained as hashed reference data only when it cannot be aligned to the fixture's freshness, scopes, and required facts.
+It verifies the real Pinchos JSON plus `jq -r` projection against a controlled synthetic input and records the exact prerequisite preventing compact quota-axi equivalence.
 
 The `go test -bench -benchmem` artifact is the source for in-process allocations and bytes per operation.
 
@@ -60,3 +62,7 @@ The driver does not apply the cache-read objective to startup or failure workloa
 The cache-read p95 objective remains unmeasured until issue #6 provides an eligible cache.
 
 Full-process startup and failure p95 values are retained as hosted trend evidence and do not gate the benchmark.
+
+An optional `--latency-baseline` JSON file enables seeded p95 regression detection for explicitly supplied workloads.
+
+That detector is independent of the deferred eligible-cache 10 ms objective and never applies that objective to startup trends.

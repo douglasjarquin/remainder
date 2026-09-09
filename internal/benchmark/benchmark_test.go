@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestSummarizeRejectsEmptySamples(t *testing.T) {
 }
 
 func TestFixtureHashIsStable(t *testing.T) {
-	const want = "a11fda4fe0caf891b76bd963540a265a60bec6eec771b7e7c9c047c74840f1d9"
+	const want = "31d906dfdd1a9d5acf114d58b92f705f6cfec8946b082a74ffaeafea247f7093"
 	if got := FixtureHash(); got != want {
 		t.Fatalf("FixtureHash() = %q, want %q", got, want)
 	}
@@ -50,5 +51,22 @@ func TestFixturesCoverRequiredObservationStates(t *testing.T) {
 		if err := fixture.Observation.Validate(); err != nil {
 			t.Fatalf("fixture %q validation error = %v", fixture.Name, err)
 		}
+	}
+}
+
+func TestDetectLatencyRegressionUsesSeededP95(t *testing.T) {
+	baseline, err := Summarize([]int64{10, 20, 30, 40, 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	regressed, err := Summarize([]int64{10, 20, 30, 40, 60})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !errors.Is(DetectLatencyRegression(regressed, baseline), ErrLatencyRegression) {
+		t.Fatalf("DetectLatencyRegression() did not reject seeded p95 regression")
+	}
+	if err := DetectLatencyRegression(baseline, baseline); err != nil {
+		t.Fatalf("DetectLatencyRegression() rejected equal baseline: %v", err)
 	}
 }

@@ -85,6 +85,28 @@ func TestObservation_RenderCompactEscapesControlCharactersInStructuralFields(t *
 	}
 }
 
+func TestObservation_RenderCompactPreservesUnitForUnknownValue(t *testing.T) {
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomePartial,
+		Windows: []evidence.Window{{
+			ID: "weekly", Scope: evidence.ScopeModel, Unit: "tokens",
+			Limits: []evidence.Limit{{ID: "remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueUnknown}}},
+		}},
+	}
+	got, err := evidence.RenderCompact(obs, obs.ObservedAt)
+	if err != nil {
+		t.Fatalf("RenderCompact() error = %v", err)
+	}
+	if !strings.Contains(got, "remaining=unknown unit=tokens") {
+		t.Fatalf("RenderCompact() = %q, want unknown value unit", got)
+	}
+}
+
 func TestObservation_RejectsNonzeroAmountForZeroState(t *testing.T) {
 	amount := json.Number("42")
 	obs := evidence.Observation{

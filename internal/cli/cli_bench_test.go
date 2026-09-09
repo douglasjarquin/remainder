@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"context"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
 	"github.com/douglasjarquin/remainder/internal/evidence"
@@ -34,11 +36,13 @@ func benchmarkObservation() evidence.Observation {
 func TestBenchmarkFixtureOutputs(t *testing.T) {
 	adapter := benchmarkAdapter{observation: benchmarkObservation()}
 	var compactOut, compactErr bytes.Buffer
-	if code := executeWithAdapter(context.Background(), []string{"--format", "compact"}, &compactOut, &compactErr, "v0.1.0", adapter); code != 0 {
+	if code := executeWithAdapterAt(context.Background(), []string{"--format", "compact"}, &compactOut, &compactErr, "v0.1.0", time.Date(2026, time.March, 8, 7, 30, 0, 0, time.UTC), adapter); code != 0 {
 		t.Fatalf("compact exit code = %d, stderr = %q", code, compactErr.String())
 	}
-	if compactErr.Len() != 0 || !bytes.Contains(compactOut.Bytes(), []byte(`schema=v1 provider="codex"`)) || !bytes.Contains(compactOut.Bytes(), []byte(`remaining=42tokens`)) {
-		t.Fatalf("compact output = %q, stderr = %q, want healthy fixture fields", compactOut.String(), compactErr.String())
+	compact := regexp.MustCompile(`age_seconds=\d+`).ReplaceAllString(compactOut.String(), "age_seconds=<age>")
+	wantCompact := `schema=v1 provider="codex" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=<age> freshness=fresh outcome=complete identity=historical account="acct-1" source="fixture/local" windows=weekly/model:remaining=42tokens` + "\n"
+	if compact != wantCompact || compactErr.Len() != 0 {
+		t.Fatalf("compact output = %q, stderr = %q, want %q", compact, compactErr.String(), wantCompact)
 	}
 
 	var jsonOut, jsonErr bytes.Buffer

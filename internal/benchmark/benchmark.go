@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -13,7 +14,12 @@ import (
 
 var ErrNoSamples = errors.New("benchmark requires at least one sample")
 
-const FixtureSeed = "remainder-issue-4-codex-cli-fixture-v1"
+const (
+	FixtureSeed  = "remainder-issue-4-codex-cli-fixture-v1"
+	FixtureClock = "2026-03-08T07:30:00Z"
+)
+
+var ErrLatencyRegression = errors.New("latency regression")
 
 type Summary struct {
 	Count        int   `json:"count"`
@@ -49,12 +55,38 @@ func Summarize(samples []int64) (Summary, error) {
 }
 
 func FixtureHash() string {
-	data, err := json.Marshal(Fixtures())
+	data, err := json.Marshal(struct {
+		Clock    string    `json:"clock"`
+		Fixtures []Fixture `json:"fixtures"`
+	}{Clock: FixtureClock, Fixtures: Fixtures()})
 	if err != nil {
 		panic(err)
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+func FixtureHashFor(fixture Fixture) string {
+	data, err := json.Marshal(struct {
+		Clock   string  `json:"clock"`
+		Fixture Fixture `json:"fixture"`
+	}{Clock: FixtureClock, Fixture: fixture})
+	if err != nil {
+		panic(err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+func FixtureTime() time.Time {
+	return time.Date(2026, time.March, 8, 7, 30, 0, 0, time.UTC)
+}
+
+func DetectLatencyRegression(current, baseline Summary) error {
+	if current.P95NS > baseline.P95NS {
+		return fmt.Errorf("%w: p95 %d ns exceeds seeded baseline %d ns", ErrLatencyRegression, current.P95NS, baseline.P95NS)
+	}
+	return nil
 }
 
 type Fixture struct {

@@ -36,6 +36,9 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 		limitParts := make([]string, 0, len(limits))
 		for _, limit := range limits {
 			part := safeToken(string(limit.Field)) + "=" + formatValue(limit, safeToken(window.Unit))
+			if limit.Value.State != ValueDefined && limit.Value.State != ValueZero && window.Unit != "" {
+				part += " unit=" + safeToken(window.Unit)
+			}
 			if limit.ResetAt != nil {
 				part += " reset=" + limit.ResetAt.Format(time.RFC3339Nano)
 			}

@@ -33,7 +33,12 @@ It records raw output, output bytes, optional actual `o200k_base` token counts, 
 
 Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `tiktoken` for actual offline token counts.
 
-Set `REMAINDER_BENCH_COMPARATORS=1` to run the preinstalled cache-only `quota-axi` compact and JSON plus `jq -c` comparator paths once without credential refresh.
+Set `TIKTOKEN_CACHE_DIR` to a provisioned local encoding cache when measuring tokens.
+The bridge verifies the expected encoding hash and fails closed without downloading or writing cache data.
+
+Set `REMAINDER_BENCH_COMPARATORS=1` to run the preinstalled `quota-axi` version probe and the actual Pinchos JSON plus `jq -r` consumer projection against a controlled fixture.
+
+The compact quota-axi comparison remains explicitly unresolved until quota-axi accepts controlled offline fixture input or Remainder implements the later provider/cache mapping.
 
 Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
 
