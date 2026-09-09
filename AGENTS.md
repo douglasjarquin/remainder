@@ -17,12 +17,13 @@ The project is positioned for personal use by its maintainer.
 
 - `cmd/remainder/main.go` owns OS signal and process-stream wiring.
 - `internal/cli/run.go` owns flag parsing, output, and exit semantics.
-- Provider collection is intentionally not implemented in this slice.
+- `internal/codex` owns the native selected-profile credential read, bounded usage request, and Codex normalization.
 
 ## Constraints
 
 - Go 1.27.1 is the canonical developer and CI toolchain pin.
 - Runtime and ordinary tests use the Go standard library plus the pinned Cobra graph.
 - Release-like builds use `CGO_ENABLED=0`.
-- The CLI performs no credential, cache, network, telemetry, or provider access.
+- Help, version, validation, and ordinary offline tests perform no credential, cache, network, telemetry, or provider access.
+- An explicitly selected Codex/default report performs one bounded read-only credential read and provider request; caching remains unimplemented.
 - Future provider commands must preserve the one-shot CLI contract and honest unavailable behavior.

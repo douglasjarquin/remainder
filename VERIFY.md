@@ -50,7 +50,8 @@ The linked [feature map](docs/features/README.md) contains the automated Cobra a
 
 The final CLI checks drive `bin/remainder --help`, `bin/remainder --version`, `bin/remainder --freshness ignored`, `bin/remainder`, and the `value` command through isolated process invocations.
 
-No scenario accesses credentials, a provider, a cache, or the network.
+No canonical verification scenario accesses credentials, a provider, a cache, or the external network.
+Codex integration tests use synthetic temp auth and loopback `httptest` servers only.
 
 ## Isolation
 
@@ -58,7 +59,7 @@ Each check runs in this checkout and uses only temporary build output or the Git
 
 The CLI is one-shot and binds no port.
 
-No user profile, credential store, daemon, database, container, or shared service is used.
+No real user profile, credential store, daemon, database, container, or shared service is used.
 
 ## Artifacts
 
@@ -80,7 +81,8 @@ Do not remove the verification run directory or its evidence during teardown.
 
 Changes to this contract, `mise.toml`, `.agents/skills/verify/`, `.agents/skills/evidence/`, `.agents/skills/maintain-verification/`, or the feature maps require independent root review.
 
-This policy does not authorize provider collection, authentication, cache implementation, or any runtime dependency beyond the pinned Cobra graph.
+This policy covers the issue #5 native Codex collection path with synthetic local sources.
+It does not authorize a live provider canary, cache implementation, or any runtime dependency beyond the standard library and pinned Cobra graph.
 
 It checks formatting, `go vet`, race-enabled shuffled tests, the reviewed Cobra dependency/import contract, and a CGO-free release-like build.
 
@@ -102,6 +104,6 @@ GOPROXY=off ./scripts/check-dependencies.sh
 CGO_ENABLED=0 GOPROXY=off go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o /tmp/remainder ./cmd/remainder
 ```
 
-The verification command does not access credentials, a provider, a cache, or the network.
+The verification command does not access real credentials, an external provider, a cache, or the external network.
 
 The task runner equivalent is `mise run verify`.

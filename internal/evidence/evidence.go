@@ -139,13 +139,14 @@ type ValueRequest struct {
 }
 
 var (
-	ErrInvalidObservation = errors.New("invalid observation")
-	ErrDuplicateID        = errors.New("duplicate evidence id")
-	ErrMalformedTime      = errors.New("malformed evidence time")
-	ErrAmbiguous          = errors.New("ambiguous evidence selection")
-	ErrStale              = errors.New("evidence is stale")
-	ErrWrongAccount       = errors.New("evidence account does not match")
-	ErrUndefined          = errors.New("evidence value is undefined")
+	ErrInvalidObservation  = errors.New("invalid observation")
+	ErrDuplicateID         = errors.New("duplicate evidence id")
+	ErrMalformedTime       = errors.New("malformed evidence time")
+	ErrAmbiguous           = errors.New("ambiguous evidence selection")
+	ErrStale               = errors.New("evidence is stale")
+	ErrWrongAccount        = errors.New("evidence account does not match")
+	ErrUndefined           = errors.New("evidence value is undefined")
+	ErrProviderUnavailable = errors.New("provider evidence is unavailable")
 )
 
 func (o Observation) Validate() error {

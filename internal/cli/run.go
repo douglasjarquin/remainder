@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,17 @@ func (unavailableAdapter) Observe(ctx context.Context, _ evidence.Request) (evid
 	return evidence.Observation{}, ErrUnavailable
 }
 
+type runtimeAdapter struct {
+	codex codex.Adapter
+}
+
+func (a runtimeAdapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
+	if request.Provider == "" {
+		return unavailableAdapter{}.Observe(ctx, request)
+	}
+	return a.codex.Observe(ctx, request)
+}
+
 type options struct {
 	format    string
 	provider  evidence.Provider
@@ -45,7 +57,7 @@ type options struct {
 }
 
 func Execute(ctx context.Context, args []string, stdout, stderr io.Writer, version string) int {
-	return executeWithAdapter(ctx, args, stdout, stderr, version, unavailableAdapter{})
+	return executeWithAdapter(ctx, args, stdout, stderr, version, runtimeAdapter{codex: codex.Default()})
 }
 
 func ExecuteWithAdapter(ctx context.Context, args []string, stdout, stderr io.Writer, version string, adapter Adapter) int {
@@ -74,7 +86,7 @@ func executeWithAdapterAt(ctx context.Context, args []string, stdout, stderr io.
 		}
 		fmt.Fprintf(stderr, "remainder: %s\n", err)
 		switch {
-		case errors.Is(err, ErrUnavailable):
+		case errors.Is(err, ErrUnavailable), errors.Is(err, evidence.ErrProviderUnavailable):
 			return 1
 		case errors.Is(err, ErrPartial):
 			return 3

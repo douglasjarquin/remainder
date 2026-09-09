@@ -1,6 +1,6 @@
 # Quota evidence
 
-Status: implemented for deterministic local fixtures and unavailable runtime behavior.
+Status: implemented for deterministic fixtures, unavailable behavior, and controlled native Codex collection.
 
 ## Entry points
 
@@ -10,6 +10,7 @@ Status: implemented for deterministic local fixtures and unavailable runtime beh
 - `remainder value --provider PROVIDER --profile PROFILE --window WINDOW --field FIELD` emits one exact scalar value.
 - `internal/cli/run.go` owns Cobra parsing, adapter calls, output routing, and exit semantics.
 - `internal/evidence/evidence.go`, `internal/evidence/parse.go`, `internal/evidence/render.go`, and `internal/evidence/select.go` own the typed observation, parsing, projections, and exact selection.
+- `internal/codex/adapter.go`, `internal/codex/auth.go`, `internal/codex/source.go`, and `internal/codex/normalize.go` own the selected native source, bounded I/O, source schema, and normalization.
 
 ## Scenarios
 
@@ -24,6 +25,9 @@ Status: implemented for deterministic local fixtures and unavailable runtime beh
 | quota-partial | Partial evidence is rendered as data and returns a distinct exit 3 with one stderr diagnostic. | automated `internal/cli/issue3_test.go` | `artifacts/issue-3/green-focused-tests.txt` |
 | quota-unavailable | The shipped binary reports honest unavailable behavior with exit 1 and empty stdout. | automated `internal/cli/cli_test.go` and `bin/remainder` | `artifacts/issue-3/cli/final-unavailable.stderr` |
 | quota-fresh-trees | Repeated command execution uses fresh Cobra trees and does not leak adapter or flag state. | automated `internal/cli/issue3_test.go` | `artifacts/issue-3/green-focused-tests.txt` |
+| codex-native-healthy | Selected synthetic auth and controlled TLS usage responses render compact, JSON, and exact scalar results through Cobra. | automated `internal/codex/codex_test.go` and `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/codex ./internal/cli` |
+| codex-native-bounds | Missing, malformed, expired, wrong-profile, wrong-account, delayed, oversized, malformed, redirected, rejected, rate-limited, canceled, and schema-drift inputs fail safely without secret disclosure. | automated `internal/codex/codex_test.go` | `go test -race -shuffle=on -count=1 ./internal/codex` |
+| codex-native-process | A compiled helper process drives the actual Cobra entrypoint against a controlled HTTP source and emits the exact scalar. | automated `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 
 ## Driving it
 
@@ -45,7 +49,9 @@ Exit 130 means interruption.
 
 Help, version, and invalid input perform no adapter work.
 
-The runtime performs no credential, provider, cache, network, telemetry, or account-binding operation.
+Help, version, and validation perform no credential, provider, cache, network, telemetry, or account-binding operation.
+
+An explicit Codex/default request reads only the selected auth file and performs one bounded read-only usage operation.
 
 ## Gotchas and manual gaps
 
@@ -53,6 +59,7 @@ The observation records last-observed account identity separately from freshness
 
 This release does not prove current login, revocation, or credential binding.
 
-Provider collection remains planned for issue #5 and credential feasibility remains governed by issue #15.
+Codex provider collection is implemented from the selected native file source.
+The authorized Remainder live endpoint canary remains unrun, so source-specific live support is unverified.
 
 The full product inventory and any live provider route remain manual work for later issues; see the [provider source matrix](../provider-sources.md).

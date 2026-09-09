@@ -4,9 +4,10 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-This slice provides honest help, version, unavailable-provider behavior, and the typed evidence output contract.
+This slice provides a native read-only Codex quota path plus honest help, version, unavailable-provider behavior, and the typed evidence output contract.
 
-It does not access credentials, the network, a cache, or any provider.
+An explicit `--provider codex --profile default` selection reads only `$CODEX_HOME/auth.json` or `~/.codex/auth.json`, then makes a bounded request to the Codex usage endpoint.
+It does not log in, refresh credentials, switch accounts, invoke another CLI, make a generative request, or write a cache.
 
 ## Build and verify
 
@@ -40,7 +41,7 @@ Set `REMAINDER_BENCH_COMPARATORS=1` to run the preinstalled `quota-axi` version 
 
 The compact quota-axi comparison remains explicitly unresolved until quota-axi accepts controlled offline fixture input or Remainder implements the later provider/cache mapping.
 
-Cache reads remain unimplemented pending issue #6, and provider refresh remains unimplemented pending issue #5.
+Cache reads remain unimplemented pending issue #6.
 
 Without the optional tokenizer environment, token fields are explicitly unmeasured rather than word counts.
 
@@ -53,6 +54,9 @@ The `o200k_base` measurement is an offline Codex-family comparison encoding and 
 `remainder --version` writes the release or source identity to stdout and exits successfully.
 
 An invocation without a provider writes an honest unavailable message to stderr and exits nonzero.
+
+Use `remainder --provider codex --profile default` for the selected native Codex context.
+The `default` profile label means the single `CODEX_HOME` context selected by the process environment; Remainder does not scan or discover other profiles.
 
 Unknown flags and positional commands write an actionable error to stderr and exit nonzero.
 
@@ -70,7 +74,8 @@ Exit 1 means the observation is unavailable, exit 2 means invocation or selectio
 
 The observation records last-observed account identity separately from freshness and credential binding.
 
-This release does not prove current login, revocation, or credential binding, and it does not access credentials, a provider, or a cache.
+The source-built implementation has controlled local HTTP/TLS coverage, but its selected native route still requires the separate authorized live canary before a provider release claim.
+It does not access a cache.
 
 Explicit provider/profile flags are the only supported selection source in this slice; `--all` asks only for configured sources, of which this slice has none.
 
@@ -80,7 +85,7 @@ Remainder owns provider evidence collection, normalization, cache, rendering, an
 
 Pinchos and Sum remain independent consumers.
 
-The first provider work begins in issue #5 after the output contract and credential feasibility gates.
+The first provider implementation is the Codex native route from issue #5.
 
 See [the feature map](docs/features/README.md), [verification](VERIFY.md), and [attributions](ATTRIBUTIONS.md).
 
