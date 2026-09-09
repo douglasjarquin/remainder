@@ -13,12 +13,16 @@ Available Commands:
 Flags:
       --account string     expected last-observed account
       --all                read all configured sources
+      --cache string       cache policy: auto, off, or only (default "auto")
       --format string      output format: compact or json (default "compact")
       --freshness string   freshness policy: any or fresh (default "any")
   -h, --help               help for remainder
+      --max-age duration   maximum cache observation age (default 5s)
       --profile string     exact profile selection
       --provider string    exact provider selection
+      --refresh            require a newer cache generation
       --scope string       exact scope selection
+      --stale-on-error     return stale evidence after a transient refresh failure
   -v, --version            version for remainder
       --window string      exact window selection
 

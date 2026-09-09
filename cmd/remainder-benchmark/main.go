@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/douglasjarquin/remainder/internal/benchmark"
 )
@@ -50,6 +52,7 @@ func main() {
 	for _, item := range workloads {
 		workloadNames = append(workloadNames, item.Name)
 	}
+	workloadNames = append(workloadNames, "controlled-refresh", cacheHitWorkload, "cache-hit-provenance")
 	version := commandOutput(*binary, "--version")
 	tokenizer, tokenizerInfo, err := startTokenizer(*tokenizerPython)
 	if err != nil {
@@ -59,10 +62,17 @@ func main() {
 	if err != nil {
 		fatalf("controlled refresh: %v", err)
 	}
+	cached, err := runCacheHit(context.Background(), *binary, *samples, time.Second, time.Hour, tokenizer)
+	if err != nil {
+		fatalf("cache hit: %v", err)
+	}
 	buildInfo := inspectBuild(*binary)
 	host := inspectHost()
 	var comparison []comparator
 	var regressions []string
+	if err := cacheHitObjectiveFailure(cached.Summary.Workloads[cacheHitWorkload], runtime.GOOS, runtime.GOARCH, appleSiliconP95ObjectiveNS); err != nil {
+		regressions = append(regressions, err.Error())
+	}
 	if *comparators {
 		comparison = runComparators(tokenizer, *quotaAxiPreload)
 		regressions = append(regressions, comparatorFailures(comparison)...)
@@ -70,36 +80,49 @@ func main() {
 		comparison = notRunComparators()
 	}
 	writeJSON(metadata{
-		Kind:                   "metadata",
-		Source:                 "full-process-cobra-entrypoint",
-		Binary:                 *binary,
-		Version:                version,
-		Machine:                runtime.GOOS + "/" + runtime.GOARCH,
-		GoVersion:              runtime.Version(),
-		GoOS:                   runtime.GOOS,
-		GoArch:                 runtime.GOARCH,
-		CPUCount:               runtime.NumCPU(),
-		GOMAXPROCS:             runtime.GOMAXPROCS(0),
-		Host:                   host,
-		Build:                  buildInfo,
-		HelperBuild:            controlled.HelperBuild,
-		SizeBytes:              info.Size(),
-		HelperSizeBytes:        controlled.HelperSize,
-		SamplesPerWorkload:     *samples,
-		Workloads:              workloadNames,
-		Tokenizer:              tokenizerInfo,
-		FixtureSeed:            benchmark.FixtureSeed,
-		FixtureClock:           benchmark.FixtureClock,
-		FixtureSHA256:          benchmark.FixtureHash(),
-		TokenApplicability:     "o200k_base is an offline Codex-family comparison encoding; model-specific tokenizer certification remains outside this baseline",
-		CacheWorkload:          "unimplemented pending issue #6",
+		Kind:               "metadata",
+		Source:             "full-process-cobra-entrypoint",
+		Binary:             *binary,
+		Version:            version,
+		Machine:            runtime.GOOS + "/" + runtime.GOARCH,
+		GoVersion:          runtime.Version(),
+		GoOS:               runtime.GOOS,
+		GoArch:             runtime.GOARCH,
+		CPUCount:           runtime.NumCPU(),
+		GOMAXPROCS:         runtime.GOMAXPROCS(0),
+		Host:               host,
+		Build:              buildInfo,
+		HelperBuild:        controlled.HelperBuild,
+		SizeBytes:          info.Size(),
+		HelperSizeBytes:    controlled.HelperSize,
+		SamplesPerWorkload: *samples,
+		Workloads:          workloadNames,
+		Tokenizer:          tokenizerInfo,
+		FixtureSeed:        benchmark.FixtureSeed,
+		FixtureClock:       benchmark.FixtureClock,
+		FixtureSHA256:      benchmark.FixtureHash(),
+		TokenApplicability: "o200k_base is an offline Codex-family comparison encoding; model-specific tokenizer certification remains outside this baseline",
+		CacheWorkload:      "eligible release-binary cache hit with synthetic metadata binding",
+		CacheMeasurement: cacheMeasurement{
+			Source:                 cacheHitSource,
+			Policy:                 "auto",
+			ObservationAgeNS:       cached.ObservationAge.Nanoseconds(),
+			MaxAgeNS:               cached.MaxAge.Nanoseconds(),
+			ObservedAt:             cached.ObservedAt.Format(time.RFC3339Nano),
+			Freshness:              string(cached.Freshness),
+			Account:                cached.Account,
+			IdentityBinding:        string(cached.IdentityBinding),
+			TimedSamples:           len(cached.Samples),
+			ProvenanceSubprocesses: cached.Provenance.SubprocessCount,
+			SandboxCleanup:         cached.SandboxCleanup,
+		},
 		RefreshWorkload:        "controlled compiled test helper through Cobra and native Codex adapter",
-		ObservedSubprocesses:   (len(workloads) + 1) * *samples,
+		ObservedSubprocesses:   (len(workloads)+2)*(*samples) + cached.Provenance.SubprocessCount,
 		ObservedRequests:       controlled.RequestCount,
 		AllocationsMeasurement: "go test -bench -benchmem output in artifacts/benchmark-in-process.txt",
 		P95ObjectiveNS:         appleSiliconP95ObjectiveNS,
-		P95ObjectiveScope:      "eligible cache reads on the declared Apple Silicon host; cache is unimplemented pending issue #6",
-		P95Policy:              "full-process startup and failure summaries are trend evidence; no gate is applied to them",
+		P95ObjectiveScope:      "eligible release-binary cache hits on the declared Apple Silicon reference host",
+		P95Policy:              "cache-hit p95 gates darwin/arm64 reference-host runs; startup, failure, refresh, and other-host summaries remain trend evidence",
 		Comparators:            comparison,
 	})
 
@@ -146,6 +169,11 @@ func main() {
 	}
 	writeJSON(controlled.ProcessSummary)
 	writeJSON(controlled.RequestSummary)
+	for _, result := range cached.Samples {
+		writeJSON(result)
+	}
+	writeJSON(cached.Provenance)
+	writeJSON(cached.Summary)
 
 	summaries := make(map[string]benchmark.Summary, len(byWorkload))
 	for name, samples := range byWorkload {
