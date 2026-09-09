@@ -3,6 +3,10 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	json "encoding/json/v2"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,18 +47,53 @@ func TestExecuteWithCodexAdapter_rendersEveryOutputMode(t *testing.T) {
 	}
 }
 
-func TestCodexProcessEntryPoint_readsControlledSource(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+func TestCodexProcessEntryPoint_readsControlledTLSSource(t *testing.T) {
+	var requests atomic.Int64
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.Method != http.MethodGet || r.URL.Path != "/backend-api/wham/usage" || r.Header.Get("Authorization") != "Bearer synthetic-secret" || r.Header.Get("ChatGPT-Account-Id") != "acct-test" || r.Header.Get("Accept") != "application/json" {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
 		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":40,"limit_window_seconds":18000}}}`)
 	}))
 	defer server.Close()
-	command := exec.Command(os.Args[0], "-test.run=^TestIssue5HelperProcess$")
-	command.Env = []string{"REMAINDER_ISSUE5_HELPER=1", "REMAINDER_ISSUE5_AUTH=" + writeCLIAuth(t), "REMAINDER_ISSUE5_ENDPOINT=" + server.URL}
+	metricsPath := filepath.Join(t.TempDir(), "metrics.json")
+	command := issue5HelperCommand(t, server, metricsPath, writeCLIAuth(t), writeTestCA(t, server))
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil || stdout.String() != "60\n" || stderr.Len() != 0 {
 		t.Fatalf("process result: err=%v stdout=%q stderr=%q", err, stdout.String(), stderr.String())
+	}
+	metrics := readIssue5Metrics(t, metricsPath)
+	if requests.Load() != 1 || metrics.RequestCount != 1 || metrics.ControlledTLSRoundTripNS <= 0 {
+		t.Fatalf("requests = %d, metrics = %+v", requests.Load(), metrics)
+	}
+}
+
+func TestCodexProcessEntryPoint_rejectsInvalidCA(t *testing.T) {
+	var requests atomic.Int64
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+	fixtureDir := t.TempDir()
+	metricsPath := filepath.Join(fixtureDir, "metrics.json")
+	caPath := filepath.Join(fixtureDir, "ca.pem")
+	if err := os.WriteFile(caPath, []byte("invalid CA"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	command := issue5HelperCommand(t, server, metricsPath, writeCLIAuth(t), caPath)
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
+	metrics, _ := os.ReadFile(metricsPath)
+	allOutput := stdout.String() + stderr.String() + string(metrics)
+	if err == nil || stdout.Len() != 0 || requests.Load() != 0 || strings.Contains(allOutput, "synthetic-secret") {
+		t.Fatalf("process result: err=%v stdout=%q stderr=%q requests=%d metrics=%q", err, stdout.String(), stderr.String(), requests.Load(), metrics)
 	}
 }
 
@@ -109,12 +149,98 @@ func TestIssue5HelperProcess(t *testing.T) {
 	if os.Getenv("REMAINDER_ISSUE5_HELPER") != "1" {
 		return
 	}
-	adapter := codex.New(codex.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoints: []string{os.Getenv("REMAINDER_ISSUE5_ENDPOINT")}, Timeout: time.Second})
-	code := ExecuteWithAdapter(context.Background(), []string{"value", "--provider", "codex", "--profile", "default", "--window", "five_hour", "--field", "remaining"}, os.Stdout, os.Stderr, "test", adapter)
-	os.Exit(code)
+	os.Exit(runIssue5Helper())
 }
 
-func writeCLIAuth(t *testing.T) string {
+type issue5Metrics struct {
+	SchemaVersion            string `json:"schema_version"`
+	RequestCount             int64  `json:"request_count"`
+	ControlledTLSRoundTripNS int64  `json:"controlled_tls_round_trip_ns"`
+}
+
+type issue5TimingTransport struct {
+	base     http.RoundTripper
+	requests atomic.Int64
+	elapsed  atomic.Int64
+}
+
+func (t *issue5TimingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	start := time.Now()
+	response, err := t.base.RoundTrip(request)
+	t.elapsed.Add(time.Since(start).Nanoseconds())
+	t.requests.Add(1)
+	return response, err
+}
+
+func runIssue5Helper() int {
+	caData, err := os.ReadFile(os.Getenv("REMAINDER_ISSUE5_CA"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "remainder benchmark helper: read CA")
+		return 1
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(caData) {
+		fmt.Fprintln(os.Stderr, "remainder benchmark helper: invalid CA")
+		return 1
+	}
+	transport := &issue5TimingTransport{base: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}}
+	client := &http.Client{Transport: transport}
+	fixedNow := func() time.Time { return time.Date(2026, time.March, 8, 7, 30, 0, 0, time.UTC) }
+	adapter := codex.New(codex.Options{AuthFile: os.Getenv("REMAINDER_ISSUE5_AUTH"), Endpoints: []string{os.Getenv("REMAINDER_ISSUE5_ENDPOINT")}, Client: client, Timeout: time.Second, Now: fixedNow})
+	code := ExecuteWithAdapterAt(context.Background(), []string{"value", "--provider", "codex", "--profile", "default", "--window", "five_hour", "--field", "remaining"}, os.Stdout, os.Stderr, "test", fixedNow(), adapter)
+	if code != 0 {
+		return code
+	}
+	metrics := issue5Metrics{SchemaVersion: "v1", RequestCount: transport.requests.Load(), ControlledTLSRoundTripNS: transport.elapsed.Load()}
+	data, err := json.Marshal(metrics)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "remainder benchmark helper: encode metrics")
+		return 1
+	}
+	if err := os.WriteFile(os.Getenv("REMAINDER_ISSUE5_METRICS"), append(data, '\n'), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, "remainder benchmark helper: write metrics")
+		return 1
+	}
+	return 0
+}
+
+func issue5HelperCommand(t *testing.T, server *httptest.Server, metricsPath, authPath, caPath string) *exec.Cmd {
+	t.Helper()
+	command := exec.Command(os.Args[0], "-test.run=^TestIssue5HelperProcess$")
+	command.Env = []string{
+		"REMAINDER_ISSUE5_HELPER=1",
+		"REMAINDER_ISSUE5_AUTH=" + authPath,
+		"REMAINDER_ISSUE5_ENDPOINT=" + server.URL + "/backend-api/wham/usage",
+		"REMAINDER_ISSUE5_CA=" + caPath,
+		"REMAINDER_ISSUE5_METRICS=" + metricsPath,
+	}
+	return command
+}
+
+func writeTestCA(t *testing.T, server *httptest.Server) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ca.pem")
+	certificate := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	if err := os.WriteFile(path, certificate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func readIssue5Metrics(t *testing.T, path string) issue5Metrics {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var metrics issue5Metrics
+	if err := json.Unmarshal(data, &metrics); err != nil {
+		t.Fatal(err)
+	}
+	return metrics
+}
+
+func writeCLIAuth(t testing.TB) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "auth.json")
 	if err := os.WriteFile(path, []byte(`{"tokens":{"access_token":"synthetic-secret","account_id":"acct-test"}}`), 0o600); err != nil {

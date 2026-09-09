@@ -28,7 +28,7 @@ Status: implemented for deterministic fixtures, unavailable behavior, and contro
 | quota-fresh-trees | Repeated command execution uses fresh Cobra trees and does not leak adapter or flag state. | automated `internal/cli/issue3_test.go` | `artifacts/issue-3/green-focused-tests.txt` |
 | codex-native-healthy | Selected synthetic auth and controlled TLS usage responses render compact, JSON, and exact scalar results through Cobra. | automated `internal/codex/codex_test.go` and `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/codex ./internal/cli` |
 | codex-native-bounds | Missing, malformed, expired, wrong-profile, wrong-account, delayed, oversized, malformed, redirected, rejected, rate-limited, canceled, and schema-drift inputs fail safely without secret disclosure. | automated `internal/codex/codex_test.go` | `go test -race -shuffle=on -count=1 ./internal/codex` |
-| codex-native-process | A compiled helper process drives the actual Cobra entrypoint against a controlled HTTP source and emits the exact scalar. | automated `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
+| codex-native-process | A compiled helper process drives the actual Cobra entrypoint against controlled TLS, emits the exact scalar, and records one request per sample. | automated `internal/cli/issue5_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | cache-policy | Invalid modes, negative ages, and incompatible off/only options fail before source or cache work. | automated `internal/cli/issue6_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | cache-hit | An eligible cached-only hit returns the complete observation with its original time and historical identity without OAuth parsing, lock waiting, or provider access. | automated `internal/cache/store_test.go`, `internal/cache/process_lock_test.go`, `internal/cli/issue6_test.go`, and `internal/codex/cache_binding_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache ./internal/codex ./internal/cli` |
 | cache-refresh | Misses, expiry, future clocks, forced generations, stale-on-transient-error, revocation, and account mismatch preserve age and identity policy. | automated `internal/cache/store_errors_test.go`, `internal/cache/store_concurrency_test.go`, and `internal/cli/issue6_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache ./internal/cli` |
@@ -65,6 +65,8 @@ An uncached Codex/default request reads only the selected auth file and performs
 ## Gotchas and manual gaps
 
 The observation records last-observed account identity separately from freshness and binding.
+
+Verified binding describes the provider response at observation time; it does not prove the current login or detect later revocation without another observation.
 
 Cached evidence does not prove current login or an unobserved remote revocation.
 An observed 401/403 or account mismatch blocks stale fallback until a successful refresh replaces the record or the source binding changes.

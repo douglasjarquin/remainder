@@ -44,6 +44,10 @@ It runs formatting, `GOPROXY=off go vet ./...`, `GOPROXY=off go test -race -shuf
 
 The direct checks are `GOPROXY=off go vet ./...`, `GOPROXY=off go test -race -shuffle=on -count=1 ./...`, `GOPROXY=off ./scripts/check-dependencies.sh`, and `CGO_ENABLED=0 GOPROXY=off go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o /tmp/remainder ./cmd/remainder`.
 
+Run `mise run benchmark` for the retained process JSONL and in-process allocation evidence.
+Controlled refresh uses a compiled test helper with synthetic auth and loopback TLS, independently counts one request per sample, and separates helper-process timing from controlled TLS round-trip timing to response headers.
+Neither timing certifies release-binary refresh or live provider latency.
+
 ## Scenarios
 
 The linked [feature map](docs/features/README.md) contains the automated Cobra and renderer scenarios.

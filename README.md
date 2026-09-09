@@ -30,6 +30,11 @@ Run `mise run benchmark` after building to emit preserved JSON Lines full-proces
 
 The benchmark records startup/help, version, unavailable, and invalid-freshness workloads through the compiled Cobra entrypoint and checks their expected output streams.
 
+Controlled refresh samples use a separately compiled Go test helper that runs the actual Cobra and native Codex adapter against loopback TLS with synthetic authentication.
+Each sample must make exactly one counted request; helper-process elapsed time and controlled TLS round-trip time to response headers have separate p50/p95 summaries.
+The helper measurement includes test-runtime and metrics overhead and does not measure release-binary refresh or the live provider endpoint.
+The in-process refresh benchmark reports allocations and requests per operation.
+
 It records raw output, output bytes, optional actual `o200k_base` token counts, process/request counts, measured-binary build metadata, host metadata, p50/p95, mean, and dispersion.
 
 Set `REMAINDER_TOKENIZER_PYTHON` to an isolated Python environment with pinned `tiktoken` for actual offline token counts.

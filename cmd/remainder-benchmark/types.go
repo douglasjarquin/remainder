@@ -14,24 +14,27 @@ type workload struct {
 }
 
 type sample struct {
-	Kind            string   `json:"kind"`
-	Workload        string   `json:"workload"`
-	Args            []string `json:"args"`
-	Sample          int      `json:"sample"`
-	FilesystemState string   `json:"filesystem_state"`
-	ElapsedNS       int64    `json:"elapsed_ns"`
-	ExitCode        int      `json:"exit_code"`
-	Stdout          string   `json:"stdout"`
-	Stderr          string   `json:"stderr"`
-	StdoutBytes     int      `json:"stdout_bytes"`
-	StderrBytes     int      `json:"stderr_bytes"`
-	StdoutTokens    *int     `json:"stdout_tokens,omitempty"`
-	StderrTokens    *int     `json:"stderr_tokens,omitempty"`
-	StdoutSHA256    string   `json:"stdout_sha256"`
-	StderrSHA256    string   `json:"stderr_sha256"`
-	SubprocessCount int      `json:"subprocess_count"`
-	RequestCount    int      `json:"request_count"`
-	OutputStatus    string   `json:"output_status"`
+	Kind                     string         `json:"kind"`
+	Source                   string         `json:"source"`
+	Workload                 string         `json:"workload"`
+	Args                     []string       `json:"args"`
+	Sample                   int            `json:"sample"`
+	FilesystemState          string         `json:"filesystem_state"`
+	ElapsedNS                int64          `json:"elapsed_ns"`
+	ExitCode                 int            `json:"exit_code"`
+	Stdout                   string         `json:"stdout"`
+	Stderr                   string         `json:"stderr"`
+	StdoutBytes              int            `json:"stdout_bytes"`
+	StderrBytes              int            `json:"stderr_bytes"`
+	StdoutTokens             *int           `json:"stdout_tokens,omitempty"`
+	StderrTokens             *int           `json:"stderr_tokens,omitempty"`
+	StdoutSHA256             string         `json:"stdout_sha256"`
+	StderrSHA256             string         `json:"stderr_sha256"`
+	SubprocessCount          int            `json:"subprocess_count"`
+	RequestCount             int            `json:"request_count"`
+	ControlledTLSRoundTripNS int64          `json:"controlled_tls_round_trip_ns"`
+	HelperBuild              *buildMetadata `json:"helper_build,omitempty"`
+	OutputStatus             string         `json:"output_status"`
 }
 
 type metadata struct {
@@ -47,7 +50,9 @@ type metadata struct {
 	GOMAXPROCS             int               `json:"gomaxprocs"`
 	Host                   hostMetadata      `json:"host"`
 	Build                  buildMetadata     `json:"measured_binary_build"`
+	HelperBuild            buildMetadata     `json:"controlled_helper_build"`
 	SizeBytes              int64             `json:"size_bytes"`
+	HelperSizeBytes        int64             `json:"controlled_helper_size_bytes"`
 	SamplesPerWorkload     int               `json:"samples_per_workload"`
 	Workloads              []string          `json:"workloads"`
 	Tokenizer              tokenizerMetadata `json:"tokenizer"`
@@ -78,6 +83,13 @@ type summary struct {
 	Kind      string                       `json:"kind"`
 	Source    string                       `json:"source"`
 	Workloads map[string]benchmark.Summary `json:"workloads"`
+}
+
+type requestTimingSummary struct {
+	Kind     string            `json:"kind"`
+	Source   string            `json:"source"`
+	Workload string            `json:"workload"`
+	Timing   benchmark.Summary `json:"controlled_tls_round_trip_ns"`
 }
 
 type hostMetadata struct {
