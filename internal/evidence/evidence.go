@@ -191,7 +191,7 @@ func (o Observation) Validate() error {
 			}
 		}
 		if window.Pace != nil {
-			if err := window.Pace.validate(); err != nil {
+			if err := window.Pace.validate(o, window); err != nil {
 				return err
 			}
 		}
