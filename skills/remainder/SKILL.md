@@ -12,10 +12,10 @@ If the executable is absent, give one actionable diagnostic: `remainder is not i
 Stop after that diagnostic unless the user asks to install or build it.
 
 The v0.1.0 release supports provider `codex` with profile `default`.
-The current source also implements `claude` and `grok` with profile `default`, using only their selected credential files; their native canaries remain unverified.
+The current source also implements `claude`, `grok`, and Linux `cursor` with profile `default`, using only their selected credential files; their native canaries remain unverified.
 Check the installed executable before assuming a source increment is available.
 It reads quota evidence without logging in, refreshing credentials, switching accounts, or making a generative request.
-Cursor is not supported by this increment.
+Cursor uses only the Linux CLI auth file; its macOS Keychain and editor SQLite routes are unsupported.
 Use `--all` for the fixed provider default contexts only when the installed executable supports it; retain separate observations and provider failures.
 Missing or expired credentials are unavailable; do not use Keychain, refresh, or another credential route as a fallback.
 

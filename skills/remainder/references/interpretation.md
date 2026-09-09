@@ -1,9 +1,11 @@
 # Interpretation
 
 Treat the executable's help and returned observation as the command and identifier catalog.
-The source supports providers `codex`, `claude`, and `grok` with profile `default`.
-The released v0.1.0 artifact supports Codex; source support does not certify native Claude or Grok access.
+The source supports providers `codex`, `claude`, `grok`, and Linux `cursor` with profile `default`.
+The released v0.1.0 artifact supports Codex; source support does not certify native Claude, Grok, or Cursor access.
 Grok uses `credits`, `product:<kind>`, and `prepaid` windows and cannot verify an explicit account selector.
+Cursor uses `included_usage`, `auto_usage`, `api_usage`, `spend_limit`, and `grok_bot` when the source provides them.
+Its spend-limit amounts use `usd_cents`, separate from percentage allowances, and its unknown identity cannot satisfy an explicit account selector.
 Window IDs such as `five_hour` and `weekly`, scopes such as `account`, `model`, and `global`, and field IDs such as `remaining`, `reset`, `duration`, and `pace` are exact values rather than display labels.
 An `--account` value is an assertion about the observation's last-observed account identity, not an instruction to switch accounts.
 
@@ -24,7 +26,7 @@ Compact `age_seconds` is measured from that original observation.
 A historical account binding describes the last observed identity and does not prove the current login.
 Unknown identity remains unknown after cache reuse.
 
-`--all` attempts each supported provider default context and preserves separate observations and failures in a mixed report.
+`--all` attempts Codex, Claude, and Grok default contexts, plus Cursor on Linux, preserving separate observations and failures in a mixed report.
 Do not pass provider, profile, or account flags with it.
 A failed source does not discard usable evidence from another source; preserve partial output on exit 3.
 A fresh cache hit that exceeds max-age while another source runs is excluded without changing its observation timestamp.
