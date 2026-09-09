@@ -57,61 +57,20 @@ func TestSkillExamples_runThroughCompiledCobraFixture(t *testing.T) {
 		t.Fatal("no shell examples found")
 	}
 	var requests atomic.Int64
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		requests.Add(1)
-		if request.Method != http.MethodGet || request.Header.Get("Authorization") != "Bearer synthetic-secret" || request.Header.Get("ChatGPT-Account-Id") != "acct-test" {
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
-		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":58,"limit_window_seconds":604800,"reset_after_seconds":604800}}}`)
-	}))
-	defer server.Close()
-	syntheticHome := t.TempDir()
-	authPath := filepath.Join(syntheticHome, ".codex", "auth.json")
-	if err := os.MkdirAll(filepath.Dir(authPath), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(authPath, []byte(`{"tokens":{"access_token":"synthetic-secret","account_id":"acct-test"}}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	binDir := filepath.Join(syntheticHome, "bin")
-	if err := os.Mkdir(binDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	wrapper := filepath.Join(binDir, "remainder")
-	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \"$REMAINDER_ISSUE12_TEST_BINARY\" -test.run=^TestIssue12FixtureProcess$ -- \"$@\"\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	command := exec.Command("/bin/sh", "-eu")
-	command.Dir = repositoryRoot
-	command.Stdin = strings.NewReader(script)
-	command.Env = []string{
-		"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
-		"HOME=" + syntheticHome,
-		"CODEX_HOME=" + filepath.Join(syntheticHome, ".codex"),
-		"XDG_CACHE_HOME=" + filepath.Join(syntheticHome, ".cache"),
-		"REMAINDER_ISSUE12_FIXTURE=1",
-		"REMAINDER_ISSUE12_TEST_BINARY=" + os.Args[0],
-		"REMAINDER_ISSUE12_ENDPOINT=" + server.URL,
-		"REMAINDER_ISSUE12_AUTH=" + authPath,
-		"REMAINDER_ISSUE12_CACHE=" + filepath.Join(syntheticHome, ".cache", "remainder", "v1"),
-	}
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
+	server := newSkillFixtureServer(t, &requests)
 
 	// When
-	err = command.Run()
+	stdout, stderr, err := runSkillScript(t, repositoryRoot, script, server.URL)
 
 	// Then
-	if err != nil || stderr.Len() != 0 {
-		t.Fatalf("examples: err=%v stdout=%q stderr=%q", err, stdout.String(), stderr.String())
+	if err != nil || stderr != "" {
+		t.Fatalf("examples: err=%v stdout=%q stderr=%q", err, stdout, stderr)
 	}
-	if !strings.Contains(stdout.String(), "Usage:\n  remainder [flags]") || !strings.Contains(stdout.String(), "Usage:\n  remainder value [flags]") {
-		t.Fatalf("help was not visible: stdout=%q", stdout.String())
+	if !strings.Contains(stdout, "Usage:\n  remainder [flags]") || !strings.Contains(stdout, "Usage:\n  remainder value [flags]") {
+		t.Fatalf("help was not visible: stdout=%q", stdout)
 	}
 	compactCount, jsonCount, remainingCount, paceCount := 0, 0, 0, 0
-	for line := range strings.SplitSeq(stdout.String(), "\n") {
+	for line := range strings.SplitSeq(stdout, "\n") {
 		switch {
 		case strings.HasPrefix(line, "schema=v1 "):
 			compactCount++
@@ -144,6 +103,83 @@ func TestSkillExamples_runThroughCompiledCobraFixture(t *testing.T) {
 		t.Fatalf("outputs: compact=%d json=%d remaining=%d pace=%d requests=%d", compactCount, jsonCount, remainingCount, paceCount, requests.Load())
 	}
 	t.Logf("compiled helper: compact=%d json=%d remaining=%d pace=%d provider_requests=%d", compactCount, jsonCount, remainingCount, paceCount, requests.Load())
+}
+
+func TestSkillPinchosExample_runsAloneOnFirstPoll(t *testing.T) {
+	// Given
+	repositoryRoot := filepath.Join("..", "..")
+	examples, err := os.ReadFile(filepath.Join(repositoryRoot, "skills", "remainder", "references", "examples.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := pinchosExample(shellExamples(string(examples)))
+	if strings.TrimSpace(script) == "" {
+		t.Fatal("direct Pinchos example not found")
+	}
+	var requests atomic.Int64
+	server := newSkillFixtureServer(t, &requests)
+
+	// When
+	stdout, stderr, err := runSkillScript(t, repositoryRoot, script, server.URL)
+
+	// Then
+	if err != nil || stdout != "42\n42\n" || stderr != "" || requests.Load() != 1 {
+		t.Fatalf("direct Pinchos example: err=%v stdout=%q stderr=%q requests=%d", err, stdout, stderr, requests.Load())
+	}
+	t.Logf("direct Pinchos first poll: stdout=%q provider_requests=%d", strings.TrimSpace(stdout), requests.Load())
+}
+
+func newSkillFixtureServer(t *testing.T, requests *atomic.Int64) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		if request.Method != http.MethodGet || request.Header.Get("Authorization") != "Bearer synthetic-secret" || request.Header.Get("ChatGPT-Account-Id") != "acct-test" {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		fmt.Fprint(w, `{"account_id":"acct-test","rate_limit":{"primary_window":{"used_percent":58,"limit_window_seconds":604800,"reset_after_seconds":604800}}}`)
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func runSkillScript(t *testing.T, repositoryRoot, script, endpoint string) (string, string, error) {
+	t.Helper()
+	syntheticHome := t.TempDir()
+	authPath := filepath.Join(syntheticHome, ".codex", "auth.json")
+	if err := os.MkdirAll(filepath.Dir(authPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(authPath, []byte(`{"tokens":{"access_token":"synthetic-secret","account_id":"acct-test"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	binDir := filepath.Join(syntheticHome, "bin")
+	if err := os.Mkdir(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	wrapper := filepath.Join(binDir, "remainder")
+	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \"$REMAINDER_ISSUE12_TEST_BINARY\" -test.run=^TestIssue12FixtureProcess$ -- \"$@\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.Command("/bin/sh", "-eu")
+	command.Dir = repositoryRoot
+	command.Stdin = strings.NewReader(script)
+	command.Env = []string{
+		"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"HOME=" + syntheticHome,
+		"CODEX_HOME=" + filepath.Join(syntheticHome, ".codex"),
+		"XDG_CACHE_HOME=" + filepath.Join(syntheticHome, ".cache"),
+		"REMAINDER_ISSUE12_FIXTURE=1",
+		"REMAINDER_ISSUE12_TEST_BINARY=" + os.Args[0],
+		"REMAINDER_ISSUE12_ENDPOINT=" + endpoint,
+		"REMAINDER_ISSUE12_AUTH=" + authPath,
+		"REMAINDER_ISSUE12_CACHE=" + filepath.Join(syntheticHome, ".cache", "remainder", "v1"),
+	}
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
+	return stdout.String(), stderr.String(), err
 }
 
 func TestIssue12FixtureProcess(t *testing.T) {
@@ -185,4 +221,18 @@ func shellExamples(markdown string) string {
 		}
 	}
 	return script.String()
+}
+
+func pinchosExample(script string) string {
+	const function = "pinchos_read_codex_weekly_remaining() {"
+	start := strings.Index(script, function)
+	if start < 0 {
+		return ""
+	}
+	direct := strings.TrimSpace(script[start:])
+	_, invocation, ok := strings.CutLast(direct, "\n")
+	if !ok || strings.TrimSpace(invocation) == "" {
+		return ""
+	}
+	return direct + "\n" + invocation + "\n"
 }

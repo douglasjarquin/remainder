@@ -14,7 +14,7 @@ remainder value --provider codex --profile default --window weekly --scope accou
 remainder value --provider codex --profile default --window weekly --scope account --field pace --cache only --freshness fresh
 
 pinchos_read_codex_weekly_remaining() {
-	remainder value --provider codex --profile default --window weekly --scope account --field remaining --cache only --freshness fresh
+	remainder value --provider codex --profile default --window weekly --scope account --field remaining --cache auto --freshness fresh
 }
 pinchos_read_codex_weekly_remaining
 ```
