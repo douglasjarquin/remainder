@@ -23,7 +23,32 @@ func (v *controlledRequestValidator) ServeHTTP(w http.ResponseWriter, r *http.Re
 		v.serveClaude(w, r)
 		return
 	}
+	if v.provider == "grok" {
+		v.serveGrok(w, r)
+		return
+	}
 	v.serveCodex(w, r)
+}
+
+func (v *controlledRequestValidator) serveGrok(w http.ResponseWriter, r *http.Request) {
+	v.validateAndWrite(w, r, []struct {
+		valid   bool
+		failure string
+	}{
+		{r.Method == http.MethodPost, "method mismatch"},
+		{r.URL.Path == "/", "path mismatch"},
+		{r.Header.Get("Authorization") == "Bearer synthetic-secret", "authorization header mismatch"},
+		{r.Header.Get("Accept") == "*/*", "accept header mismatch"},
+		{r.Header.Get("Content-Type") == "application/grpc-web+proto", "content type mismatch"},
+		{r.Header.Get("Origin") == "https://grok.com", "origin header mismatch"},
+		{r.Header.Get("Referer") == "https://grok.com/?_s=usage", "referer header mismatch"},
+		{r.Header.Get("X-Grpc-Web") == "1", "gRPC web header mismatch"},
+		{r.Header.Get("X-User-Agent") == "connect-es/2.1.1", "user agent header mismatch"},
+	}, string(grokControlledResponse()))
+}
+
+func grokControlledResponse() []byte {
+	return []byte{0, 0, 0, 0, 7, 10, 5, 13, 0, 0, 32, 66, 128, 0, 0, 0, 16, 'g', 'r', 'p', 'c', '-', 's', 't', 'a', 't', 'u', 's', ':', ' ', '0', '\r', '\n'}
 }
 
 func (v *controlledRequestValidator) serveCodex(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +140,10 @@ func (v *controlledRequestValidator) countFailure(provider string, beforeRequest
 		}
 	case "claude":
 		if requests == 2 && profile == 1 && usage == 1 {
+			return nil
+		}
+	case "grok":
+		if requests == 1 && profile == 0 && usage == 0 {
 			return nil
 		}
 	}

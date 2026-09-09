@@ -44,8 +44,8 @@ func runControlledRefresh(helper, provider string, samples int, tokenizer *token
 }
 
 func runControlledRefreshWithFault(helper, provider string, samples int, tokenizer *tokenizerClient, fault controlledRefreshFault) (result controlledRefreshResult, resultErr error) {
-	if provider != "codex" && provider != "claude" {
-		return result, fmt.Errorf("controlled refresh provider must be codex or claude")
+	if provider != "codex" && provider != "claude" && provider != "grok" {
+		return result, fmt.Errorf("controlled refresh provider must be codex, claude, or grok")
 	}
 	info, err := os.Stat(helper)
 	if err != nil {
@@ -76,6 +76,8 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 	if provider == "claude" {
 		authName = ".credentials.json"
 		authBody = []byte(`{"claudeAiOauth":{"accessToken":"synthetic-secret"}}`)
+	} else if provider == "grok" {
+		authBody = []byte(`{"grok.com":{"key":"synthetic-secret"}}`)
 	}
 	authPath := filepath.Join(root, authName)
 	if err := os.WriteFile(authPath, authBody, 0o600); err != nil {
@@ -112,6 +114,7 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 			"HOME=" + home,
 			"CODEX_HOME=" + codeHome,
 			"CLAUDE_CONFIG_DIR=" + codeHome,
+			"GROK_HOME=" + codeHome,
 			"TMPDIR=" + tmp,
 			"REMAINDER_ISSUE5_HELPER=1",
 			"REMAINDER_ISSUE5_PROVIDER=" + provider,
@@ -119,6 +122,7 @@ func runControlledRefreshWithFault(helper, provider string, samples int, tokeniz
 			"REMAINDER_ISSUE5_ENDPOINT=" + server.URL + "/backend-api/wham/usage",
 			"REMAINDER_ISSUE5_PROFILE_ENDPOINT=" + server.URL + "/profile",
 			"REMAINDER_ISSUE5_USAGE_ENDPOINT=" + server.URL + "/usage",
+			"REMAINDER_ISSUE5_GROK_ENDPOINT=" + server.URL,
 			"REMAINDER_ISSUE5_CA=" + caPath,
 			"REMAINDER_ISSUE5_METRICS=" + metricsPath,
 		}
