@@ -67,3 +67,11 @@ func TestNormalize_scoped_model_groups_and_unscaled_paid_values_remain_distinct(
 		t.Fatalf("native used = %+v", got)
 	}
 }
+
+func TestNormalize_present_empty_authoritative_limits_fails_closed(t *testing.T) {
+	adapter := testAdapter(t, `{"account":{"uuid":"account-1"}}`, `{"limits":[],"five_hour":{"utilization":10}}`, http.StatusOK)
+	_, err := adapter.Observe(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
+	if err == nil || !strings.Contains(err.Error(), "no limits") {
+		t.Fatalf("error = %v", err)
+	}
+}

@@ -121,6 +121,9 @@ func normalizeExtraUsage(raw extraUsage) (evidence.Window, error) {
 	unit := "credits"
 	decimalPlaces, hasPlaces := raw.DecimalPlaces.int64()
 	if raw.Used != "" || raw.MonthlyLimit != "" {
+		if raw.DecimalPlaces != "" && !hasPlaces {
+			return evidence.Window{}, errors.New("Claude extra usage decimal places are invalid")
+		}
 		if hasPlaces && (decimalPlaces < 0 || decimalPlaces > 9) {
 			return evidence.Window{}, errors.New("Claude extra usage decimal places are required and invalid")
 		}
