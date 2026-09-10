@@ -1,8 +1,8 @@
 # Claude file collection
 
-Status: implemented with controlled file and HTTP fixtures; native canary unverified.
-The authorized default credential file was absent during the 2026-09-09 preflight.
-This source increment does not change the released v0.1.0 Codex artifact or certify a live Claude route.
+Status: implemented with controlled file and HTTP fixtures; native canary verified.
+The authorized default credential file was absent during the 2026-09-09 preflight; on 2026-09-10 the same selected `default` route was authorized and exercised against a real installed and authenticated Claude Code CLI (`~/.local/bin/claude` 2.1.267) on `host-development.douglasjarquin.i-09b74c2aaae0cbbb8` (Linux).
+This source increment does not change the released v0.1.0 Codex artifact.
 
 ## Selection and identity
 
@@ -44,9 +44,9 @@ When used exceeds the stated limit, both supplied values are retained and remain
 | claude-cli | Compact, JSON, scalar zero, and compiled Cobra helper output preserve native CLI behavior; absent credentials are exit 1. | automated `internal/cli/claude_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | claude-cache | Eligible hits avoid auth-body parsing and HTTP; 401 revokes, 403 remains transient, and 429 coalesces through existing cache policy. | automated `internal/cli/claude_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | cache-unknown-identity | Fresh and stale reuse never upgrades unknown account identity. | automated `internal/cache/identity_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache` |
-| claude-native-canary | An authorized usable file must establish the actual source route before native certification. | manual source-specific canary | Unverified: selected default file absent; no fallback authorized. |
+| claude-native-canary | An authorized usable file must establish the actual source route before native certification. | manual source-specific canary | Verified 2026-09-10 against a real installed/authenticated Claude Code CLI: two live `--provider claude --profile default` observations (one cold, one `--refresh`) each returned exit 0, fresh complete evidence, `native_file_http`/`claude_credentials_json`, and the same verified account binding; a same-run cache hit reused the original `observed_at` and made zero `connect`/`socket`/`.credentials.json` `openat` calls under `strace`. Evidence retained at `.artifacts/claude-native-canary/` (git-ignored, not published). |
 
 The [source matrix](../provider-sources.md) pins the upstream research and records the authorization boundary.
 The OAuth payload contract is inferred from that pinned implementation; no published first-party schema is assumed.
 Paid amounts retain the shared v1 finite numeric range while exact arithmetic preserves their decimal digits.
-Controlled fixtures prove implementation behavior only.
+Controlled fixtures prove implementation behavior; the 2026-09-10 canary above is the separate live-route evidence.
