@@ -18,6 +18,7 @@ import (
 const (
 	appleSiliconP95ObjectiveNS int64 = 10_000_000
 	quotaAxiVersion                  = "0.1.41"
+	defaultExpectedVersion           = "v0.1.0"
 )
 
 func main() {
@@ -30,9 +31,14 @@ func main() {
 	coalescing := flag.Bool("coalescing-acceptance", false, "run the release-binary cross-process cache acceptance workload")
 	quotaAxiPreload := flag.String("quota-axi-preload", "scripts/quota_axi_fixture.mjs", "developer-only Node preload for synthetic quota-axi input")
 	latencyBaseline := flag.String("latency-baseline", "", "optional JSON baseline for seeded p95 regression detection")
+	expectedVersionFlag := flag.String("expected-version", defaultExpectedVersion, "exact release version expected from --version")
 	flag.Parse()
 	if *samples < 1 {
 		fatalf("samples must be at least 1")
+	}
+	expectedVersion, err := parseExpectedVersion(*expectedVersionFlag)
+	if err != nil {
+		fatalf("expected version: %v", err)
 	}
 	info, err := os.Stat(*binary)
 	if err != nil {
@@ -54,7 +60,7 @@ func main() {
 	}
 	workloads := []workload{
 		{Name: "startup-help", Args: []string{"--help"}, ExitCode: 0},
-		{Name: "startup-version", Args: []string{"--version"}, ExitCode: 0},
+		{Name: "startup-version", Args: []string{"--version"}, ExitCode: 0, ExpectedVersion: expectedVersion},
 		{Name: "failure-unavailable", ExitCode: 1},
 		{Name: "failure-invalid-freshness", Args: []string{"--freshness", "ignored"}, ExitCode: 2},
 	}
@@ -210,6 +216,13 @@ func main() {
 	if len(regressions) > 0 {
 		os.Exit(1)
 	}
+}
+
+func parseExpectedVersion(value string) (expectedVersion, error) {
+	if value == "" {
+		return "", fmt.Errorf("must not be empty")
+	}
+	return expectedVersion(value), nil
 }
 
 func commandOutput(binary string, arg string) string {

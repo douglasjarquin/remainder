@@ -8,10 +8,13 @@ import (
 )
 
 type workload struct {
-	Name     string
-	Args     []string
-	ExitCode int
+	Name            string
+	Args            []string
+	ExitCode        int
+	ExpectedVersion expectedVersion
 }
+
+type expectedVersion string
 
 type sample struct {
 	Kind                     string         `json:"kind"`

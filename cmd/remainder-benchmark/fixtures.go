@@ -132,7 +132,10 @@ func validateOutput(item workload, result sample) string {
 			return "help output mismatch"
 		}
 	case "startup-version":
-		if result.Stdout != "remainder v0.1.0 (github.com/douglasjarquin/remainder)\n" || result.Stderr != "" {
+		if item.ExpectedVersion == "" {
+			return "version expectation missing"
+		}
+		if result.Stdout != "remainder "+string(item.ExpectedVersion)+" (github.com/douglasjarquin/remainder)\n" || result.Stderr != "" {
 			return "version output mismatch"
 		}
 	case "failure-unavailable":

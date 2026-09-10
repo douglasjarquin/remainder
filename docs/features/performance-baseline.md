@@ -7,6 +7,7 @@ The baseline is a small developer measurement path rather than a benchmark servi
 `mise run benchmark` builds the release-like binary, runs `go test -bench -benchmem` for in-process CLI allocations, and runs `scripts/benchmark.sh` for release startup and controlled refresh measurements.
 
 The full-process driver starts the compiled binary once per sample and records the exact arguments, exit code, stdout, stderr, output byte counts, optional model-token counts, output hashes, elapsed time, filesystem-cache label, subprocess count, and request count.
+It validates `--version` against `--expected-version`, which defaults to `v0.1.0` for ordinary developer runs and must be set explicitly for a packaged release version.
 
 The controlled refresh driver compiles a Go test helper once, invokes the actual Cobra execution seam with the selected native adapter, and sends one Codex or Grok request, two Claude requests, or three Cursor requests per sample to a synthetic loopback TLS server.
 
