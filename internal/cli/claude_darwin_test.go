@@ -58,14 +58,18 @@ func TestExecute_native_Claude_promptedKeychainThenCachedOnlySkipsHelper_onDarwi
 	var stdout, stderr bytes.Buffer
 
 	firstCode := executeWithAdapterAt(t.Context(), []string{"--provider=claude", "--profile=default", "--allow-keychain-prompt"}, &stdout, &stderr, "test", now, adapter)
+	firstStderr := stderr.String()
 	stdout.Reset()
+	stderr.Reset()
 	secondCode := executeWithAdapterAt(t.Context(), []string{"--provider=claude", "--profile=default", "--cache=only", "--max-age=1m", "--format=json"}, &stdout, &stderr, "test", now, adapter)
-	cachedOutput := stdout.String()
+	cachedOutput, secondStderr := stdout.String(), stderr.String()
 	stdout.Reset()
+	stderr.Reset()
 	thirdCode := executeWithAdapterAt(t.Context(), []string{"--provider=claude", "--profile=default", "--cache=off"}, &stdout, &stderr, "test", now, adapter)
+	thirdStderr := stderr.String()
 
-	if firstCode != 0 || secondCode != 0 || thirdCode != 1 || keychainCalls.Load() != 1 || requests.Load() != 4 || !strings.Contains(stderr.String(), "--allow-keychain-prompt") {
-		t.Fatalf("codes=%d/%d/%d keychain=%d requests=%d stderr=%q", firstCode, secondCode, thirdCode, keychainCalls.Load(), requests.Load(), stderr.String())
+	if firstCode != 0 || secondCode != 0 || thirdCode != 1 || keychainCalls.Load() != 1 || requests.Load() != 2 || firstStderr != "" || secondStderr != "" || !strings.Contains(thirdStderr, "--allow-keychain-prompt") {
+		t.Fatalf("codes=%d/%d/%d keychain=%d requests=%d stderr1=%q stderr2=%q stderr3=%q", firstCode, secondCode, thirdCode, keychainCalls.Load(), requests.Load(), firstStderr, secondStderr, thirdStderr)
 	}
 	if !strings.Contains(cachedOutput, `"source":{"kind":"native_keychain_http","name":"claude_keychain"}`) {
 		t.Fatalf("cached stdout=%q", cachedOutput)
