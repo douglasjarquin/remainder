@@ -170,7 +170,7 @@ func TestAdapter_rejects_credential_boundary_failures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			adapter := New(Options{AuthFile: tt.make(t), Now: fixedNow})
+			adapter := New(Options{AuthFile: tt.make(t), Now: fixedNow, goos: "linux"})
 			_, err := adapter.Observe(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
 			if err == nil || !strings.Contains(err.Error(), tt.want) || strings.Contains(err.Error(), "synthetic-secret") {
 				t.Fatalf("error = %v", err)

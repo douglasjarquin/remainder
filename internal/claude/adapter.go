@@ -8,12 +8,18 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
+)
+
+var (
+	fileSourceIdentity     = evidence.SourceIdentity{Kind: "native_file_http", Name: "claude_credentials_json"}
+	keychainSourceIdentity = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "claude_keychain"}
 )
 
 const (
@@ -35,18 +41,24 @@ type Options struct {
 	AuthFile        string
 	ProfileEndpoint string
 	UsageEndpoint   string
+	KeychainReader  func(context.Context) ([]byte, error)
 	Client          *http.Client
 	Timeout         time.Duration
 	Now             func() time.Time
+
+	goos string
 }
 
 type Adapter struct {
-	authFile        string
-	profileEndpoint string
-	usageEndpoint   string
-	client          *http.Client
-	timeout         time.Duration
-	now             func() time.Time
+	authFile            string
+	profileEndpoint     string
+	usageEndpoint       string
+	keychainReader      func(context.Context) ([]byte, error)
+	allowKeychainPrompt bool
+	client              *http.Client
+	timeout             time.Duration
+	now                 func() time.Time
+	goos                string
 }
 
 type RetryError struct{ RetryAt time.Time }
@@ -97,7 +109,20 @@ func New(options Options) Adapter {
 	if usageEndpoint == "" {
 		usageEndpoint = usageURL
 	}
-	return Adapter{authFile: options.AuthFile, profileEndpoint: profileEndpoint, usageEndpoint: usageEndpoint, client: &clientCopy, timeout: timeout, now: now}
+	goos := options.goos
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	keychainReader := options.KeychainReader
+	if keychainReader == nil {
+		keychainReader = readMacKeychain
+	}
+	return Adapter{authFile: options.AuthFile, profileEndpoint: profileEndpoint, usageEndpoint: usageEndpoint, keychainReader: keychainReader, client: &clientCopy, timeout: timeout, now: now, goos: goos}
+}
+
+func (a Adapter) WithKeychainPrompt() Adapter {
+	a.allowKeychainPrompt = true
+	return a
 }
 
 func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (cache.Binding, error) {
@@ -108,15 +133,24 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		return cache.Binding{}, err
 	}
 	info, err := inspectAuthFile(a.authFile)
+	if err == nil {
+		identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d", filepath.Clean(a.authFile), info.Size(), info.ModTime().UnixNano(), info.Mode())
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			identity += fmt.Sprintf("\x00%d\x00%d", stat.Dev, stat.Ino)
+		}
+		fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
+		return cache.Binding{Provider: "claude", Profile: "default", ResponseBoundary: "profile_usage", SourceKind: fileSourceIdentity.Kind, SourceName: fileSourceIdentity.Name, CredentialFingerprint: fingerprint}, nil
+	}
+	if !errors.Is(err, errAuthFileMissing) || a.goos != "darwin" {
+		return cache.Binding{}, collectionError(err)
+	}
+	account, err := keychainAccount()
 	if err != nil {
 		return cache.Binding{}, collectionError(err)
 	}
-	identity := fmt.Sprintf("%s\x00%d\x00%d\x00%d", filepath.Clean(a.authFile), info.Size(), info.ModTime().UnixNano(), info.Mode())
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		identity += fmt.Sprintf("\x00%d\x00%d", stat.Dev, stat.Ino)
-	}
+	identity := "claude\x00default\x00" + keychainSourceIdentity.Kind + "\x00" + keychainSourceIdentity.Name + "\x00" + account
 	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
-	return cache.Binding{Provider: "claude", Profile: "default", ResponseBoundary: "profile_usage", SourceKind: "native_file_http", SourceName: "claude_credentials_json", CredentialFingerprint: fingerprint}, nil
+	return cache.Binding{Provider: "claude", Profile: "default", ResponseBoundary: "profile_usage", SourceKind: keychainSourceIdentity.Kind, SourceName: keychainSourceIdentity.Name, CredentialFingerprint: fingerprint}, nil
 }
 
 func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {
@@ -128,7 +162,7 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	}
 	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
-	credentials, err := readCredentials(a.authFile, a.now())
+	credentials, source, err := a.acquireCredentials(ctx)
 	if err != nil {
 		return evidence.Observation{}, collectionError(err)
 	}
@@ -143,11 +177,26 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	if err != nil {
 		return evidence.Observation{}, collectionError(err)
 	}
-	observation, err := normalize(usage, profile.accountID, a.now())
+	observation, err := normalize(usage, profile.accountID, a.now(), source)
 	if err != nil {
 		return evidence.Observation{}, collectionError(err)
 	}
 	return observation, nil
+}
+
+func (a Adapter) acquireCredentials(ctx context.Context) (credentials, evidence.SourceIdentity, error) {
+	if _, err := inspectAuthFile(a.authFile); err != nil {
+		if !errors.Is(err, errAuthFileMissing) || a.goos != "darwin" {
+			return credentials{}, evidence.SourceIdentity{}, err
+		}
+		if !a.allowKeychainPrompt {
+			return credentials{}, evidence.SourceIdentity{}, ErrKeychainPromptRequired
+		}
+		creds, err := a.readKeychainCredentials(ctx)
+		return creds, keychainSourceIdentity, err
+	}
+	creds, err := readCredentials(a.authFile, a.now())
+	return creds, fileSourceIdentity, err
 }
 
 func (a Adapter) Failure(err error) (cache.FailureKind, time.Time) {

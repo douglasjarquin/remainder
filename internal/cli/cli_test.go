@@ -66,13 +66,13 @@ func TestExecuteRejectsUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestExecuteRejectsKeychainPromptForNonCursorProvider(t *testing.T) {
+func TestExecuteRejectsKeychainPromptForUnsupportedProvider(t *testing.T) {
 	adapter := &fixtureAdapter{observation: benchmarkObservation()}
 	var stdout, stderr bytes.Buffer
 
 	code := executeWithAdapter(t.Context(), []string{"--provider=codex", "--allow-keychain-prompt"}, &stdout, &stderr, "test", adapter)
 
-	if code != 2 || adapter.calls != 0 || stdout.Len() != 0 || !bytes.Contains(stderr.Bytes(), []byte("--allow-keychain-prompt requires --provider cursor or --all")) {
+	if code != 2 || adapter.calls != 0 || stdout.Len() != 0 || !bytes.Contains(stderr.Bytes(), []byte("--allow-keychain-prompt requires --provider cursor, --provider claude, or --all")) {
 		t.Fatalf("code=%d calls=%d stdout=%q stderr=%q", code, adapter.calls, stdout.String(), stderr.String())
 	}
 }
