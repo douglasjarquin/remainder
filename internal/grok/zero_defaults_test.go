@@ -21,7 +21,6 @@ func TestAdapterObserve_defaultsOmittedProtoScalarsWhenCycleIsValid(t *testing.T
 
 	// When
 	observation, err := adapter.Observe(t.Context(), request())
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +57,6 @@ func TestAdapterObserve_defaultsOmittedProductKindAndUsageWhenCycleIsValid(t *te
 
 	// When
 	observation, err := adapter.Observe(t.Context(), request())
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +89,6 @@ func TestAdapterObserve_preservesExplicitScalarValues(t *testing.T) {
 
 	// When
 	observation, err := adapter.Observe(t.Context(), request())
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +118,6 @@ func TestAdapterObserve_keepsMissingUsageUnknownWithoutValidCycle(t *testing.T) 
 
 	// When
 	observation, err := adapter.Observe(t.Context(), request())
-
 	// Then
 	if err != nil {
 		t.Fatal(err)
