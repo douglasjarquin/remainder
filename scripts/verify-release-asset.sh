@@ -35,6 +35,11 @@ case "$archive_base" in
 		expected_goos=linux
 		expected_goarch=arm64
 		;;
+	remainder_v[0-9]*.[0-9]*.[0-9]*_linux_amd64)
+		target=linux_amd64
+		expected_goos=linux
+		expected_goarch=amd64
+		;;
 	*)
 		printf 'verify-release-asset: unsupported archive name: %s\n' "$archive_name" >&2
 		exit 2
