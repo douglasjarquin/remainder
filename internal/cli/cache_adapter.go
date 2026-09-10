@@ -36,11 +36,12 @@ func authorizeKeychainPrompt(adapter Adapter, allowed bool) Adapter {
 	if !ok {
 		return adapter
 	}
-	cursorAdapter, ok := runtime.cursor.(cursor.Adapter)
-	if !ok {
-		return adapter
+	if cursorAdapter, ok := runtime.cursor.(cursor.Adapter); ok {
+		runtime.cursor = cursorAdapter.WithKeychainPrompt()
 	}
-	runtime.cursor = cursorAdapter.WithKeychainPrompt()
+	if claudeAdapter, ok := runtime.claude.(claude.Adapter); ok {
+		runtime.claude = claudeAdapter.WithKeychainPrompt()
+	}
 	return runtime
 }
 

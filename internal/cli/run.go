@@ -208,8 +208,8 @@ func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (opti
 		return options{}, fmt.Errorf("%w: unsupported freshness %q", ErrUsage, freshness)
 	}
 	all := values.all
-	if values.allowKeychainPrompt && !all && provider != "cursor" {
-		return options{}, fmt.Errorf("%w: --allow-keychain-prompt requires --provider cursor or --all", ErrUsage)
+	if values.allowKeychainPrompt && !all && provider != "cursor" && provider != "claude" {
+		return options{}, fmt.Errorf("%w: --allow-keychain-prompt requires --provider cursor, --provider claude, or --all", ErrUsage)
 	}
 	if valueCommand && all {
 		return options{}, fmt.Errorf("%w: value cannot use --all", ErrUsage)

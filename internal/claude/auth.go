@@ -3,6 +3,7 @@ package claude
 import (
 	json "encoding/json/v2"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -21,13 +22,15 @@ type oauthCredentials struct {
 	ExpiresAtSnake   sourceNumber `json:"expires_at"`
 }
 
+var errAuthFileMissing = errors.New("Claude authentication file is missing for profile default")
+
 func inspectAuthFile(path string) (os.FileInfo, error) {
 	if path == "" {
 		return nil, errors.New("Claude authentication directory could not be resolved")
 	}
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, errors.New("Claude authentication file is missing for profile default")
+		return nil, errAuthFileMissing
 	}
 	if err != nil || !info.Mode().IsRegular() || info.Size() > maxAuthBytes {
 		return nil, errors.New("Claude authentication file is not a bounded regular file")
@@ -56,16 +59,20 @@ func readCredentials(path string, now time.Time) (credentials, error) {
 	if len(body) > maxAuthBytes {
 		return credentials{}, errors.New("Claude authentication file is not a bounded regular file")
 	}
+	return parseCredentials(body, now, "authentication file")
+}
+
+func parseCredentials(body []byte, now time.Time, source string) (credentials, error) {
 	var raw authFile
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return credentials{}, errors.New("Claude authentication file is malformed")
+		return credentials{}, fmt.Errorf("Claude %s is malformed", source)
 	}
 	token := raw.OAuth.AccessTokenCamel
 	if token == "" {
 		token = raw.OAuth.AccessTokenSnake
 	}
 	if token == "" {
-		return credentials{}, errors.New("Claude authentication file lacks an OAuth access token")
+		return credentials{}, fmt.Errorf("Claude %s lacks an OAuth access token", source)
 	}
 	expires := raw.OAuth.ExpiresAtCamel
 	if expires == "" {
