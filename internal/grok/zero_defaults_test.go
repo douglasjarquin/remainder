@@ -42,7 +42,7 @@ func TestAdapterObserve_defaultsOmittedProtoScalarsWhenCycleIsValid(t *testing.T
 			t.Fatalf("%s/%s = %+v", check.window, check.limit, got)
 		}
 	}
-	t.Logf("native omitted-scalar observation=%+v", observation)
+	t.Logf("controlled fixture native omitted-scalar observation=%+v", observation)
 }
 
 func TestAdapterObserve_defaultsOmittedProductKindAndUsageWhenCycleIsValid(t *testing.T) {
