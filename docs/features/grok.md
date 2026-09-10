@@ -1,8 +1,9 @@
 # Grok file collection
 
-Status: implemented with controlled file and HTTP fixtures; native canary unverified.
-The authorized default credential file contained an expired consumer session during the 2026-09-09 preflight.
-This increment does not certify a live Grok route or change the released v0.1.0 Codex artifact.
+Status: the selected macOS file route passed an authorized native canary at commit `b41972ab97a38f855439b5810a1550481b6410af` on 2026-09-10 UTC.
+The six-command run returned fresh complete evidence, 100 percent shared allowance remaining, zero prepaid credits, and behind pace, then reused the same cached observation timestamp.
+The selected credential file metadata remained unchanged; no login or credential refresh occurred.
+This source fix does not change the immutable v0.1.0 or v0.2.0 release artifacts or certify other accounts and platforms.
 
 ## Selection and identity
 
@@ -31,12 +32,15 @@ Product windows use `product:<kind>` for both ID and scope.
 Known kinds include `api`, `grok_build`, `grok_plugins`, `chat`, `imagine`, and `voice`; unfamiliar numeric kinds remain distinct.
 Window `prepaid` contains a separate `remaining` credit balance.
 No shared, product, or prepaid pools are added together, and credits are not converted to tokens.
-Absent values remain unknown while measured zero remains zero.
+With a valid shared cycle, an omitted usage scalar is the protocol default of zero used, so remaining allowance is 100 percent.
+The same rule applies to a present product entry with a valid cycle.
+A present prepaid message with an omitted balance means zero credits; an absent prepaid message does not create a balance.
+Missing usage without a valid cycle remains unknown.
 Source-supplied weekly or monthly start/reset pairs provide cycle provenance; malformed or unsupported periods fail conservatively.
 
 ## Mixed reports
 
-`remainder --all --format json` reads the default Codex, Claude, and Grok contexts concurrently and emits them in that order, followed by Cursor on Linux.
+`remainder --all --format json` reads the default Codex, Claude, and Grok contexts concurrently and emits them in that order, followed by Cursor on Linux and macOS.
 It does not discover additional profiles.
 Do not combine `--all` with `--provider`, `--profile`, or `--account`.
 Window and scope filters apply separately to each provider.
@@ -61,12 +65,12 @@ Explicit stale-on-error evidence remains subject to the selected freshness polic
 
 | ID | Description | Driver | Evidence |
 | --- | --- | --- | --- |
-| grok-collection | Shared and product percentages, cycles, zero, unknown, and prepaid credits retain their native meanings. | automated `internal/grok/adapter_test.go`, `internal/grok/source_test.go`, and `internal/grok/duration_boundary_test.go` | `go test -race -shuffle=on -count=1 ./internal/grok` |
+| grok-collection | Shared and product percentages, cycles, omitted scalar defaults, zero, unknown, and prepaid credits retain their native meanings. | automated `internal/grok/adapter_test.go`, `internal/grok/source_test.go`, `internal/grok/zero_defaults_test.go`, and `internal/grok/duration_boundary_test.go` | `go test -race -shuffle=on -count=1 ./internal/grok` |
 | grok-boundaries | Credential precedence, expired and ambiguous sessions, API keys, nonregular files, redirects, oversized responses, cancellation, and malformed protobuf are bounded. | automated `internal/grok/adapter_test.go`, `internal/grok/wire_test.go`, and `internal/grok/source_test.go` | `go test -race -shuffle=on -count=1 ./internal/grok` |
 | grok-cache-binding | Selected source metadata isolates cache records and classifies authorization and retry failures. | automated `internal/grok/cache_failure_test.go` | `go test -race -shuffle=on -count=1 ./internal/grok` |
 | grok-cli | Compact, JSON, scalar, missing-source, explicit account, and eligible cache behavior run through Cobra and native Grok fixtures. | automated `internal/cli/grok_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | grok-mixed | Provider ordering, scoped failures, unchanged observation wire format, cache age, selection conflicts, and cancellation preserve usable evidence. | automated `internal/cli/mixed_test.go`, `internal/cli/mixed_runtime_test.go`, and `internal/cli/mixed.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
-| grok-native-canary | A usable authorized default consumer file must establish the actual quota route before native certification. | manual source-specific canary | Unverified: selected session expired; refresh and alternate routes are excluded. |
+| grok-native-canary | A usable authorized default consumer file establishes the actual quota route, with compact, JSON, scalar, and cache reuse checks. | manual source-specific canary | Passed for the selected macOS context at the source commit above; credential refresh and alternate routes remain excluded. |
 
 The [source matrix](../provider-sources.md) pins the upstream research and authorization boundary.
 The private RPC schema is inferred from that implementation, not a published first-party protocol contract.
