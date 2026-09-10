@@ -47,6 +47,9 @@ func normalize(payload []byte, now time.Time) (evidence.Observation, error) {
 	if err != nil {
 		return evidence.Observation{}, err
 	}
+	if hasCycle && !hasShared {
+		shared, hasShared = 0, true
+	}
 	if hasShared || hasCycle {
 		window, unknown, err := percentWindow("credits", evidence.ScopeAccount, shared, hasShared, cycle, hasCycle)
 		if err != nil {
@@ -65,8 +68,11 @@ func normalize(payload []byte, now time.Time) (evidence.Observation, error) {
 			return evidence.Observation{}, err
 		}
 		kind, present, err := varintAt(product, 1)
-		if err != nil || !present {
+		if err != nil {
 			return evidence.Observation{}, errors.New("Grok product limit has no product kind")
+		}
+		if !present {
+			kind = 0
 		}
 		name, ok := productNames[kind]
 		if !ok {
@@ -75,6 +81,9 @@ func normalize(payload []byte, now time.Time) (evidence.Observation, error) {
 		used, hasUsed, err := floatAt(product, 2)
 		if err != nil {
 			return evidence.Observation{}, err
+		}
+		if hasCycle && !hasUsed {
+			used, hasUsed = 0, true
 		}
 		id := "product:" + name
 		window, unknown, err := percentWindow(id, evidence.Scope(id), used, hasUsed, cycle, hasCycle)
@@ -95,11 +104,9 @@ func normalize(payload []byte, now time.Time) (evidence.Observation, error) {
 		if err != nil {
 			return evidence.Observation{}, err
 		}
-		value := evidence.Value{State: evidence.ValueUnknown}
+		value := integerValue(0)
 		if hasBalance {
 			value = integerValue(balance)
-		} else {
-			partial = true
 		}
 		windows = append(windows, evidence.Window{ID: "prepaid", Scope: evidence.ScopeAccount, Unit: "credits", Limits: []evidence.Limit{{ID: "prepaid_remaining", Field: evidence.FieldRemaining, Value: value}}})
 	}

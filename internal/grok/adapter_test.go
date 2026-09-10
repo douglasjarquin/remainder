@@ -77,8 +77,8 @@ func TestAdapterObserve(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if observation.Outcome != evidence.OutcomePartial || limit(t, observation, "credits", "credits_used").Value.State != evidence.ValueUnknown || limit(t, observation, "product:chat", "product:chat_remaining").Value.State != evidence.ValueUnknown {
-			t.Fatalf("unknowns = %+v", observation)
+		if observation.Outcome != evidence.OutcomeComplete || limit(t, observation, "credits", "credits_used").Value.State != evidence.ValueZero || limit(t, observation, "product:chat", "product:chat_remaining").Value.State != evidence.ValueDefined {
+			t.Fatalf("defaults = %+v", observation)
 		}
 	})
 
