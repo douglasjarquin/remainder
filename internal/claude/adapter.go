@@ -144,9 +144,6 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 	if !errors.Is(err, errAuthFileMissing) || a.goos != "darwin" {
 		return cache.Binding{}, collectionError(err)
 	}
-	if !a.allowKeychainPrompt {
-		return cache.Binding{}, collectionError(ErrKeychainPromptRequired)
-	}
 	account, err := keychainAccount()
 	if err != nil {
 		return cache.Binding{}, collectionError(err)

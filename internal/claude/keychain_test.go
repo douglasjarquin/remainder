@@ -210,7 +210,7 @@ func TestAdapterMacKeychain_rejectsWrongAccountBeforeUsage(t *testing.T) {
 	}
 }
 
-func TestAdapterMacCacheBinding_requiresConsentBeforeHelper(t *testing.T) {
+func TestAdapterMacCacheBinding_succeedsWithoutConsentAndNeverInvokesHelper(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing", ".credentials.json")
 	calls := 0
 	adapter := New(Options{AuthFile: missing, Now: fixedNow, KeychainReader: func(context.Context) ([]byte, error) {
@@ -218,9 +218,12 @@ func TestAdapterMacCacheBinding_requiresConsentBeforeHelper(t *testing.T) {
 		return nil, errors.New("must not be called")
 	}, goos: "darwin"})
 
-	_, err := adapter.CacheBinding(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
+	binding, err := adapter.CacheBinding(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
 
-	if err == nil || calls != 0 || !strings.Contains(err.Error(), "--allow-keychain-prompt") {
-		t.Fatalf("CacheBinding() error/calls = %v/%d", err, calls)
+	if err != nil || calls != 0 {
+		t.Fatalf("CacheBinding() error/calls = %v/%d, want a binding without consent or a helper call", err, calls)
+	}
+	if binding.SourceKind != keychainSourceIdentity.Kind || binding.SourceName != keychainSourceIdentity.Name || binding.CredentialFingerprint == "" {
+		t.Fatalf("binding = %+v", binding)
 	}
 }
