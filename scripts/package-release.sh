@@ -56,6 +56,11 @@ case "$(uname -s):$(uname -m)" in
 		target_os=linux
 		target_arch=arm64
 		;;
+	Linux:x86_64 | Linux:amd64)
+		target=linux_amd64
+		target_os=linux
+		target_arch=amd64
+		;;
 	*)
 		printf 'package-release: unsupported build host: %s %s\n' "$(uname -s)" "$(uname -m)" >&2
 		exit 1

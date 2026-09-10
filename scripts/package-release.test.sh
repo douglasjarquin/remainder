@@ -7,12 +7,23 @@ case "$(uname -s):$(uname -m)" in
 	Darwin:arm64)
 		target=darwin_arm64
 		native_goos=darwin
+		native_arch=arm64
 		foreign_goos=linux
+		foreign_arch=amd64
 		;;
 	Linux:arm64 | Linux:aarch64)
 		target=linux_arm64
 		native_goos=linux
+		native_arch=arm64
 		foreign_goos=darwin
+		foreign_arch=amd64
+		;;
+	Linux:x86_64 | Linux:amd64)
+		target=linux_amd64
+		native_goos=linux
+		native_arch=amd64
+		foreign_goos=darwin
+		foreign_arch=arm64
 		;;
 	*)
 		printf 'package-release-test: unsupported test host: %s %s\n' "$(uname -s)" "$(uname -m)" >&2
@@ -72,7 +83,7 @@ fi
 grep -F 'source checkout is dirty' "$test_root/dirty.stderr" >/dev/null
 test ! -e "$test_root/dirty-dist"
 
-GOOS="$foreign_goos" GOARCH=amd64 \
+GOOS="$foreign_goos" GOARCH="$foreign_arch" \
 	"$repository_root/scripts/package-release.sh" v0.1.0 "$output_dir"
 
 archive="$output_dir/$archive_base.tar.gz"
@@ -125,7 +136,7 @@ cmp "$repository_root/docs/features/cursor.md" "$extract_dir/$archive_base/docs/
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOOS=$native_goos" >/dev/null
-go version -m "$binary" | grep -F "build$(printf '\t')GOARCH=arm64" >/dev/null
+go version -m "$binary" | grep -F "build$(printf '\t')GOARCH=$native_arch" >/dev/null
 grep -F '"publication_status": "pending_final_release_verification"' "$qa_manifest" >/dev/null
 grep -F '"license": "MIT"' "$qa_manifest" >/dev/null
 if test -f "$repository_root/docs/release-readiness.md"; then
