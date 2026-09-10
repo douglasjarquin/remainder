@@ -6,8 +6,9 @@ It is positioned as a personal-use tool for the maintainer's local quota evidenc
 
 The source implements read-only Codex, Claude, Grok, and Cursor CLI providers, plus help, version, unavailable-provider behavior, and typed evidence output.
 The v0.1.0 artifacts support Codex.
-The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route.
-Claude, Grok, and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
+The v0.2.1 release scope includes Codex, the verified macOS Cursor CLI Keychain route, and the selected macOS Grok consumer file route.
+The patch fixes omitted Grok zero values without combining shared allowance, product limits, and prepaid credits.
+Claude and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
 Use the published release verification record and the [source matrix](docs/provider-sources.md) to distinguish native certification from controlled fixtures.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.
@@ -30,11 +31,14 @@ On macOS, a new Cursor observation requires `--allow-keychain-prompt`; editor SQ
 
 Use Go 1.27.1, which is pinned in `mise.toml` and CI.
 
-Build directly with:
+Build a local development binary labelled `dev` with:
 
 ```sh
-CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o bin/remainder ./cmd/remainder
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/remainder ./cmd/remainder
 ```
+
+The `mise run build` task retains a fixed version label for the developer benchmark fixtures.
+Use the [release construction command](docs/release.md#candidate-construction) to create a versioned release package.
 
 Before offline verification in a fresh checkout, prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`.
 The setup uses the Go 1.27.1 toolchain pinned in `mise.toml` and CI; verification itself keeps module lookup disabled.
