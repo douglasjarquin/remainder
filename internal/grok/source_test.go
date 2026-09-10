@@ -20,16 +20,16 @@ func TestNormalizeSourceFixtures(t *testing.T) {
 	start := now.Add(-7 * 24 * time.Hour)
 	reset := now.Add(24 * time.Hour)
 
-	t.Run("missing_scalars_are_unknown", func(t *testing.T) {
-		payload := quotaPayload(nil, []productFixture{{kind: 6}}, 2, start, reset, nil)
+	t.Run("missing_usage_without_a_cycle_is_unknown", func(t *testing.T) {
+		payload := quotaPayload(nil, []productFixture{{kind: 6}}, 0, time.Time{}, time.Time{}, nil)
 		config, _, _ := bytesAt(mustScan(t, payload), 1)
 		config = append(config, bytesField(12, nil)...)
 		observation, err := normalize(bytesField(1, config), now)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if observation.Outcome != evidence.OutcomePartial || limit(t, observation, "credits", "credits_remaining").Value.State != evidence.ValueUnknown || limit(t, observation, "product:voice", "product:voice_used").Value.State != evidence.ValueUnknown || limit(t, observation, "prepaid", "prepaid_remaining").Value.State != evidence.ValueUnknown {
-			t.Fatalf("missing scalars were inferred: %+v", observation)
+		if observation.Outcome != evidence.OutcomePartial || limit(t, observation, "product:voice", "product:voice_used").Value.State != evidence.ValueUnknown || limit(t, observation, "prepaid", "prepaid_remaining").Value.State != evidence.ValueZero {
+			t.Fatalf("missing usage = %+v", observation)
 		}
 	})
 

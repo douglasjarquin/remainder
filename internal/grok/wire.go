@@ -48,9 +48,6 @@ func scanMessage(data []byte, depth int) ([]wireField, error) {
 			}
 		case 3:
 			offset, err = skipGroup(data, offset, number, depth+1)
-			if err == nil {
-				continue
-			}
 		case 4:
 			return nil, errors.New("unexpected protobuf end group")
 		case 5:

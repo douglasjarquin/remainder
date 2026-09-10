@@ -15,7 +15,7 @@ func TestWireBoundaries(t *testing.T) {
 		message = append(message, varintField(1, 7)...)
 		message = append(message, varint(24<<3|4)...)
 		fields, err := scanMessage(message, 0)
-		if err != nil || len(fields) != 4 {
+		if err != nil || len(fields) != 5 || fields[4].number != 24 || fields[4].wire != 3 {
 			t.Fatalf("fields = %+v, error = %v", fields, err)
 		}
 	})
