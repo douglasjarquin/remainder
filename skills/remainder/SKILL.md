@@ -13,7 +13,8 @@ Stop after that diagnostic unless the user asks to install or build it.
 
 The v0.1.0 release supports provider `codex` with profile `default`.
 The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route with profile `default`.
-Claude, Grok, and Linux Cursor source implementations have controlled fixtures but remain outside native release certification.
+The v0.2.1 patch fixes Grok omitted zero values and includes the selected macOS consumer file route.
+Claude and Linux Cursor source implementations have controlled fixtures but remain outside native release certification.
 Retain the existing collector for an unverified route.
 Check the installed executable before assuming a source increment is available.
 It reads quota evidence without logging in, refreshing credentials, switching accounts, or making a generative request.

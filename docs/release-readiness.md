@@ -1,6 +1,17 @@
 # Release readiness
 
-## v0.2.0 scope
+## v0.2.1 scope
+
+This patch adds the selected macOS Grok consumer file route to the Codex and macOS Cursor release scope.
+Source commit `31941c9adb668709467586b34fef83c06a8f7805` fixes omitted protobuf scalars: a valid quota cycle permits zero used and 100 percent remaining, and a present empty prepaid message means zero credits.
+Malformed known fields encoded as groups remain errors; absent entitlements are not invented.
+Six authorized native CLI commands passed with shared remaining 100 percent, prepaid zero, and behind pace, while cached projections retained the original observation timestamp and unknown account identity.
+Credential metadata remained unchanged and the isolated cache was removed; no login, credential refresh, or generative request occurred.
+The final source passed 42 automated checks, independent review, macOS and Ubuntu CI, and a 100-sample Grok cache benchmark with p95 8.25625 ms against the unchanged 10 ms target.
+Final v0.2.1 packaged and public-download checks are recorded separately in the release verification.json; this source evidence alone does not replace them.
+Claude and Linux Cursor native routes remain unverified, and Sum/Herdr integration remains deferred.
+
+## Historical v0.2.0 scope
 
 The release scope is Codex plus the macOS Cursor CLI Keychain route.
 Claude, Grok, and Linux Cursor native canaries remain unverified; their source fixtures are not native release certification.

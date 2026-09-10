@@ -6,8 +6,9 @@ It is positioned as a personal-use tool for the maintainer's local quota evidenc
 
 The source implements read-only Codex, Claude, Grok, and Cursor CLI providers, plus help, version, unavailable-provider behavior, and typed evidence output.
 The v0.1.0 artifacts support Codex.
-The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route.
-Claude, Grok, and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
+The v0.2.1 release scope includes Codex, the verified macOS Cursor CLI Keychain route, and the selected macOS Grok consumer file route.
+The patch fixes omitted Grok zero values without combining shared allowance, product limits, and prepaid credits.
+Claude and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
 Use the published release verification record and the [source matrix](docs/provider-sources.md) to distinguish native certification from controlled fixtures.
 
 An explicit `--provider codex --profile default` selection first checks a short-lived, account/source-bound observation cache, then reads `$CODEX_HOME/auth.json` or `~/.codex/auth.json` and makes a bounded request to the Codex usage endpoint on a miss.

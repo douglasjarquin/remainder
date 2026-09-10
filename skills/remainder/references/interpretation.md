@@ -2,7 +2,8 @@
 
 Treat the executable's help and returned observation as the command and identifier catalog.
 The source supports providers `codex`, `claude`, `grok`, and `cursor` with profile `default`.
-The released v0.1.0 artifact supports Codex; source support does not certify native Claude, Grok, or Cursor access.
+Release v0.2.1 includes Codex, macOS Cursor CLI Keychain, and the selected macOS Grok consumer file route.
+Claude and Linux Cursor source fixtures do not certify native access.
 Grok uses `credits`, `product:<kind>`, and `prepaid` windows and cannot verify an explicit account selector.
 Cursor uses `included_usage`, `auto_usage`, `api_usage`, `spend_limit`, and `grok_bot` when the source provides them.
 Its spend-limit amounts use `usd_cents`, separate from percentage allowances, and its unknown identity cannot satisfy an explicit account selector.
