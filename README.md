@@ -31,11 +31,14 @@ On macOS, a new Cursor observation requires `--allow-keychain-prompt`; editor SQ
 
 Use Go 1.27.1, which is pinned in `mise.toml` and CI.
 
-Build directly with:
+Build a local development binary labelled `dev` with:
 
 ```sh
-CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -X main.version=v0.1.0' -o bin/remainder ./cmd/remainder
+CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o bin/remainder ./cmd/remainder
 ```
+
+The `mise run build` task retains a fixed version label for the developer benchmark fixtures.
+Use the [release construction command](docs/release.md#candidate-construction) to create a versioned release package.
 
 Before offline verification in a fresh checkout, prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`.
 The setup uses the Go 1.27.1 toolchain pinned in `mise.toml` and CI; verification itself keeps module lookup disabled.
