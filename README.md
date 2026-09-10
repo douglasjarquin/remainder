@@ -8,6 +8,7 @@ The source implements read-only Codex, Claude, Grok, and Cursor CLI providers, p
 The v0.1.0 artifacts support Codex.
 The v0.2.1 release scope includes Codex, the verified macOS Cursor CLI Keychain route, and the selected macOS Grok consumer file route.
 The patch fixes omitted Grok zero values without combining shared allowance, product limits, and prepaid credits.
+v0.2.2 adds a `linux_amd64` build target with no provider or output change; see [release notes](docs/release.md).
 Claude and Linux Cursor native routes remain unverified; retain existing collectors for those routes.
 Use the published release verification record and the [source matrix](docs/provider-sources.md) to distinguish native certification from controlled fixtures.
 

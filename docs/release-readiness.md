@@ -1,5 +1,11 @@
 # Release readiness
 
+## v0.2.2 scope
+
+This patch adds a `linux_amd64` (Linux x86_64) build target to `scripts/package-release.sh` and `scripts/verify-release-asset.sh`, and generalizes `scripts/package-release.test.sh`'s host-detection switch (previously hardcoded to treat `arm64` as the only native arch) to a `native_arch`/`foreign_arch` pair per host. No provider source, cache, output, or CLI behavior changed; `internal/` and `cmd/` are untouched since v0.2.1 aside from the already-released Claude native-canary documentation update.
+Verified on this linux/amd64 build host only: `go build ./...`, `go vet ./...`, `go test -race -shuffle=on -count=1 ./...` (all packages pass), and `sh ./scripts/package-release.test.sh` (packages, checksums, and verifies a real `remainder_v0.2.2_linux_amd64.tar.gz`).
+This release does not repeat the full historical readiness ceremony (hosted macOS+Ubuntu CI matrix, a separate independent reviewer, a native provider canary) — it is a build-tooling addition, not a provider or output change, and no darwin/arm64 host was available to rebuild those platforms. `darwin_arm64` and `linux_arm64` remain pinned at their v0.2.1 assets, which are unaffected by this patch.
+
 ## v0.2.1 scope
 
 This patch adds the selected macOS Grok consumer file route to the Codex and macOS Cursor release scope.
