@@ -19,6 +19,59 @@ func TestValidateOutputRequiresExactHelpGolden(t *testing.T) {
 	}
 }
 
+func TestValidateOutputAcceptsExpectedReleaseVersion(t *testing.T) {
+	// Given: the packaged v0.2.0 release version output.
+	item := workload{Name: "startup-version", ExitCode: 0, ExpectedVersion: "v0.2.0"}
+	result := sample{Stdout: "remainder v0.2.0 (github.com/douglasjarquin/remainder)\n"}
+
+	// When: the benchmark validates its version workload.
+	status := validateOutput(item, result)
+
+	// Then: the declared release version is accepted.
+	if status != "pass" {
+		t.Fatalf("validateOutput() = %q, want pass", status)
+	}
+}
+
+func TestValidateOutputRejectsUnexpectedReleaseVersion(t *testing.T) {
+	// Given: a v0.2.0 release output and a separately supplied v0.1.0 expectation.
+	item := workload{Name: "startup-version", ExitCode: 0, ExpectedVersion: "v0.1.0"}
+	result := sample{Stdout: "remainder v0.2.0 (github.com/douglasjarquin/remainder)\n"}
+
+	// When: the benchmark validates the output against that expectation.
+	status := validateOutput(item, result)
+
+	// Then: the mismatch stays observable.
+	if status != "version output mismatch" {
+		t.Fatalf("validateOutput() = %q, want version output mismatch", status)
+	}
+}
+
+func TestParseExpectedVersionRejectsEmptyValue(t *testing.T) {
+	// Given: an empty expected-version flag value.
+	_, err := parseExpectedVersion("")
+
+	// When: the flag value crosses into the typed workload expectation.
+	// Then: the boundary rejects it.
+	if err == nil {
+		t.Fatal("parseExpectedVersion() error = nil, want error")
+	}
+}
+
+func TestParseExpectedVersionPreservesDefault(t *testing.T) {
+	// Given: the ordinary developer expected-version default.
+	version, err := parseExpectedVersion(defaultExpectedVersion)
+	if err != nil {
+		t.Fatalf("parseExpectedVersion() error = %v", err)
+	}
+
+	// When: the value becomes a typed workload expectation.
+	// Then: the original v0.1.0 default remains intact.
+	if version != expectedVersion("v0.1.0") {
+		t.Fatalf("parseExpectedVersion() = %q, want v0.1.0", version)
+	}
+}
+
 func TestMeasureFixturePreservesEquivalentRequiredFacts(t *testing.T) {
 	for _, fixture := range benchmark.Fixtures() {
 		record, err := measureFixture(fixture, nil)

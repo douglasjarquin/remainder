@@ -9,7 +9,8 @@ Ask before replacing an existing installation.
 The release executable already contains Cobra and its approved module graph, so consumers do not install Cobra or a Go toolchain.
 Installing the artifact must not edit shell completion, shell profiles, provider credentials, or account state.
 Keep each Remainder version in a separate directory and switch an explicit path or user-owned symlink.
-For the first release, retain the existing `quota-axi --provider codex --no-credential-refresh` command as the rollback path instead of inventing an earlier Remainder release.
+Keep v0.1.0 available for Codex rollback when installing a later version.
+Retain the existing collector for each provider route until its migration is separately approved.
 
 For development from a source checkout, use the Go version pinned by `mise.toml`.
 Prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`, then build with `CGO_ENABLED=0 GOPROXY=off go build -trimpath -o bin/remainder ./cmd/remainder`.

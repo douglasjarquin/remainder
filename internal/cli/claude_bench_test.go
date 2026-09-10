@@ -85,7 +85,7 @@ func BenchmarkExecuteClaudeControlledRefresh(b *testing.B) {
 	}))
 	b.Cleanup(server.Close)
 	adapter := controlledClaudeRuntimeAdapter(b, server)
-	args := []string{"value", "--provider", "claude", "--profile", "default", "--window", "five_hour", "--field", "remaining"}
+	args := []string{"value", "--provider", "claude", "--profile", "default", "--window", "five_hour", "--field", "remaining", "--cache", "off"}
 	var stdout, stderr bytes.Buffer
 	code := 0
 	b.ReportAllocs()

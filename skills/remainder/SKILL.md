@@ -12,7 +12,9 @@ If the executable is absent, give one actionable diagnostic: `remainder is not i
 Stop after that diagnostic unless the user asks to install or build it.
 
 The v0.1.0 release supports provider `codex` with profile `default`.
-The current source also implements `claude`, `grok`, and `cursor` with profile `default`, using selected CLI credential sources; native canary status is source-specific.
+The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route with profile `default`.
+Claude, Grok, and Linux Cursor source implementations have controlled fixtures but remain outside native release certification.
+Retain the existing collector for an unverified route.
 Check the installed executable before assuming a source increment is available.
 It reads quota evidence without logging in, refreshing credentials, switching accounts, or making a generative request.
 Cursor uses the Linux CLI auth file or, on macOS, the CLI Keychain item with explicit `--allow-keychain-prompt` for refreshes.

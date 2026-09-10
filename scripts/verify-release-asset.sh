@@ -75,6 +75,10 @@ $archive_base/ASSET_MANIFEST.json
 $archive_base/ATTRIBUTIONS.md
 $archive_base/LICENSE
 $archive_base/docs/
+$archive_base/docs/features/
+$archive_base/docs/features/claude.md
+$archive_base/docs/features/cursor.md
+$archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
 $archive_base/remainder
@@ -99,6 +103,9 @@ diff -u "$expected" "$listing"
 tar -xzf "$archive" -C "$qa_root"
 bundle="$qa_root/$archive_base"
 binary="$bundle/remainder"
+cmp "docs/features/claude.md" "$bundle/docs/features/claude.md"
+cmp "docs/features/grok.md" "$bundle/docs/features/grok.md"
+cmp "docs/features/cursor.md" "$bundle/docs/features/cursor.md"
 runtime_home="$qa_root/runtime-home"
 runtime_path="$qa_root/runtime-path"
 mkdir -p "$runtime_home" "$runtime_path"
@@ -180,7 +187,8 @@ cat >"$output_manifest" <<EOF
     "embedded_go_version": "passed",
     "embedded_cgo_disabled": "passed",
     "embedded_clean_source": "passed",
-    "asset_manifest": "passed"
+    "asset_manifest": "passed",
+    "provider_document_bytes": "passed"
   },
   "runtime_path_excluded": ["go", "node", "python", "jq", "sum", "herdr"],
   "license": "MIT",

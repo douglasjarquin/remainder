@@ -84,13 +84,16 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 bundle="$build_root/$archive_base"
 
-mkdir -p "$bundle/docs" "$bundle/skills/remainder/references"
+mkdir -p "$bundle/docs/features" "$bundle/skills/remainder/references"
 CGO_ENABLED=0 GOOS="$target_os" GOARCH="$target_arch" GOPROXY=off GOTOOLCHAIN=local \
 	go build -buildvcs=true -trimpath \
 	-ldflags="-s -w -X main.version=$version" \
 	-o "$bundle/remainder" ./cmd/remainder
 copy_regular_source ATTRIBUTIONS.md "$bundle/ATTRIBUTIONS.md"
 copy_regular_source LICENSE "$bundle/LICENSE"
+copy_regular_source docs/features/claude.md "$bundle/docs/features/claude.md"
+copy_regular_source docs/features/grok.md "$bundle/docs/features/grok.md"
+copy_regular_source docs/features/cursor.md "$bundle/docs/features/cursor.md"
 copy_regular_source docs/provider-sources.md "$bundle/docs/provider-sources.md"
 copy_regular_source docs/release.md "$bundle/docs/release.md"
 copy_regular_source skills/remainder/SKILL.md "$bundle/skills/remainder/SKILL.md"

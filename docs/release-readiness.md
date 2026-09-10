@@ -1,8 +1,24 @@
-# Codex release readiness
+# Release readiness
 
-Status: the source candidate is ready for independent verification, while downloaded executable proof remains the issue #14 release gate.
+## v0.2.0 scope
 
-## Scope and evidence
+The release scope is Codex plus the macOS Cursor CLI Keychain route.
+Claude, Grok, and Linux Cursor native canaries remain unverified; their source fixtures are not native release certification.
+Unsupported desktop SQLite routes and user-deferred Sum/Herdr integration remain outside this release.
+
+Cursor source commit `00471fb37b58294b1410e2044ec089bb24c188b4` passed an authorized headless native read with caching disabled: five fresh windows, unknown account identity, and no stderr.
+It passed 42 automated checks, actual Mac and Linux fixture CLI scenarios, independent review, and both hosted CI jobs before PR #33 merged.
+The initial Cursor 100-sample cache timing missed the 10 ms p95 objective at 10.311584 ms.
+The predefined combined 200 valid samples passed at 9.473292 ms, retaining the original samples and a 28.092833 ms maximum; an earlier comparison-harness failure had no usable timing result and remains inconclusive.
+This source evidence does not replace final packaged and downloaded executable verification.
+The release’s verification.json must bind those results, source revision, native route, platform, archive digests, and remaining limitations.
+
+## Historical v0.1.0 readiness
+
+The following record describes the first Codex source gate.
+The immutable v0.1.0 release subsequently completed its packaged and downloaded executable checks.
+
+### Scope and evidence
 
 The first release supports only the native Codex `default` profile through Remainder's compiled Cobra entrypoint.
 Claude, Grok, Cursor, consumer migration, and packaging are outside this readiness decision.
@@ -50,13 +66,13 @@ The final candidate still requires the independent root rerun on its exact full 
 - [ ] Measure raw full-process samples through the CGO-free binary and require eligible Apple Silicon cache-hit p95 to remain at or below 10 ms.
 - [ ] Record process, request, allocation, memory, output, and cleanup facts without combining local, harness, network, or auth latency.
 - [ ] Run the pinned comparator and declared tokenizer only from pre-provisioned isolated environments, with external lookup disabled and uncertainty preserved.
-- [ ] Keep one explicitly approved live Codex canary separate from fixtures and record the exact source SHA, selection, auth behavior, metadata stability, and cleanup.
+- [ ] Keep explicitly approved native canaries for the release’s certified routes separate from fixtures and record the exact source SHA, selection, auth behavior, metadata stability, and cleanup.
 - [ ] Re-run supported macOS and Linux checks and the 12-process concurrency workloads on the exact final source SHA.
 - [ ] Inspect the final module and executable dependency records, dependency notices, and CGO setting for unexpected runtime requirements.
 - [ ] For issue #14, install the downloaded release executable into an isolated environment and prove it runs without a separately installed Go or Cobra runtime.
 - [ ] Preserve the adopted MIT license, positive attribution, human merge, and independent final-SHA verification.
 
-## Limitations
+### Historical limitations
 
 This local candidate is not a public release artifact, so downloaded-binary installation and packaging remain pending issue #14.
 The repository adopts the MIT license in `LICENSE`.

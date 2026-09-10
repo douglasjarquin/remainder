@@ -92,6 +92,10 @@ $archive_base/ASSET_MANIFEST.json
 $archive_base/ATTRIBUTIONS.md
 $archive_base/LICENSE
 $archive_base/docs/
+$archive_base/docs/features/
+$archive_base/docs/features/claude.md
+$archive_base/docs/features/cursor.md
+$archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
 $archive_base/remainder
@@ -115,6 +119,9 @@ mkdir -p "$extract_dir"
 tar -xzf "$archive" -C "$extract_dir"
 binary="$extract_dir/$archive_base/remainder"
 cmp "$repository_root/LICENSE" "$extract_dir/$archive_base/LICENSE"
+cmp "$repository_root/docs/features/claude.md" "$extract_dir/$archive_base/docs/features/claude.md"
+cmp "$repository_root/docs/features/grok.md" "$extract_dir/$archive_base/docs/features/grok.md"
+cmp "$repository_root/docs/features/cursor.md" "$extract_dir/$archive_base/docs/features/cursor.md"
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOOS=$native_goos" >/dev/null
@@ -126,6 +133,37 @@ if test -f "$repository_root/docs/release-readiness.md"; then
 else
 	grep -F '"readiness_integration": "pending"' "$qa_manifest" >/dev/null
 fi
+
+regular_source_repo="$test_root/regular-source-repo"
+git clone --quiet --no-hardlinks "$repository_root" "$regular_source_repo"
+git -C "$regular_source_repo" checkout --quiet --detach "$(git -C "$repository_root" rev-parse HEAD)"
+regular_source_doc="$regular_source_repo/docs/features/claude.md"
+regular_source_backup="$test_root/claude.md.backup"
+untrusted_provider_doc="$test_root/untrusted-provider-doc.md"
+printf '%s\n' 'untrusted provider doc' >"$untrusted_provider_doc"
+regular_source_fake_bin="$test_root/regular-source-fake-bin"
+mkdir -p "$regular_source_fake_bin"
+real_go=$(command -v go)
+cat >"$regular_source_fake_bin/go" <<EOF
+#!/bin/sh
+if test "\$1" = version; then
+	mv "\$REMAINDER_PROVIDER_DOC_SOURCE" "\$REMAINDER_PROVIDER_DOC_BACKUP"
+	ln -s "\$REMAINDER_UNTRUSTED_PROVIDER_DOC" "\$REMAINDER_PROVIDER_DOC_SOURCE"
+fi
+exec "$real_go" "\$@"
+EOF
+chmod +x "$regular_source_fake_bin/go"
+if PATH="$regular_source_fake_bin:$PATH" \
+	REMAINDER_PROVIDER_DOC_SOURCE="$regular_source_doc" \
+	REMAINDER_PROVIDER_DOC_BACKUP="$regular_source_backup" \
+	REMAINDER_UNTRUSTED_PROVIDER_DOC="$untrusted_provider_doc" \
+	"$regular_source_repo/scripts/package-release.sh" v0.1.0 "$test_root/regular-source-dist" \
+	>"$test_root/regular-source.stdout" 2>"$test_root/regular-source.stderr"; then
+	printf '%s\n' 'package-release-test: symlinked required provider document source was accepted' >&2
+	exit 1
+fi
+grep -F 'source input must be a regular file: docs/features/claude.md' "$test_root/regular-source.stderr" >/dev/null
+test ! -e "$test_root/regular-source-dist"
 
 crafted_root="$test_root/crafted"
 mkdir -p "$crafted_root"
