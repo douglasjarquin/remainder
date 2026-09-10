@@ -11,7 +11,7 @@ It passed 42 automated checks, actual Mac and Linux fixture CLI scenarios, indep
 The initial Cursor 100-sample cache timing missed the 10 ms p95 objective at 10.311584 ms.
 The predefined combined 200 valid samples passed at 9.473292 ms, retaining the original samples and a 28.092833 ms maximum; an earlier comparison-harness failure had no usable timing result and remains inconclusive.
 This source evidence does not replace final packaged and downloaded executable verification.
-The release’s `verification.json` must bind those results, source revision, native route, platform, archive digests, and remaining limitations.
+The release’s verification.json must bind those results, source revision, native route, platform, archive digests, and remaining limitations.
 
 ## Historical v0.1.0 readiness
 
