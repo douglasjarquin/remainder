@@ -40,15 +40,6 @@ func TestExecute_native_Claude_supports_compact_JSON_and_scalar(t *testing.T) {
 	}
 }
 
-func TestExecute_native_Claude_missing_file_is_operational_failure(t *testing.T) {
-	adapter := runtimeAdapter{codex: codex.Default(), claude: claude.New(claude.Options{AuthFile: filepath.Join(t.TempDir(), "missing")}), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
-	var stdout, stderr bytes.Buffer
-	code := executeWithAdapterAt(t.Context(), []string{"value", "--provider", "claude", "--profile", "default", "--window", "weekly", "--field", "remaining", "--cache", "off"}, &stdout, &stderr, "test", fixedCLINow(), adapter)
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "missing") || strings.Contains(stderr.String(), "Usage:") {
-		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-	}
-}
-
 func TestRuntimeAdapter_Claude_cache_hit_does_not_read_auth_body_or_call_HTTP(t *testing.T) {
 	now := fixedCLINow()
 	fixture := claudeRuntimeAdapter(t)

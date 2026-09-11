@@ -1,5 +1,21 @@
 # Release readiness
 
+## v0.2.3 scope
+
+This release adds the opt-in macOS Keychain fallback for Claude credentials (source commit `f2430e1f`), so a macOS host whose Claude Code CLI stores its OAuth credentials in the login Keychain rather than `~/.claude/.credentials.json` can be read.
+The file route is tried first on every OS and is unchanged; the fallback runs only when that file is absent, the OS is macOS, and `--allow-keychain-prompt` is passed.
+Verified on this macOS arm64 build host: `gofmt -l .` clean, `go vet ./...`, `go test -race -shuffle=on -count=1 ./...` (all packages pass), `./scripts/check-dependencies.sh`, and the evidence redaction suite, all via `./scripts/verify.sh`.
+`scripts/package-release.sh v0.2.3 dist` produced a `darwin_arm64` archive whose 15 pre-publication asset checks all passed.
+On 2026-09-10 the macOS Keychain fallback passed an authorized native canary on a macOS 15 arm64 host, using the packaged `remainder_v0.2.3_darwin_arm64` executable rather than a source build.
+With the selected credential file absent, the read returned exit 0, fresh complete evidence, source kind `native_keychain_http` name `claude_keychain`, and a verified account binding.
+It preserved the account five-hour and weekly windows, the Fable model weekly window, and distinct paid `extra_usage` credits.
+A second read inside the max-age window reused the same observation timestamp, and the same request without `--allow-keychain-prompt` on a cold cache returned unavailable naming the flag with exit 1.
+No login, credential refresh, account switch, or generative request occurred.
+One host and one account were exercised; other macOS versions, accounts, and the Linux Cursor route remain unverified.
+Codex and Grok scalar reads were re-run on the packaged executable and were unchanged.
+This release ships a `darwin_arm64` archive only; `linux_amd64` users keep the immutable v0.2.2 asset and `linux_arm64` users keep v0.2.1, neither of which contains the Keychain fallback.
+It does not repeat the hosted CI matrix or a separate independent reviewer.
+
 ## v0.2.2 scope
 
 This patch adds a `linux_amd64` (Linux x86_64) build target to `scripts/package-release.sh` and `scripts/verify-release-asset.sh`, and generalizes `scripts/package-release.test.sh`'s host-detection switch (previously hardcoded to treat `arm64` as the only native arch) to a `native_arch`/`foreign_arch` pair per host. No provider source, cache, output, or CLI behavior changed; `internal/` and `cmd/` are untouched since v0.2.1 aside from the already-released Claude native-canary documentation update.

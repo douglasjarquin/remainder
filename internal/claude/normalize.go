@@ -10,7 +10,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-func normalize(raw usageResponse, accountID string, observedAt time.Time) (evidence.Observation, error) {
+func normalize(raw usageResponse, accountID string, observedAt time.Time, source evidence.SourceIdentity) (evidence.Observation, error) {
 	var windows []evidence.Window
 	if raw.Limits != nil {
 		for _, limit := range *raw.Limits {
@@ -55,7 +55,7 @@ func normalize(raw usageResponse, accountID string, observedAt time.Time) (evide
 	if len(windows) == 0 {
 		return evidence.Observation{}, errors.New("Claude quota response schema has no limits")
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "claude", Profile: "default", Account: evidence.AccountIdentity{LastObserved: accountID, Binding: evidence.IdentityVerified}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "claude_credentials_json"}, ObservedAt: observedAt, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "claude", Profile: "default", Account: evidence.AccountIdentity{LastObserved: accountID, Binding: evidence.IdentityVerified}, Source: source, ObservedAt: observedAt, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, errors.New("Claude normalized evidence is invalid")
 	}
