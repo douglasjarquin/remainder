@@ -86,7 +86,8 @@ $archive_base/docs/features/cursor.md
 $archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
-$archive_base/remainder
+$archive_base/bin/
+$archive_base/bin/remainder
 $archive_base/skills/
 $archive_base/skills/remainder/
 $archive_base/skills/remainder/SKILL.md
@@ -107,7 +108,7 @@ diff -u "$expected" "$listing"
 
 tar -xzf "$archive" -C "$qa_root"
 bundle="$qa_root/$archive_base"
-binary="$bundle/remainder"
+binary="$bundle/bin/remainder"
 cmp "docs/features/claude.md" "$bundle/docs/features/claude.md"
 cmp "docs/features/grok.md" "$bundle/docs/features/grok.md"
 cmp "docs/features/cursor.md" "$bundle/docs/features/cursor.md"

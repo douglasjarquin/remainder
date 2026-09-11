@@ -109,7 +109,8 @@ $archive_base/docs/features/cursor.md
 $archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
-$archive_base/remainder
+$archive_base/bin/
+$archive_base/bin/remainder
 $archive_base/skills/
 $archive_base/skills/remainder/
 $archive_base/skills/remainder/SKILL.md
@@ -128,7 +129,18 @@ diff -u "$expected_files" "$actual_files"
 extract_dir="$test_root/extract"
 mkdir -p "$extract_dir"
 tar -xzf "$archive" -C "$extract_dir"
-binary="$extract_dir/$archive_base/remainder"
+binary="$extract_dir/$archive_base/bin/remainder"
+
+expected_root_entries="$test_root/expected-root-entries.txt"
+actual_root_entries="$test_root/actual-root-entries.txt"
+printf '%s\n' ASSET_MANIFEST.json ATTRIBUTIONS.md LICENSE bin docs skills |
+	LC_ALL=C sort >"$expected_root_entries"
+(cd "$extract_dir/$archive_base" && ls -A) |
+	LC_ALL=C sort >"$actual_root_entries"
+diff -u "$expected_root_entries" "$actual_root_entries"
+test -f "$binary"
+test ! -e "$extract_dir/$archive_base/remainder"
+
 cmp "$repository_root/LICENSE" "$extract_dir/$archive_base/LICENSE"
 cmp "$repository_root/docs/features/claude.md" "$extract_dir/$archive_base/docs/features/claude.md"
 cmp "$repository_root/docs/features/grok.md" "$extract_dir/$archive_base/docs/features/grok.md"
