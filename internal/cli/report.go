@@ -28,7 +28,8 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options, now func() tim
 	if err != nil {
 		return err
 	}
-	if opts.format == "json" {
+	switch opts.format {
+	case "json":
 		output, err := evidence.RenderJSON(observation)
 		if err != nil {
 			return err
@@ -36,7 +37,15 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options, now func() tim
 		if _, err := cmd.OutOrStdout().Write(append(output, '\n')); err != nil {
 			return fmt.Errorf("write JSON: %w", err)
 		}
-	} else {
+	case "toon":
+		output, err := evidence.RenderTOON(observation)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.OutOrStdout().Write(append(output, '\n')); err != nil {
+			return fmt.Errorf("write TOON: %w", err)
+		}
+	default:
 		output, err := evidence.RenderCompact(observation, evaluatedAt)
 		if err != nil {
 			return err

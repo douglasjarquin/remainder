@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/douglasjarquin/go-toon"
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/spf13/cobra"
@@ -125,12 +126,19 @@ func runAllReport(cmd *cobra.Command, adapter Adapter, opts options, now func() 
 	if partial || len(failures) > 0 {
 		outcome = evidence.OutcomePartial
 	}
-	if opts.format == "json" {
+	switch opts.format {
+	case "json":
 		if err := writeMixedJSON(cmd.OutOrStdout(), observations, failures, outcome); err != nil {
 			return err
 		}
-	} else if err := writeMixedCompact(cmd.OutOrStdout(), observations, failures, outcome, evaluatedAt); err != nil {
-		return err
+	case "toon":
+		if err := writeMixedTOON(cmd.OutOrStdout(), observations, failures, outcome); err != nil {
+			return err
+		}
+	default:
+		if err := writeMixedCompact(cmd.OutOrStdout(), observations, failures, outcome, evaluatedAt); err != nil {
+			return err
+		}
 	}
 	if outcome == evidence.OutcomePartial {
 		return ErrPartial
@@ -204,6 +212,31 @@ func failureFor(request evidence.Request, err error) mixedFailure {
 		message = "requested quota evidence is unavailable"
 	}
 	return mixedFailure{Provider: request.Provider, Profile: request.Profile, Message: message}
+}
+
+func writeMixedTOON(writer io.Writer, observations []evidence.Observation, failures []mixedFailure, outcome evidence.Outcome) error {
+	var encodedJSON []byte
+	{
+		var buf strings.Builder
+		if err := writeMixedJSON(&buf, observations, failures, outcome); err != nil {
+			return err
+		}
+		encodedJSON = []byte(strings.TrimSuffix(buf.String(), "\n"))
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(encodedJSON)))
+	decoder.UseNumber()
+	var facts any
+	if err := decoder.Decode(&facts); err != nil {
+		return fmt.Errorf("decode mixed JSON for TOON: %w", err)
+	}
+	encoded, err := toon.Marshal(facts)
+	if err != nil {
+		return fmt.Errorf("render mixed TOON: %w", err)
+	}
+	if _, err := writer.Write(append(encoded, '\n')); err != nil {
+		return fmt.Errorf("write mixed TOON: %w", err)
+	}
+	return nil
 }
 
 func writeMixedJSON(writer io.Writer, observations []evidence.Observation, failures []mixedFailure, outcome evidence.Outcome) error {

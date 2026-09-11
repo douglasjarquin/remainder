@@ -1,12 +1,15 @@
 package evidence
 
 import (
+	"bytes"
 	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/douglasjarquin/go-toon"
 )
 
 func RenderCompact(observation Observation, now time.Time) (string, error) {
@@ -212,6 +215,20 @@ func RenderJSON(observation Observation) ([]byte, error) {
 		result.Windows = append(result.Windows, parsed)
 	}
 	return json.Marshal(result)
+}
+
+func RenderTOON(observation Observation) ([]byte, error) {
+	encoded, err := RenderJSON(observation)
+	if err != nil {
+		return nil, err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.UseNumber()
+	var facts any
+	if err := decoder.Decode(&facts); err != nil {
+		return nil, err
+	}
+	return toon.Marshal(facts)
 }
 
 func renderJSONPace(pace Pace) *jsonPace {

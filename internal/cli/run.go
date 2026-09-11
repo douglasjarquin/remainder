@@ -137,7 +137,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 	root.SetErr(stderr)
 	root.CompletionOptions.DisableDefaultCmd = true
 	flags := root.PersistentFlags()
-	flags.StringVar(&values.format, "format", "compact", "output format: compact or json")
+	flags.StringVar(&values.format, "format", "compact", "output format: compact, json, or toon")
 	flags.StringVar(&values.provider, "provider", "", "exact provider selection")
 	flags.StringVar(&values.profile, "profile", "", "exact profile selection")
 	flags.StringVar(&values.window, "window", "", "exact window selection")
@@ -195,7 +195,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter, now func
 
 func readOptions(cmd *cobra.Command, values flagValues, valueCommand bool) (options, error) {
 	format := values.format
-	if format != "compact" && format != "json" {
+	if format != "compact" && format != "json" && format != "toon" {
 		return options{}, fmt.Errorf("%w: unsupported format %q", ErrUsage, format)
 	}
 	provider := values.provider

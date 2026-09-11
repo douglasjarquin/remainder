@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/douglasjarquin/go-toon"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -63,6 +65,178 @@ func TestObservation_RenderersPreserveTypedFacts(t *testing.T) {
 	if !bytes.Contains(jsonOne, []byte(`"codex\nprod"`)) {
 		t.Fatalf("RenderJSON() did not escape control characters: %q", jsonOne)
 	}
+	wantJSON := `{"schema_version":"v1","provider":"codex\nprod","profile":"main","account":{"last_observed":"acct-1","binding":"historical"},"source":{"kind":"fixture","name":"local"},"observed_at":"2026-03-08T07:00:00Z","freshness":"fresh","outcome":"complete","windows":[{"id":"daily","scope":"account","unit":"tokens","limits":[{"id":"daily-remaining","field":"remaining","state":"zero","amount":0}]},{"id":"weekly","scope":"model","unit":"tokens","limits":[{"id":"weekly-remaining","field":"remaining","state":"defined","amount":42,"reset_at":"2026-03-08T08:00:00Z"}]}]}`
+	if string(jsonOne) != wantJSON {
+		t.Fatalf("RenderJSON() = %s, want %s", jsonOne, wantJSON)
+	}
+
+	toonOne, err := evidence.RenderTOON(obs)
+	if err != nil {
+		t.Fatalf("RenderTOON() error = %v", err)
+	}
+	toonTwo, err := evidence.RenderTOON(obs)
+	if err != nil {
+		t.Fatalf("second RenderTOON() error = %v", err)
+	}
+	if string(toonOne) != string(toonTwo) {
+		t.Fatalf("RenderTOON() is not deterministic: %q != %q", toonOne, toonTwo)
+	}
+	wantTOON := "account:\n  binding: historical\n  last_observed: acct-1\nfreshness: fresh\nobserved_at: \"2026-03-08T07:00:00Z\"\noutcome: complete\nprofile: main\nprovider: \"codex\\nprod\"\nschema_version: v1\nsource:\n  kind: fixture\n  name: local\nwindows[2]:\n  - id: daily\n    limits[1]{amount,field,id,state}:\n      0,remaining,daily-remaining,zero\n    scope: account\n    unit: tokens\n  - id: weekly\n    limits[1]{amount,field,id,reset_at,state}:\n      42,remaining,weekly-remaining,\"2026-03-08T08:00:00Z\",defined\n    scope: model\n    unit: tokens"
+	if string(toonOne) != wantTOON {
+		t.Fatalf("RenderTOON() = %q, want %q", toonOne, wantTOON)
+	}
+	if !bytes.Equal(decodeJSONFacts(t, jsonOne), decodeTOONFacts(t, toonOne)) {
+		t.Fatalf("TOON facts = %#v, want JSON facts %#v\nTOON document:\n%s", decodeTOONFacts(t, toonOne), decodeJSONFacts(t, jsonOne), toonOne)
+	}
+}
+
+func TestRenderersRecordIndependentOutputSizes(t *testing.T) {
+	obs := mixedObservation()
+	now := time.Date(2026, time.March, 8, 7, 30, 0, 0, time.UTC)
+	compact, err := evidence.RenderCompact(obs, now)
+	if err != nil {
+		t.Fatalf("RenderCompact() error = %v", err)
+	}
+	jsonOut, err := evidence.RenderJSON(obs)
+	if err != nil {
+		t.Fatalf("RenderJSON() error = %v", err)
+	}
+	toonOut, err := evidence.RenderTOON(obs)
+	if err != nil {
+		t.Fatalf("RenderTOON() error = %v", err)
+	}
+	wantCompact := `schema=v1 provider="codex\nprod" profile="main" observed_at=2026-03-08T07:00:00Z age_seconds=1800 freshness=fresh outcome=complete identity=historical account="acct-1" source="fixture/local" windows=daily/account:remaining=0tokens;weekly/model:remaining=42tokens reset=2026-03-08T08:00:00Z`
+	if compact != wantCompact {
+		t.Fatalf("compact output changed: %q", compact)
+	}
+	if len(jsonOut) != 558 {
+		t.Fatalf("json bytes = %d, want existing ceiling 558", len(jsonOut))
+	}
+	if len(toonOut) != 522 {
+		t.Fatalf("toon bytes = %d, want recorded 522", len(toonOut))
+	}
+	if bytes.Equal(toonOut, jsonOut) {
+		t.Fatal("TOON output matched JSON bytes")
+	}
+	t.Logf("toon_bytes=%d", len(toonOut))
+}
+
+func BenchmarkRenderCompact(b *testing.B) {
+	obs := mixedObservation()
+	now := obs.ObservedAt
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := evidence.RenderCompact(obs, now); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkRenderJSON(b *testing.B) {
+	obs := mixedObservation()
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := evidence.RenderJSON(obs); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkRenderTOON(b *testing.B) {
+	obs := mixedObservation()
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := evidence.RenderTOON(obs); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func mixedObservation() evidence.Observation {
+	reset := time.Date(2026, time.March, 8, 8, 0, 0, 0, time.UTC)
+	amount := json.Number("42")
+	zero := json.Number("0")
+	return evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex\nprod",
+		Profile:       "main",
+		Account: evidence.AccountIdentity{
+			LastObserved: "acct-1",
+			Binding:      evidence.IdentityHistorical,
+		},
+		Source:     evidence.SourceIdentity{Kind: "fixture", Name: "local"},
+		ObservedAt: time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:  evidence.FreshFresh,
+		Outcome:    evidence.OutcomeComplete,
+		Windows: []evidence.Window{
+			{ID: "weekly", Scope: evidence.ScopeModel, Unit: "tokens", Limits: []evidence.Limit{{ID: "weekly-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueDefined, Amount: &amount}, ResetAt: &reset}}},
+			{ID: "daily", Scope: evidence.ScopeAccount, Unit: "tokens", Limits: []evidence.Limit{{ID: "daily-remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueZero, Amount: &zero}}}},
+		},
+	}
+}
+
+func decodeJSONFacts(t *testing.T, data []byte) []byte {
+	t.Helper()
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var facts any
+	if err := decoder.Decode(&facts); err != nil {
+		t.Fatalf("decode JSON facts: %v", err)
+	}
+	encoded, err := json.Marshal(canonicalizeFacts(facts))
+	if err != nil {
+		t.Fatalf("marshal JSON facts: %v", err)
+	}
+	return encoded
+}
+
+func decodeTOONFacts(t *testing.T, data []byte) []byte {
+	t.Helper()
+	facts, err := toon.Decode(data)
+	if err != nil {
+		t.Fatalf("decode TOON facts: %v", err)
+	}
+	encoded, err := json.Marshal(canonicalizeFacts(facts))
+	if err != nil {
+		t.Fatalf("marshal TOON facts: %v", err)
+	}
+	return encoded
+}
+
+func canonicalizeFacts(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			out[key] = canonicalizeFacts(item)
+		}
+		return out
+	case []any:
+		if typed == nil {
+			return []any{}
+		}
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = canonicalizeFacts(item)
+		}
+		return out
+	case json.Number:
+		return canonicalizeNumber(typed.String())
+	case float64:
+		return canonicalizeNumber(strconv.FormatFloat(typed, 'f', -1, 64))
+	case nil:
+		return []any{}
+	default:
+		return typed
+	}
+}
+
+func canonicalizeNumber(raw string) string {
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return raw
+	}
+	return strconv.FormatFloat(parsed, 'f', -1, 64)
 }
 
 func TestObservation_RenderCompactEscapesControlCharactersInStructuralFields(t *testing.T) {

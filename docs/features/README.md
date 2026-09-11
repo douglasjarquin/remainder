@@ -15,7 +15,7 @@ The issue #4 baseline is tracked in [performance baseline](performance-baseline.
 | Claude file collection | Implemented; native canary verified 2026-09-10 | [Claude source, selectors, and fixture coverage](claude.md) |
 | Grok file collection and mixed reports | Implemented; native canary unverified | [Grok source, scopes, and mixed reports](grok.md) |
 | Cursor CLI collection | Implemented; native certification is source-specific | [Cursor source, platform boundary, and fixture coverage](cursor.md) |
-| Compact, JSON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issue #3 |
+| Compact, JSON, TOON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issues #3 and #46 |
 | Codex remaining and pace semantics | Implemented | Per-window percentage pace with source-preserving inputs, exact scalar status, and all account/model/short constraints retained in issue #11 |
 | Cache and refresh ownership | Implemented | Issue #6 atomic observations and issue #7 cross-process success, forced-generation, and bounded failure coalescing use the same stable response lock |
 | Standalone Codex skill | Implemented in source | `skills/remainder/SKILL.md` delegates command discovery to Cobra help; `internal/cli/issue12_test.go` runs its ordinary-shell and direct Pinchos examples through a compiled deterministic fixture |

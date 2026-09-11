@@ -96,14 +96,14 @@ The process handles SIGINT through a context-owned interrupt path and returns th
 
 The default report is deterministic one-line compact output.
 
-Use `--format json` for the versioned JSON observation or `value --provider PROVIDER --profile PROFILE --window WINDOW --field remaining` for one scalar value.
+Use `--format json` for the versioned JSON observation, `--format toon` for the same facts as a TOON document, or `value --provider PROVIDER --profile PROFILE --window WINDOW --field remaining` for one scalar value.
 The scalar fields also include `reset`, `duration`, and `pace`.
 
 Pace is a per-window status calculated from the same observation used by compact, JSON, and scalar output.
 For a known percentage allowance with a duration and future reset, Remainder calculates `reserve percentage points = percentage remaining - cycle time remaining percentage` under an explicitly uniform budget assumption.
 A reserve below `-1` is `ahead`, meaning spending is faster than the uniform reserve; a reserve above `1` is `behind`, meaning spending is slower; the inclusive range from `-1` through `1` is `on_pace`.
 These names match the pinned [quota-axi pace calculation](https://github.com/kunchenguid/quota-axi/blob/d3190237588cdf51046b27a346ff2e834855bf37/src/pace.ts#L38-L69) and [threshold classifier](https://github.com/kunchenguid/quota-axi/blob/d3190237588cdf51046b27a346ff2e834855bf37/src/pace.ts#L414-L420).
-JSON and compact output preserve the calculation identity, calculation time, original observation time, remaining value, reset, duration, time remaining percentage, and reserve.
+JSON, compact, and TOON output preserve the calculation identity, calculation time, original observation time, remaining value, reset, duration, time remaining percentage, and reserve.
 The pace describes the original observation and is recomputed for each output after freshness classification; stale evidence, a reset that has passed by evaluation time, a future observation or implied cycle, or missing usage, duration, or reset produces `unknown` with a reason.
 Unlimited, unknown, and zero remaining remain distinct, and non-percentage windows have no pace calculation.
 Remainder does not combine account and model windows, choose an aggregate minimum across unlike pools, or fold paid credits into included allowance.
