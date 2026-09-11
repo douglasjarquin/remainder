@@ -9,6 +9,7 @@ Remainder is licensed under the [MIT License](../LICENSE).
 The [release readiness record](release-readiness.md) separates historical Codex and Cursor evidence from the Grok patch and the v0.2.2 build-target addition.
 Version v0.2.1 fixes Grok omitted zero values and includes the selected macOS Grok consumer file route alongside Codex and macOS Cursor.
 Version v0.2.2 adds a Linux x86_64 (`linux_amd64`) build target to the packaging and verification scripts; no source behavior changed for any provider or platform. It ships a `linux_amd64` archive only — `darwin_arm64` and `linux_arm64` users see no functional difference and can keep using the immutable v0.2.1 assets for those platforms until they are rebuilt at a later version.
+The next release moves the executable to `bin/remainder` inside the archive — a breaking archive-layout change tracked in [issue #42](https://github.com/douglasjarquin/remainder/issues/42): a version manager that installs a GitHub release by extracting the archive, such as mise's `github:` backend, otherwise treats every root entry, including `docs/` and `skills/`, as an installed binary. Releases v0.1.0 through v0.2.2 keep the executable at the archive root and are not retroactively changed; only releases after v0.2.2 use the `bin/` layout.
 Claude and Linux Cursor native routes remain unverified.
 Publishing requires independent final verification and a version-specific verification record.
 Use [GitHub Releases](https://github.com/douglasjarquin/remainder/releases) to find approved assets and their verification records.
@@ -44,7 +45,7 @@ tar -xzf "$asset"
 
 On macOS ARM64 or Linux ARM64, follow the [v0.2.1 instructions](https://github.com/douglasjarquin/remainder/releases/tag/v0.2.1) instead (`remainder_v0.2.1_darwin_arm64.tar.gz` or `remainder_v0.2.1_linux_arm64.tar.gz`, `shasum -a 256 -c` on macOS).
 
-Run the extracted binary in place first.
+Run the extracted binary in place first: `bin/remainder` for releases after v0.2.2, or `remainder` at the archive root for v0.2.2 and earlier (see the archive-layout note above).
 Copy it to a user-selected versioned directory only after it passes `--version` and `--help`.
 Copy `skills/remainder` to a user-selected Codex skill directory only with permission to create or replace that location.
 The archive does not require Go, Cobra, a Cobra generator, Node, Python, jq, Sum, Herdr, Pinchos, or a daemon at runtime.
@@ -59,6 +60,14 @@ The v0.1.0, v0.2.0, and v0.2.1 tags, assets, and checksum files remain immutable
 Use mise's explicit `github:douglasjarquin/remainder` backend.
 The v0.2.2 release's `mise.toml` pins version `0.2.2` for the `linux-x64` platform only (its `darwin_arm64`/`linux_arm64` archives were not rebuilt at this version); macOS ARM64 and Linux ARM64 hosts should keep using the v0.2.1 `mise.toml`.
 It strips the archive's single outer directory so the executable is available at the installation root.
+Starting with the first release built after v0.2.2, the executable lives at `bin/remainder` inside that stripped directory, so the `[tools]` entry also needs mise's `bin_path` option; setting `bin_path` disables mise's automatic outer-directory stripping, so pair it with an explicit `strip_components = 1`:
+
+```toml
+[tools]
+"github:douglasjarquin/remainder" = { version = "X.Y.Z", strip_components = 1, bin_path = "bin" }
+```
+
+The published v0.2.2 (and v0.2.1) `mise.toml` releases omit `bin_path` because those archives still place the executable at the installation root; download and use the `mise.toml` asset published with the release you are installing rather than hand-writing this table.
 From a separate new temporary directory, download and use that configuration:
 
 ```sh
