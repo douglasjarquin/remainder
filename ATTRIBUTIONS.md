@@ -17,8 +17,7 @@ The module sums and source-relative license paths bind each record to the downlo
 The runtime-linked records are present in the supported executable dependency graph.
 Mousetrap is linked only for Cobra's Windows command implementation.
 go-toon is linked for `--format toon`.
-The Git tag v4.1.1 on that module matches toon-format/spec v4.1.1.
-Go modules cannot consume a v4 tag from module path github.com/douglasjarquin/go-toon, so Remainder pins the matching commit as a v0 pseudo-version.
+go-toon has no published module tag, so Remainder pins reviewed commit a2d441264455158c32498a94acc998ab6edc3cbe as a v0 pseudo-version.
 The module-only records are required graph metadata for Cobra's documentation or test dependencies and are not linked by Remainder binaries.
 
 ~~~json
@@ -45,7 +44,6 @@ The module-only records are required graph metadata for Cobra's documentation or
     "scope": "runtime-linked on all supported builds",
     "source": "https://github.com/douglasjarquin/go-toon/tree/a2d441264455158c32498a94acc998ab6edc3cbe",
     "source_commit": "a2d441264455158c32498a94acc998ab6edc3cbe",
-    "source_tag": "v4.1.1",
     "license_type": "MIT",
     "license_files": [
       {
@@ -356,7 +354,7 @@ SHA-256: 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283.
 
 Runtime scope: runtime-linked on all supported builds.
 
-Source: https://github.com/douglasjarquin/go-toon/tree/a2d441264455158c32498a94acc998ab6edc3cbe; source commit a2d441264455158c32498a94acc998ab6edc3cbe; git tag v4.1.1 matches toon-format/spec v4.1.1.
+Source: https://github.com/douglasjarquin/go-toon/tree/a2d441264455158c32498a94acc998ab6edc3cbe; source commit a2d441264455158c32498a94acc998ab6edc3cbe.
 
 #### LICENSE (MIT)
 
