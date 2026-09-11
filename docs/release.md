@@ -9,7 +9,8 @@ Remainder is licensed under the [MIT License](../LICENSE).
 The [release readiness record](release-readiness.md) separates historical Codex and Cursor evidence from the Grok patch and the v0.2.2 build-target addition.
 Version v0.2.1 fixes Grok omitted zero values and includes the selected macOS Grok consumer file route alongside Codex and macOS Cursor.
 Version v0.2.2 adds a Linux x86_64 (`linux_amd64`) build target to the packaging and verification scripts; no source behavior changed for any provider or platform. It ships a `linux_amd64` archive only — `darwin_arm64` and `linux_arm64` users see no functional difference and can keep using the immutable v0.2.1 assets for those platforms until they are rebuilt at a later version.
-Claude and Linux Cursor native routes remain unverified.
+Version v0.2.3 adds the opt-in macOS Keychain fallback for Claude credentials and ships a `darwin_arm64` archive only; `linux_amd64` stays at v0.2.2 and `linux_arm64` at v0.2.1, and neither contains the fallback.
+The Claude macOS routes are now both natively verified; the Linux Cursor native route remains unverified.
 Publishing requires independent final verification and a version-specific verification record.
 Use [GitHub Releases](https://github.com/douglasjarquin/remainder/releases) to find approved assets and their verification records.
 

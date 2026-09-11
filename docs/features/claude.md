@@ -1,6 +1,6 @@
 # Claude file collection
 
-Status: implemented with controlled file and HTTP fixtures; file-route native canary verified; macOS Keychain fallback has controlled fixtures only, native canary not yet verified.
+Status: implemented with controlled file and HTTP fixtures; the file route and the macOS Keychain fallback both passed native canaries.
 The authorized default credential file was absent during the 2026-09-09 preflight; on 2026-09-10 the same selected `default` route was authorized and exercised against a real installed and authenticated Claude Code CLI (`~/.local/bin/claude` 2.1.267) on `host-development.douglasjarquin.i-09b74c2aaae0cbbb8` (Linux).
 This source increment does not change the released v0.1.0 Codex artifact.
 
