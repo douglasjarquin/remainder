@@ -16,6 +16,9 @@ The module sums and source-relative license paths bind each record to the downlo
 
 The runtime-linked records are present in the supported executable dependency graph.
 Mousetrap is linked only for Cobra's Windows command implementation.
+go-toon is linked for `--format toon`.
+The Git tag v4.1.1 on that module matches toon-format/spec v4.1.1.
+Go modules cannot consume a v4 tag from module path github.com/douglasjarquin/go-toon, so Remainder pins the matching commit as a v0 pseudo-version.
 The module-only records are required graph metadata for Cobra's documentation or test dependencies and are not linked by Remainder binaries.
 
 ~~~json
@@ -35,6 +38,23 @@ The module-only records are required graph metadata for Cobra's documentation or
     ],
     "module_sum": "h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=",
     "go_mod_sum": "h1:7C1pvHqHw5A4vrJfjNwvOdzYu0Gml16OCs2GRiTUUS4="
+  },
+  {
+    "module": "github.com/douglasjarquin/go-toon",
+    "version": "v0.0.0-20260910175100-a2d441264455",
+    "scope": "runtime-linked on all supported builds",
+    "source": "https://github.com/douglasjarquin/go-toon/tree/a2d441264455158c32498a94acc998ab6edc3cbe",
+    "source_commit": "a2d441264455158c32498a94acc998ab6edc3cbe",
+    "source_tag": "v4.1.1",
+    "license_type": "MIT",
+    "license_files": [
+      {
+        "path": "LICENSE",
+        "sha256": "7342bc565630e1dccb6b0b31fa44f150774aef0632a10d8083f0bede1a0148f8"
+      }
+    ],
+    "module_sum": "h1:zn4kqY77W2hKyPXu7EnXfM6cfTNWH7hezmkys9wVH6A=",
+    "go_mod_sum": "h1:y+y+0A3zsAJsEuUS+k3VAzAV3slxWODlXWPpOuuDTrY="
   },
   {
     "module": "github.com/spf13/pflag",
@@ -330,6 +350,41 @@ SHA-256: 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283.
       defend, and hold each Contributor harmless for any liability
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
+~~~
+
+### github.com/douglasjarquin/go-toon v0.0.0-20260910175100-a2d441264455
+
+Runtime scope: runtime-linked on all supported builds.
+
+Source: https://github.com/douglasjarquin/go-toon/tree/a2d441264455158c32498a94acc998ab6edc3cbe; source commit a2d441264455158c32498a94acc998ab6edc3cbe; git tag v4.1.1 matches toon-format/spec v4.1.1.
+
+#### LICENSE (MIT)
+
+SHA-256: 7342bc565630e1dccb6b0b31fa44f150774aef0632a10d8083f0bede1a0148f8.
+
+~~~text
+MIT License
+
+Copyright (c) 2025-PRESENT Bintang Pradana Erlangga Putra
+Copyright (c) 2025-PRESENT Johann Schopplich
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ~~~
 
 ### github.com/spf13/pflag v1.0.9
