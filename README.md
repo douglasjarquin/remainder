@@ -41,7 +41,7 @@ The process handles SIGINT through a context-owned interrupt path and returns th
 
 The default report is deterministic one-line compact output.
 
-Use `--format json` for the versioned JSON observation or `value --provider PROVIDER --profile PROFILE --window WINDOW --field remaining` for one scalar value.
+Use `--format json` for the versioned JSON observation, `--format toon` for the same facts as a TOON document, or `value --provider PROVIDER --profile PROFILE --window WINDOW --field remaining` for one scalar value.
 
 Use `--freshness any` to allow stale evidence or `--freshness fresh` to reject stale and unknown freshness.
 

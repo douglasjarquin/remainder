@@ -7,6 +7,7 @@ Status: implemented for deterministic local fixtures and unavailable runtime beh
 - `remainder --help` exposes the root report flags and the `value` command.
 - `remainder --format compact` renders one deterministic compact observation.
 - `remainder --format json` renders one versioned JSON observation.
+- `remainder --format toon` renders one TOON document of the same facts JSON preserves.
 - `remainder value --provider PROVIDER --profile PROFILE --window WINDOW --field FIELD` emits one exact scalar value.
 - `internal/cli/run.go` owns Cobra parsing, adapter calls, output routing, and exit semantics.
 - `internal/evidence/evidence.go`, `internal/evidence/parse.go`, `internal/evidence/render.go`, and `internal/evidence/select.go` own the typed observation, parsing, projections, and exact selection.
@@ -19,6 +20,7 @@ Status: implemented for deterministic local fixtures and unavailable runtime beh
 | quota-invalid | Invalid freshness and incomplete value selection fail with exit 2, stderr diagnostics, and no usage text. | automated `internal/cli/issue3_test.go` and `bin/remainder --freshness ignored` | `artifacts/issue-3/cli/final-invalid.stderr` |
 | quota-compact | Compact output is deterministic, escaped, age-aware, and limited to the requested weekly model scope. | automated `internal/evidence/evidence_test.go` and `internal/cli/issue3_test.go` | `artifacts/issue-3/green-compact-cli.txt` |
 | quota-json | JSON preserves schema, source, account, freshness, outcome, failures, windows, units, values, resets, and durations. | automated `internal/evidence/evidence_test.go` and `internal/cli/issue3_test.go` | `go test -race -shuffle=on -count=1 ./...` |
+| quota-toon | TOON preserves the same facts as JSON for healthy, zero, unknown, stale-disallowed, partial `--all`, and invalid `--format` cases. | automated `internal/evidence/evidence_test.go` and `internal/cli/issue46_test.go` | `go test -race -shuffle=on -count=1 ./...` |
 | quota-scalar | Exact scalar selection emits defined and zero values plus unlimited state, while unknown, stale, wrong-account, and ambiguous data fail. | automated `internal/evidence/evidence_test.go` and `internal/cli/issue3_test.go` | `artifacts/issue-3/green-focused-tests.txt` |
 | quota-malformed | Malformed timestamps and duplicate IDs are rejected before a value can be emitted. | automated `internal/evidence/evidence_test.go` | `artifacts/issue-3/green-focused-tests.txt` |
 | quota-partial | Partial evidence is rendered as data and returns a distinct exit 3 with one stderr diagnostic. | automated `internal/cli/issue3_test.go` | `artifacts/issue-3/green-focused-tests.txt` |

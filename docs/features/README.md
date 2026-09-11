@@ -10,7 +10,7 @@ The issue #3 contract is tracked in [quota evidence](quota-evidence.md).
 | Honest unavailable-provider result | Implemented | CLI test and default invocation return a nonzero exit without a fake report |
 | Provider source feasibility | Source review complete; live routes unrun | [Provider source matrix](../provider-sources.md); issue #15 requires an authorized Codex lab before the Codex release |
 | Provider collection | Planned | Issue #5 starts after the output contract and credential route are proven |
-| Compact, JSON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issue #3 |
+| Compact, JSON, TOON, and scalar output | Implemented | Typed observations, deterministic renderers, exact selectors, and Cobra entrypoint tests in issues #3 and #46 |
 | Cache and refresh ownership | Planned | Issues #6 and #7 define these boundaries |
 | Supported macOS/Linux verification | Implemented | `.github/workflows/ci.yml` uses macOS 14 and Ubuntu 24.04 |
 | Startup and allocation baseline | Implemented | `scripts/benchmark.sh` and `internal/cli/cli_bench_test.go` record raw samples |

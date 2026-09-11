@@ -97,7 +97,7 @@ func newRoot(version string, stdout, stderr io.Writer, adapter Adapter) *cobra.C
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().String("format", "compact", "output format: compact or json")
+	root.PersistentFlags().String("format", "compact", "output format: compact, json, or toon")
 	root.PersistentFlags().String("provider", "", "exact provider selection")
 	root.PersistentFlags().String("profile", "", "exact profile selection")
 	root.PersistentFlags().String("window", "", "exact window selection")
@@ -146,7 +146,7 @@ func readOptions(cmd *cobra.Command, valueCommand bool) (options, error) {
 	if err != nil {
 		return options{}, fmt.Errorf("%w: format: %v", ErrUsage, err)
 	}
-	if format != "compact" && format != "json" {
+	if format != "compact" && format != "json" && format != "toon" {
 		return options{}, fmt.Errorf("%w: unsupported format %q", ErrUsage, format)
 	}
 	provider, err := cmd.Flags().GetString("provider")
@@ -211,7 +211,8 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options) error {
 	if err != nil {
 		return err
 	}
-	if opts.format == "json" {
+	switch opts.format {
+	case "json":
 		output, err := evidence.RenderJSON(observation)
 		if err != nil {
 			return err
@@ -219,7 +220,15 @@ func runReport(cmd *cobra.Command, adapter Adapter, opts options) error {
 		if _, err := cmd.OutOrStdout().Write(append(output, '\n')); err != nil {
 			return fmt.Errorf("write JSON: %w", err)
 		}
-	} else {
+	case "toon":
+		output, err := evidence.RenderTOON(observation)
+		if err != nil {
+			return err
+		}
+		if _, err := cmd.OutOrStdout().Write(append(output, '\n')); err != nil {
+			return fmt.Errorf("write TOON: %w", err)
+		}
+	default:
 		output, err := evidence.RenderCompact(observation, time.Now().UTC())
 		if err != nil {
 			return err

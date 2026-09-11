@@ -80,9 +80,9 @@ Do not remove the verification run directory or its evidence during teardown.
 
 Changes to this contract, `mise.toml`, `.agents/skills/verify/`, `.agents/skills/evidence/`, `.agents/skills/maintain-verification/`, or the feature maps require independent root review.
 
-This policy does not authorize provider collection, authentication, cache implementation, or any runtime dependency beyond the pinned Cobra graph.
+This policy does not authorize provider collection, authentication, cache implementation, or any runtime dependency beyond the pinned Cobra and go-toon graph.
 
-It checks formatting, `go vet`, race-enabled shuffled tests, the reviewed Cobra dependency/import contract, and a CGO-free release-like build.
+It checks formatting, `go vet`, race-enabled shuffled tests, the reviewed Cobra and go-toon dependency/import contract, and a CGO-free release-like build.
 
 Before running offline verification from a fresh checkout or empty module cache, prime the exact versions already recorded in `go.mod` and `go.sum` once with the network-enabled setup command:
 

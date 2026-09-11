@@ -22,7 +22,7 @@ The project is positioned for personal use by its maintainer.
 ## Constraints
 
 - Go 1.27.1 is the canonical developer and CI toolchain pin.
-- Runtime and ordinary tests use the Go standard library plus the pinned Cobra graph.
+- Runtime and ordinary tests use the Go standard library plus the pinned Cobra and go-toon graph.
 - Release-like builds use `CGO_ENABLED=0`.
 - The CLI performs no credential, cache, network, telemetry, or provider access.
 - Future provider commands must preserve the one-shot CLI contract and honest unavailable behavior.
