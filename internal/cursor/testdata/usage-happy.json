@@ -1,0 +1,14 @@
+{
+  "billingCycleStart": "2026-08-15T00:00:00Z",
+  "billingCycleEnd": "2026-09-15T00:00:00Z",
+  "planUsage": {
+    "totalPercentUsed": 25,
+    "autoPercentUsed": 50,
+    "apiPercentUsed": 0
+  },
+  "spendLimitUsage": {
+    "individualLimit": 2000,
+    "individualRemaining": 1250,
+    "individualUsed": 750
+  }
+}

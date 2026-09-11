@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	"bytes"
 	"encoding/json"
 	"sort"
 	"strconv"
@@ -38,6 +39,9 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 		limitParts := make([]string, 0, len(limits))
 		for _, limit := range limits {
 			part := safeToken(string(limit.Field)) + "=" + formatValue(limit, safeToken(window.Unit))
+			if limit.Value.State != ValueDefined && limit.Value.State != ValueZero && window.Unit != "" {
+				part += " unit=" + safeToken(window.Unit)
+			}
 			if limit.ResetAt != nil {
 				part += " reset=" + limit.ResetAt.Format(time.RFC3339Nano)
 			}
@@ -46,7 +50,11 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 			}
 			limitParts = append(limitParts, part)
 		}
-		windowParts = append(windowParts, safeToken(string(window.ID))+"/"+safeToken(string(window.Scope))+":"+strings.Join(limitParts, ","))
+		part := safeToken(string(window.ID)) + "/" + safeToken(string(window.Scope)) + ":" + strings.Join(limitParts, ",")
+		if window.Pace != nil {
+			part += " " + formatPace(*window.Pace, safeToken(window.Unit))
+		}
+		windowParts = append(windowParts, part)
 	}
 	parts = append(parts, "windows="+strings.Join(windowParts, ";"))
 	if len(observation.Failures) > 0 {
@@ -57,6 +65,36 @@ func RenderCompact(observation Observation, now time.Time) (string, error) {
 		parts = append(parts, "failures="+strings.Join(failures, ","))
 	}
 	return strings.Join(parts, " "), nil
+}
+
+func formatPace(pace Pace, unit string) string {
+	parts := []string{
+		"pace=" + safeToken(string(pace.Status)),
+		"pace_calculation=" + safeToken(pace.Calculation),
+		"pace_calculated_at=" + pace.CalculatedAt.Format(time.RFC3339Nano),
+		"pace_observed_at=" + pace.Inputs.ObservedAt.Format(time.RFC3339Nano),
+		"pace_remaining=" + formatPaceValue(pace.Inputs.Remaining, unit),
+	}
+	if pace.Reason != "" {
+		parts = append(parts, "pace_reason="+safeToken(pace.Reason))
+	}
+	if pace.Inputs.ResetAt != nil {
+		parts = append(parts, "pace_reset="+pace.Inputs.ResetAt.Format(time.RFC3339Nano))
+	}
+	if pace.Inputs.Duration != nil {
+		parts = append(parts, "pace_duration="+pace.Inputs.Duration.String())
+	}
+	if pace.TimeRemainingPercent != nil {
+		parts = append(parts, "pace_time_remaining="+pace.TimeRemainingPercent.String()+"percent")
+	}
+	if pace.ReservePercentPoints != nil {
+		parts = append(parts, "pace_reserve="+pace.ReservePercentPoints.String()+"percentage_points")
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatPaceValue(value Value, unit string) string {
+	return formatValue(Limit{Value: value}, unit)
 }
 
 func safeToken(value string) string {
@@ -87,88 +125,80 @@ func formatValue(limit Limit, unit string) string {
 }
 
 type jsonObservation struct {
-	SchemaVersion string        `json:"schema_version" toon:"schema_version"`
-	Provider      string        `json:"provider" toon:"provider"`
-	Profile       string        `json:"profile" toon:"profile"`
-	Account       jsonAccount   `json:"account" toon:"account"`
-	Source        jsonSource    `json:"source" toon:"source"`
-	ObservedAt    string        `json:"observed_at" toon:"observed_at"`
-	SourceAt      *string       `json:"source_at,omitempty" toon:"source_at,omitempty"`
-	Freshness     string        `json:"freshness" toon:"freshness"`
-	Outcome       string        `json:"outcome" toon:"outcome"`
-	Windows       []jsonWindow  `json:"windows" toon:"windows"`
-	Failures      []jsonFailure `json:"failures,omitempty" toon:"failures,omitempty"`
-}
-
-type jsonAccount struct {
-	LastObserved string `json:"last_observed" toon:"last_observed"`
-	Binding      string `json:"binding" toon:"binding"`
-}
-
-type jsonSource struct {
-	Kind string `json:"kind" toon:"kind"`
-	Name string `json:"name" toon:"name"`
-}
-
-type jsonFailure struct {
-	Scope   string `json:"scope" toon:"scope"`
-	Message string `json:"message" toon:"message"`
+	SchemaVersion string          `json:"schema_version"`
+	Provider      Provider        `json:"provider"`
+	Profile       Profile         `json:"profile"`
+	Account       AccountIdentity `json:"account"`
+	Source        SourceIdentity  `json:"source"`
+	ObservedAt    string          `json:"observed_at"`
+	SourceAt      *string         `json:"source_at,omitempty"`
+	Freshness     Freshness       `json:"freshness"`
+	Outcome       Outcome         `json:"outcome"`
+	Windows       []jsonWindow    `json:"windows"`
+	Failures      []Failure       `json:"failures,omitempty"`
 }
 
 type jsonWindow struct {
-	ID     string      `json:"id" toon:"id"`
-	Scope  string      `json:"scope" toon:"scope"`
-	Unit   string      `json:"unit" toon:"unit"`
-	Limits []jsonLimit `json:"limits" toon:"limits"`
+	ID     WindowID    `json:"id"`
+	Scope  Scope       `json:"scope"`
+	Unit   string      `json:"unit"`
+	Limits []jsonLimit `json:"limits"`
+	Pace   *jsonPace   `json:"pace,omitempty"`
+}
+
+type jsonPace struct {
+	Status               PaceStatus     `json:"status"`
+	Reason               string         `json:"reason,omitempty"`
+	Calculation          string         `json:"calculation"`
+	CalculatedAt         string         `json:"calculated_at"`
+	Inputs               jsonPaceInputs `json:"inputs"`
+	TimeRemainingPercent *json.Number   `json:"time_remaining_percent,omitempty"`
+	ReservePercentPoints *json.Number   `json:"reserve_percent_points,omitempty"`
+}
+
+type jsonPaceInputs struct {
+	ObservedAt string  `json:"observed_at"`
+	Remaining  Value   `json:"remaining"`
+	ResetAt    *string `json:"reset_at,omitempty"`
+	Duration   *string `json:"duration,omitempty"`
 }
 
 type jsonLimit struct {
-	ID       string  `json:"id" toon:"id"`
-	Field    string  `json:"field" toon:"field"`
-	State    string  `json:"state" toon:"state"`
-	Amount   any     `json:"amount,omitempty" toon:"amount,omitempty"`
-	ResetAt  *string `json:"reset_at,omitempty" toon:"reset_at,omitempty"`
-	Duration *string `json:"duration,omitempty" toon:"duration,omitempty"`
+	ID       string       `json:"id"`
+	Field    Field        `json:"field"`
+	State    ValueState   `json:"state"`
+	Amount   *json.Number `json:"amount,omitempty"`
+	ResetAt  *string      `json:"reset_at,omitempty"`
+	Duration *string      `json:"duration,omitempty"`
 }
 
-func reportDocument(observation Observation) jsonObservation {
+func RenderJSON(observation Observation) ([]byte, error) {
+	if err := observation.Validate(); err != nil {
+		return nil, err
+	}
 	result := jsonObservation{
 		SchemaVersion: observation.SchemaVersion,
-		Provider:      string(observation.Provider),
-		Profile:       string(observation.Profile),
-		Account: jsonAccount{
-			LastObserved: observation.Account.LastObserved,
-			Binding:      string(observation.Account.Binding),
-		},
-		Source: jsonSource{
-			Kind: observation.Source.Kind,
-			Name: observation.Source.Name,
-		},
-		ObservedAt: observation.ObservedAt.Format(time.RFC3339Nano),
-		Freshness:  string(observation.Freshness),
-		Outcome:    string(observation.Outcome),
+		Provider:      observation.Provider,
+		Profile:       observation.Profile,
+		Account:       observation.Account,
+		Source:        observation.Source,
+		ObservedAt:    observation.ObservedAt.Format(time.RFC3339Nano),
+		Freshness:     observation.Freshness,
+		Outcome:       observation.Outcome,
+		Failures:      observation.Failures,
 	}
 	if observation.SourceAt != nil {
 		value := observation.SourceAt.Format(time.RFC3339Nano)
 		result.SourceAt = &value
-	}
-	if len(observation.Failures) > 0 {
-		result.Failures = make([]jsonFailure, 0, len(observation.Failures))
-		for _, failure := range observation.Failures {
-			result.Failures = append(result.Failures, jsonFailure{Scope: failure.Scope, Message: failure.Message})
-		}
 	}
 	windows := append([]Window(nil), observation.Windows...)
 	sort.Slice(windows, func(i, j int) bool { return windows[i].ID < windows[j].ID })
 	for _, window := range windows {
 		limits := append([]Limit(nil), window.Limits...)
 		sort.Slice(limits, func(i, j int) bool { return limits[i].ID < limits[j].ID })
-		parsed := jsonWindow{ID: string(window.ID), Scope: string(window.Scope), Unit: window.Unit}
+		parsed := jsonWindow{ID: window.ID, Scope: window.Scope, Unit: window.Unit}
 		for _, limit := range limits {
-			item := jsonLimit{ID: limit.ID, Field: string(limit.Field), State: string(limit.Value.State)}
-			if limit.Value.Amount != nil {
-				item.Amount = *limit.Value.Amount
-			}
+			item := jsonLimit{ID: limit.ID, Field: limit.Field, State: limit.Value.State, Amount: limit.Value.Amount}
 			if limit.ResetAt != nil {
 				value := limit.ResetAt.Format(time.RFC3339Nano)
 				item.ResetAt = &value
@@ -179,21 +209,45 @@ func reportDocument(observation Observation) jsonObservation {
 			}
 			parsed.Limits = append(parsed.Limits, item)
 		}
+		if window.Pace != nil {
+			parsed.Pace = renderJSONPace(*window.Pace)
+		}
 		result.Windows = append(result.Windows, parsed)
 	}
-	return result
-}
-
-func RenderJSON(observation Observation) ([]byte, error) {
-	if err := observation.Validate(); err != nil {
-		return nil, err
-	}
-	return json.Marshal(reportDocument(observation))
+	return json.Marshal(result)
 }
 
 func RenderTOON(observation Observation) ([]byte, error) {
-	if err := observation.Validate(); err != nil {
+	encoded, err := RenderJSON(observation)
+	if err != nil {
 		return nil, err
 	}
-	return toon.Marshal(reportDocument(observation))
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.UseNumber()
+	var facts any
+	if err := decoder.Decode(&facts); err != nil {
+		return nil, err
+	}
+	return toon.Marshal(facts)
+}
+
+func renderJSONPace(pace Pace) *jsonPace {
+	result := &jsonPace{
+		Status:               pace.Status,
+		Reason:               pace.Reason,
+		Calculation:          pace.Calculation,
+		CalculatedAt:         pace.CalculatedAt.Format(time.RFC3339Nano),
+		Inputs:               jsonPaceInputs{ObservedAt: pace.Inputs.ObservedAt.Format(time.RFC3339Nano), Remaining: pace.Inputs.Remaining},
+		TimeRemainingPercent: pace.TimeRemainingPercent,
+		ReservePercentPoints: pace.ReservePercentPoints,
+	}
+	if pace.Inputs.ResetAt != nil {
+		value := pace.Inputs.ResetAt.Format(time.RFC3339Nano)
+		result.Inputs.ResetAt = &value
+	}
+	if pace.Inputs.Duration != nil {
+		value := pace.Inputs.Duration.String()
+		result.Inputs.Duration = &value
+	}
+	return result
 }

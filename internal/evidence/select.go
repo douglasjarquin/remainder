@@ -63,6 +63,9 @@ func SelectValue(observation Observation, request ValueRequest, policy Freshness
 	if request.Account != "" && (observation.Account.LastObserved != request.Account || observation.Account.Binding == IdentityMismatch) {
 		return "", ErrWrongAccount
 	}
+	if request.Field == FieldPace {
+		return selectPace(observation, request)
+	}
 	var matches []Limit
 	for _, window := range observation.Windows {
 		if (request.Window != "" && window.ID != request.Window) || (request.Scope != "" && window.Scope != request.Scope) {
@@ -106,4 +109,24 @@ func SelectValue(observation Observation, request ValueRequest, policy Freshness
 	default:
 		return "", fmt.Errorf("%w: unknown state %q", ErrUndefined, value.Value.State)
 	}
+}
+
+func selectPace(observation Observation, request ValueRequest) (string, error) {
+	var matches []*Pace
+	for _, window := range observation.Windows {
+		if (request.Window != "" && window.ID != request.Window) || (request.Scope != "" && window.Scope != request.Scope) {
+			continue
+		}
+		matches = append(matches, window.Pace)
+	}
+	if len(matches) == 0 {
+		return "", ErrNoMatch
+	}
+	if len(matches) > 1 {
+		return "", ErrAmbiguous
+	}
+	if matches[0] == nil || matches[0].Status == PaceUnknown || matches[0].Status == PaceNotApplicable {
+		return "", ErrUndefined
+	}
+	return string(matches[0].Status) + "\n", nil
 }

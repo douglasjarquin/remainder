@@ -66,13 +66,24 @@ func TestExecuteRejectsUnknownFlag(t *testing.T) {
 	}
 }
 
-func TestExecuteRefusesQuotaUntilProviderExists(t *testing.T) {
+func TestExecuteRejectsKeychainPromptForUnsupportedProvider(t *testing.T) {
+	adapter := &fixtureAdapter{observation: benchmarkObservation()}
+	var stdout, stderr bytes.Buffer
+
+	code := executeWithAdapter(t.Context(), []string{"--provider=codex", "--allow-keychain-prompt"}, &stdout, &stderr, "test", adapter)
+
+	if code != 2 || adapter.calls != 0 || stdout.Len() != 0 || !bytes.Contains(stderr.Bytes(), []byte("--allow-keychain-prompt requires --provider cursor, --provider claude, or --all")) {
+		t.Fatalf("code=%d calls=%d stdout=%q stderr=%q", code, adapter.calls, stdout.String(), stderr.String())
+	}
+}
+
+func TestExecuteRequiresProviderSelectionForQuota(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Execute(context.Background(), nil, &stdout, &stderr, "v0.1.0")
 	if code == 0 {
 		t.Fatal("Execute() exit code = 0, want unavailable-provider failure")
 	}
-	if !bytes.Contains(stderr.Bytes(), []byte("no provider is implemented")) {
+	if !bytes.Contains(stderr.Bytes(), []byte("quota is unavailable; select a supported provider")) {
 		t.Fatalf("stderr = %q, want unavailable-provider message", stderr.String())
 	}
 	if stdout.Len() != 0 {

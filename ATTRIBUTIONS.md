@@ -2,12 +2,17 @@
 
 Remainder is an independent implementation.
 
-The proposed project MIT license remains in LICENSE_PROPOSAL.md for owner review.
-Nothing in this file adopts that proposal as Remainder's license.
+Remainder is licensed under the MIT License in [LICENSE](LICENSE).
 
 The roadmap and product direction were informed by the positive prior work in [quota-axi](https://github.com/kunchenguid/quota-axi).
 
 Remainder does not copy quota-axi source, depend on its binaries, or imply that quota-axi endorses this project.
+
+The native Codex source contract was researched against [quota-axi revision d3190237588cdf51046b27a346ff2e834855bf37](https://github.com/kunchenguid/quota-axi/tree/d3190237588cdf51046b27a346ff2e834855bf37) and [OpenAI Codex revision 283f34387b7e16bd524d8f3a431f77aa7395471d](https://github.com/openai/codex/tree/283f34387b7e16bd524d8f3a431f77aa7395471d).
+The Claude file source contract was researched against [quota-axi revision a19268827220e12e173067d11703e6ee36d5d88f](https://github.com/kunchenguid/quota-axi/blob/a19268827220e12e173067d11703e6ee36d5d88f/src/providers/claude.ts).
+The Grok file and consumer RPC contract was researched against [quota-axi revision a19268827220e12e173067d11703e6ee36d5d88f](https://github.com/kunchenguid/quota-axi/blob/a19268827220e12e173067d11703e6ee36d5d88f/src/providers/grok.ts).
+The Cursor CLI credential routes and quota schemas were researched against the same pinned [Cursor provider](https://github.com/kunchenguid/quota-axi/blob/a19268827220e12e173067d11703e6ee36d5d88f/src/providers/cursor.ts) and [CLI credential helper](https://github.com/kunchenguid/quota-axi/blob/a19268827220e12e173067d11703e6ee36d5d88f/src/providers/cursor-cli-credential.ts).
+These are source-contract references, not additional runtime dependencies; the [provider source matrix](docs/provider-sources.md) records the route and its observed limits.
 
 ## Pinned dependency provenance
 

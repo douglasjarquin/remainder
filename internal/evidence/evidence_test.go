@@ -81,7 +81,7 @@ func TestObservation_RenderersPreserveTypedFacts(t *testing.T) {
 	if string(toonOne) != string(toonTwo) {
 		t.Fatalf("RenderTOON() is not deterministic: %q != %q", toonOne, toonTwo)
 	}
-	wantTOON := "schema_version: v1\nprovider: \"codex\\nprod\"\nprofile: main\naccount:\n  last_observed: acct-1\n  binding: historical\nsource:\n  kind: fixture\n  name: local\nobserved_at: \"2026-03-08T07:00:00Z\"\nfreshness: fresh\noutcome: complete\nwindows[2]:\n  - id: daily\n    scope: account\n    unit: tokens\n    limits[1]{id,field,state,amount}:\n      daily-remaining,remaining,zero,0\n  - id: weekly\n    scope: model\n    unit: tokens\n    limits[1]{id,field,state,amount,reset_at}:\n      weekly-remaining,remaining,defined,42,\"2026-03-08T08:00:00Z\""
+	wantTOON := "account:\n  binding: historical\n  last_observed: acct-1\nfreshness: fresh\nobserved_at: \"2026-03-08T07:00:00Z\"\noutcome: complete\nprofile: main\nprovider: \"codex\\nprod\"\nschema_version: v1\nsource:\n  kind: fixture\n  name: local\nwindows[2]:\n  - id: daily\n    limits[1]{amount,field,id,state}:\n      0,remaining,daily-remaining,zero\n    scope: account\n    unit: tokens\n  - id: weekly\n    limits[1]{amount,field,id,reset_at,state}:\n      42,remaining,weekly-remaining,\"2026-03-08T08:00:00Z\",defined\n    scope: model\n    unit: tokens"
 	if string(toonOne) != wantTOON {
 		t.Fatalf("RenderTOON() = %q, want %q", toonOne, wantTOON)
 	}
@@ -256,6 +256,28 @@ func TestObservation_RenderCompactEscapesControlCharactersInStructuralFields(t *
 	}
 	if strings.ContainsAny(got, "\r\n\t") {
 		t.Fatalf("RenderCompact() contains raw control characters: %q", got)
+	}
+}
+
+func TestObservation_RenderCompactPreservesUnitForUnknownValue(t *testing.T) {
+	obs := evidence.Observation{
+		SchemaVersion: evidence.SchemaV1,
+		Provider:      "codex",
+		Profile:       "main",
+		ObservedAt:    time.Date(2026, time.March, 8, 7, 0, 0, 0, time.UTC),
+		Freshness:     evidence.FreshFresh,
+		Outcome:       evidence.OutcomePartial,
+		Windows: []evidence.Window{{
+			ID: "weekly", Scope: evidence.ScopeModel, Unit: "tokens",
+			Limits: []evidence.Limit{{ID: "remaining", Field: evidence.FieldRemaining, Value: evidence.Value{State: evidence.ValueUnknown}}},
+		}},
+	}
+	got, err := evidence.RenderCompact(obs, obs.ObservedAt)
+	if err != nil {
+		t.Fatalf("RenderCompact() error = %v", err)
+	}
+	if !strings.Contains(got, "remaining=unknown unit=tokens") {
+		t.Fatalf("RenderCompact() = %q, want unknown value unit", got)
 	}
 }
 

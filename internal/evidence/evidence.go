@@ -3,6 +3,8 @@ package evidence
 import (
 	"encoding/json"
 	"errors"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -97,6 +99,7 @@ type Window struct {
 	Scope  Scope    `json:"scope"`
 	Unit   string   `json:"unit"`
 	Limits []Limit  `json:"limits"`
+	Pace   *Pace    `json:"pace,omitempty"`
 }
 
 type Failure struct {
@@ -139,13 +142,14 @@ type ValueRequest struct {
 }
 
 var (
-	ErrInvalidObservation = errors.New("invalid observation")
-	ErrDuplicateID        = errors.New("duplicate evidence id")
-	ErrMalformedTime      = errors.New("malformed evidence time")
-	ErrAmbiguous          = errors.New("ambiguous evidence selection")
-	ErrStale              = errors.New("evidence is stale")
-	ErrWrongAccount       = errors.New("evidence account does not match")
-	ErrUndefined          = errors.New("evidence value is undefined")
+	ErrInvalidObservation  = errors.New("invalid observation")
+	ErrDuplicateID         = errors.New("duplicate evidence id")
+	ErrMalformedTime       = errors.New("malformed evidence time")
+	ErrAmbiguous           = errors.New("ambiguous evidence selection")
+	ErrStale               = errors.New("evidence is stale")
+	ErrWrongAccount        = errors.New("evidence account does not match")
+	ErrUndefined           = errors.New("evidence value is undefined")
+	ErrProviderUnavailable = errors.New("provider evidence is unavailable")
 )
 
 func (o Observation) Validate() error {
@@ -179,6 +183,17 @@ func (o Observation) Validate() error {
 			if err := limit.Value.validate(); err != nil {
 				return err
 			}
+			if window.Unit == "percent" && (limit.Field == FieldRemaining || limit.Field == Field("used")) && limit.Value.Amount != nil {
+				amount, err := strconv.ParseFloat(limit.Value.Amount.String(), 64)
+				if err != nil || amount > 100 {
+					return ErrInvalidObservation
+				}
+			}
+		}
+		if window.Pace != nil {
+			if err := window.Pace.validate(o, window); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -207,19 +222,31 @@ func (v Value) validate() error {
 }
 
 func validateNumber(number *json.Number) error {
+	if err := validateSignedNumber(number); err != nil {
+		return err
+	}
+	value, _ := strconv.ParseFloat(number.String(), 64)
+	if value < 0 {
+		return ErrInvalidObservation
+	}
+	return nil
+}
+
+func validateSignedNumber(number *json.Number) error {
 	raw := number.String()
 	var parsed json.Number
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil || parsed.String() != raw {
+		return ErrInvalidObservation
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
 		return ErrInvalidObservation
 	}
 	return nil
 }
 
 func isZeroNumber(number json.Number) bool {
-	raw := number.String()
-	if strings.HasPrefix(raw, "-") {
-		raw = raw[1:]
-	}
+	raw := strings.TrimPrefix(number.String(), "-")
 	if exponent := strings.IndexAny(raw, "eE"); exponent >= 0 {
 		raw = raw[:exponent]
 	}
