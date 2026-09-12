@@ -14,6 +14,7 @@ Stop after that diagnostic unless the user asks to install or build it.
 The v0.1.0 release supports provider `codex` with profile `default`.
 The v0.2.0 release scope adds the verified macOS Cursor CLI Keychain route with profile `default`.
 The v0.2.1 patch fixes Grok omitted zero values and includes the selected macOS consumer file route.
+The v0.3.0 release adds `--format toon` as another projection of the same observation JSON already emits; compact stays the default and `value` stays scalar.
 Claude and Linux Cursor source implementations have controlled fixtures but remain outside native release certification.
 Retain the existing collector for an unverified route.
 Check the installed executable before assuming a source increment is available.
