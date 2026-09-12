@@ -1,5 +1,16 @@
 # Release readiness
 
+## v0.3.0 scope
+
+This release adds `--format toon` (source merge `a4f283b`, PR 47 / issue 46) so a caller can render the same paced observation JSON already emits as a TOON document.
+Compact stays the default; JSON and `value` stay unchanged.
+It is also the first published archive that places the executable at `bin/remainder` (packaging change `a48b9dd`), so a GitHub-release installer such as mise's `github:` backend does not treat `docs/` and `skills/` as binaries.
+Verified on this macOS arm64 build host: `gofmt -l .` clean, `go vet ./...`, `go test -race -shuffle=on -count=1 ./...` (all packages pass), `./scripts/check-dependencies.sh`, and the evidence redaction suite, all via `./scripts/verify.sh`.
+`scripts/package-release.sh v0.3.0 dist` is the publication packaging command for the native `darwin_arm64` archive.
+This release ships a `darwin_arm64` archive only; `linux_amd64` users keep the immutable v0.2.2 asset and `linux_arm64` users keep v0.2.1, neither of which contains `--format toon` or the `bin/` layout.
+No new credential route is introduced, so this increment does not run a live provider canary.
+It does not repeat the hosted CI matrix or a separate independent reviewer.
+
 ## v0.2.3 scope
 
 This release adds the opt-in macOS Keychain fallback for Claude credentials (source commit `f2430e1f`), so a macOS host whose Claude Code CLI stores its OAuth credentials in the login Keychain rather than `~/.claude/.credentials.json` can be read.

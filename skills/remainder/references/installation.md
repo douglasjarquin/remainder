@@ -4,7 +4,8 @@ Remainder is licensed under the MIT license in the repository `LICENSE` file.
 Use an approved Remainder release artifact; do not invent a download URL or claim that a source checkout is an installed release.
 The candidate packaging and approved installation procedure is documented in the repository's `docs/release.md`.
 
-Place an approved release artifact's `remainder` executable in a user-selected executable directory and copy the accompanying `skills/remainder` directory only to the user's selected Codex skill location.
+Place an approved release artifact's executable in a user-selected executable directory: `bin/remainder` for v0.3.0 and later, or `remainder` at the archive root for v0.2.3 and earlier.
+Copy the accompanying `skills/remainder` directory only to the user's selected Codex skill location.
 Ask before replacing an existing installation.
 The release executable already contains Cobra and its approved module graph, so consumers do not install Cobra or a Go toolchain.
 Installing the artifact must not edit shell completion, shell profiles, provider credentials, or account state.

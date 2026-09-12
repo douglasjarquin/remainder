@@ -3,6 +3,7 @@
 Treat the executable's help and returned observation as the command and identifier catalog.
 The source supports providers `codex`, `claude`, `grok`, and `cursor` with profile `default`.
 Release v0.2.1 includes Codex, macOS Cursor CLI Keychain, and the selected macOS Grok consumer file route.
+Release v0.3.0 adds `--format toon`.
 Claude and Linux Cursor source fixtures do not certify native access.
 Grok uses `credits`, `product:<kind>`, and `prepaid` windows and cannot verify an explicit account selector.
 Cursor uses `included_usage`, `auto_usage`, `api_usage`, `spend_limit`, and `grok_bot` when the source provides them.
@@ -12,6 +13,7 @@ An `--account` value is an assertion about the observation's last-observed accou
 
 The default compact format is a one-line summary.
 Use `--format json` when a caller needs the full typed observation.
+Use `--format toon` for the same facts as a TOON document.
 Use `remainder value` for one scalar and provide exact `--provider`, `--profile`, `--window`, and `--field` values; add `--scope` when a window ID alone would be ambiguous.
 
 `--freshness any` accepts fresh, stale, or unknown freshness, while `--freshness fresh` rejects anything other than fresh evidence.
