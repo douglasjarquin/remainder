@@ -1,5 +1,7 @@
 # remainder
 
+<img width="1280" height="640" alt="3Iwlc" src="https://github.com/user-attachments/assets/dda68c4e-e28f-45dd-a9c6-bf5148179c18" />
+
 Remainder is a small, one-shot quota CLI written in Go with Cobra for its command layer.
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
