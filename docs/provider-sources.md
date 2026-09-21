@@ -61,7 +61,7 @@ The initial native observation exposed a weekly-primary/null-secondary normaliza
 Synthetic adapter and Cobra regressions reproduced it before the fix, and genuine duplicate supplied windows still fail closed.
 The successful native observations establish this selected macOS source route; they do not certify other accounts, operating systems, or future source availability.
 On 2026-09-10, the Claude source passed two authorized live `remainder --provider claude --profile default` observations against the real installed and authenticated Claude Code CLI (`~/.local/bin/claude` 2.1.267) on `host-development.douglasjarquin.i-09b74c2aaae0cbbb8` (Linux), one cold and one `--refresh`-forced; both returned exit 0, fresh complete evidence, and the same verified account binding.
-A same-run cache-hit sample, captured under `strace`, reused the first sample's `observed_at` timestamp, relabeled identity `historical`, and made zero `connect`/`socket` syscalls and zero `.credentials.json` `openat` calls.
+A same-run cache-hit sample, captured under `strace`, reused the first sample's `observed_at` timestamp, relabeled identity `historical`, and made zero `connect`/`socket` syscalls and zero credential-file `openat` calls.
 No login, credential refresh, account switch, or generative request occurred; only the two documented read-only GETs per live sample.
 Evidence is retained at `.artifacts/claude-native-canary/` in the verifying checkout; raw account identifiers are not published here.
 On 2026-09-10 UTC, the Grok source at `b41972ab97a38f855439b5810a1550481b6410af` passed six actual CLI commands using the existing selected default consumer file on macOS.

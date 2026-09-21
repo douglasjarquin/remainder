@@ -2,7 +2,7 @@
 
 ## v0.2.3 scope
 
-This release adds the opt-in macOS Keychain fallback for Claude credentials (source commit `f2430e1f`), so a macOS host whose Claude Code CLI stores its OAuth credentials in the login Keychain rather than `~/.claude/.credentials.json` can be read.
+This release adds the opt-in macOS Keychain fallback for Claude credentials (source commit `f2430e1f`), so a macOS host whose Claude Code CLI stores its OAuth credentials in the login Keychain rather than `$HOME/.claude/.credentials.json` can be read.
 The file route is tried first on every OS and is unchanged; the fallback runs only when that file is absent, the OS is macOS, and `--allow-keychain-prompt` is passed.
 Verified on this macOS arm64 build host: `gofmt -l .` clean, `go vet ./...`, `go test -race -shuffle=on -count=1 ./...` (all packages pass), `./scripts/check-dependencies.sh`, and the evidence redaction suite, all via `./scripts/verify.sh`.
 `scripts/package-release.sh v0.2.3 dist` produced a `darwin_arm64` archive whose 15 pre-publication asset checks all passed.
