@@ -30,6 +30,22 @@ Use `--provider cursor --profile default` on Linux for the selected CLI auth fil
 Included percentages and spend amounts in cents remain separate, with unknown account identity.
 On macOS, a new Cursor observation requires `--allow-keychain-prompt`; editor SQLite remains unsupported; see [Cursor CLI collection](docs/features/cursor.md).
 
+## Install
+
+Install the newest release archive for your platform with:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/douglasjarquin/remainder/main/scripts/install.sh | bash
+```
+
+The script detects `darwin_arm64`, `linux_arm64`, and `linux_amd64` hosts, resolves the newest GitHub release that ships an archive for the detected platform, verifies it against that release's `SHA256SUMS`, and installs the binary into `~/.local/bin`.
+Set `REMAINDER_VERSION` to pin a tag (for example `v0.3.0`) and `REMAINDER_INSTALL_DIR` to change the destination.
+Releases are published per platform rather than one tag for every platform, so the resolved tag is the newest release carrying your platform's archive; see [release artifacts](docs/release.md) for the version-specific matrix and the manual procedure.
+
+On Homebrew, `homebrew/remainder.rb` is a binary formula for the same checksummed archives.
+It is meant to be published as `Formula/remainder.rb` in a `douglasjarquin/homebrew-tap` repository, where `brew install douglasjarquin/tap/remainder` installs it.
+Homebrew requires formulae to live in a tap, so the file is not installable directly from this checkout until that tap repository exists.
+
 ## Build and verify
 
 Use Go 1.27.1, which is pinned in `mise.toml` and CI.
