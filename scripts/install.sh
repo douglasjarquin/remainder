@@ -35,10 +35,15 @@ if test -n "${REMAINDER_VERSION:-}"; then
 	tag=v$version
 else
 	printf 'install: resolving newest %s release\n' "$target" >&2
+	# The API returns releases newest first; matching browser_download_url
+	# fields keeps the tag/asset association and ignores URLs quoted in
+	# release notes. Only the 30 most recent releases are searched; an older
+	# platform archive beyond that needs an explicit REMAINDER_VERSION.
 	releases=$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=30") ||
 		fail 'cannot list GitHub releases; set REMAINDER_VERSION to select a tag directly'
 	asset_url=$(printf '%s\n' "$releases" |
-		grep -oE "https://github.com/$repo/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/remainder_v[0-9]+\.[0-9]+\.[0-9]+_${target}\.tar\.gz" |
+		grep -oE "\"browser_download_url\": ?\"https://github.com/$repo/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/remainder_v[0-9]+\.[0-9]+\.[0-9]+_${target}\.tar\.gz\"" |
+		sed -E 's/^"browser_download_url": ?"//; s/"$//' |
 		head -n 1 || true)
 	test -n "$asset_url" || fail "no published release ships a $target archive"
 	tag=$(basename "$(dirname "$asset_url")")
@@ -51,7 +56,10 @@ tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/remainder-install.XXXXXX")
 cleanup() {
 	rm -rf "$tmp_dir"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 printf 'install: downloading %s\n' "$archive" >&2
 curl -fsSL -o "$tmp_dir/$archive" "$release_url/$archive" ||
