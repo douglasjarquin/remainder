@@ -56,7 +56,7 @@ Switching that pointer does not terminate an in-flight process.
 Keep the existing v0.2.1 (and v0.2.0) executables for rollback and retain each consumer’s existing collector until its migration is separately approved.
 The v0.1.0, v0.2.0, and v0.2.1 tags, assets, and checksum files remain immutable.
 
-`scripts/install.sh` performs the same download, single-entry checksum selection, and `SHA256SUMS` verification for the newest release carrying the detected `darwin_arm64`, `linux_arm64`, or `linux_amd64` archive, then installs the binary into `~/.local/bin` (`REMAINDER_INSTALL_DIR` overrides the destination and `REMAINDER_VERSION` pins the tag).
+`scripts/install.sh` performs the same download, single-entry checksum selection, and `SHA256SUMS` verification for the newest release carrying the detected `darwin_arm64`, `linux_arm64`, or `linux_amd64` archive — across both the root and `bin/` executable layouts — then installs the binary into `~/.local/bin` (`REMAINDER_INSTALL_DIR` overrides the destination and `REMAINDER_VERSION` pins the tag).
 `homebrew/remainder.rb` is the Homebrew formula for the same archives, staged for a `douglasjarquin/homebrew-tap` repository.
 
 ## Approved mise configuration

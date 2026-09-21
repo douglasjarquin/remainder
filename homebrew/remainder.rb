@@ -2,8 +2,6 @@
 #
 # Intended home: Formula/remainder.rb in a douglasjarquin/homebrew-tap
 # repository, installed as `brew install douglasjarquin/tap/remainder`.
-# Until that tap exists it can be installed from a checkout with
-# `brew install ./homebrew/remainder.rb`.
 #
 # Remainder publishes one archive per platform rather than one tag for every
 # platform, so each block below pins the newest release carrying its target.
@@ -13,13 +11,12 @@ class Remainder < Formula
   license "MIT"
 
   on_macos do
+    depends_on arch: :arm64
+
     on_arm do
       url "https://github.com/douglasjarquin/remainder/releases/download/v0.3.0/remainder_v0.3.0_darwin_arm64.tar.gz"
       sha256 "b0e263a0f0ac96125d76691cf145836650d777cfd7a85dd8d840ae5c1a898ba2"
       version "0.3.0"
-    end
-    on_intel do
-      odie "remainder publishes no Intel Mac archive; use scripts/install.sh or build from source"
     end
   end
 
@@ -37,9 +34,7 @@ class Remainder < Formula
   end
 
   def install
-    target = "#{OS.mac? ? "darwin" : "linux"}_#{Hardware::CPU.arm? ? "arm64" : "amd64"}"
-    bundle = "remainder_v#{version}_#{target}"
-    binary = File.exist?("#{bundle}/bin/remainder") ? "#{bundle}/bin/remainder" : "#{bundle}/remainder"
+    binary = File.exist?("bin/remainder") ? "bin/remainder" : "remainder"
     bin.install binary
   end
 
