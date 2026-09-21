@@ -32,7 +32,7 @@ func TestExecute_native_Cursor_requiresPromptConsentBeforeSourceAccess_onDarwin(
 }
 
 func TestAllRequests_includeCursorLast_onDarwin(t *testing.T) {
-	want := []evidence.Provider{"codex", "claude", "grok", "cursor"}
+	want := []evidence.Provider{"codex", "claude", "grok", "devin", "cursor"}
 	if len(allRequests) != len(want) {
 		t.Fatalf("allRequests=%+v", allRequests)
 	}

@@ -23,6 +23,7 @@ func TestRuntimeAdapter_ObserveAllStartsProviderOperationsConcurrently(t *testin
 		claude: blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "claude"), started: started, release: release},
 		grok:   blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "grok"), started: started, release: release},
 		cursor: blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "cursor"), started: started, release: release},
+		devin:  blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "devin"), started: started, release: release},
 	}
 	completed := make(chan []collectionResult, 1)
 	go func() {
@@ -41,8 +42,13 @@ func TestRuntimeAdapter_ObserveAllStartsProviderOperationsConcurrently(t *testin
 	close(release)
 	results := <-completed
 
-	if len(results) != len(allRequests) || !seen["codex"] || !seen["claude"] || !seen["grok"] || len(allRequests) == 4 && !seen["cursor"] {
+	if len(results) != len(allRequests) {
 		t.Fatalf("started=%v results=%+v", seen, results)
+	}
+	for _, request := range allRequests {
+		if !seen[request.Provider] {
+			t.Fatalf("provider %s did not start; started=%v", request.Provider, seen)
+		}
 	}
 }
 
@@ -53,6 +59,7 @@ func TestExecuteAll_sharedDeadlineRetainsCompletedProvider(t *testing.T) {
 		claude:     blockingNativeAdapter{provider: "claude", release: block},
 		grok:       blockingNativeAdapter{provider: "grok", release: block},
 		cursor:     blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "cursor")},
+		devin:      blockingNativeAdapter{provider: "devin", release: block},
 		allTimeout: 20 * time.Millisecond,
 	}
 	var stdout, stderr bytes.Buffer
@@ -74,6 +81,7 @@ func TestExecuteAll_cancellationWaitsForOwnedOperationsAndWritesNoStdout(t *test
 		claude: blockingNativeAdapter{provider: "claude", started: started, release: block, active: &active},
 		grok:   blockingNativeAdapter{provider: "grok", started: started, release: block, active: &active},
 		cursor: blockingNativeAdapter{provider: "cursor", started: started, release: block, active: &active},
+		devin:  blockingNativeAdapter{provider: "devin", started: started, release: block, active: &active},
 	}
 	go func() {
 		for range len(allRequests) {

@@ -24,6 +24,7 @@ var allRequests = []evidence.Request{
 	{Provider: "codex", Profile: "default"},
 	{Provider: "claude", Profile: "default"},
 	{Provider: "grok", Profile: "default"},
+	{Provider: "devin", Profile: "default"},
 }
 
 func init() {
