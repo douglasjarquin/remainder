@@ -39,22 +39,22 @@ When used exceeds the stated limit, both supplied values are retained and remain
 
 ## macOS Keychain fallback
 
-Claude Code on macOS stores its OAuth credentials in the login Keychain instead of writing `.credentials.json`; when that file is absent, Remainder can read the Keychain item instead of failing.
+Claude Code on macOS stores its OAuth credentials in the login Keychain instead of writing .credentials.json; when that file is absent, Remainder can read the Keychain item instead of failing.
 This is a fallback, not an OS branch: the file is always tried first, on every platform, exactly as above.
 Only when the file is absent, `runtime.GOOS == "darwin"`, and `--allow-keychain-prompt` was passed does Remainder read the Keychain.
 A cache miss with the file absent on macOS and no `--allow-keychain-prompt` fails naming the flag, without touching the Keychain.
 The consent check applies only to the read itself: computing the Keychain route's cache identity (the current macOS username, no subprocess) never requires the flag, so a later invocation that omits it can still read data an earlier consented invocation already cached.
 Non-darwin absent-file behavior is unchanged: today's "authentication file is missing" error, with no Keychain attempt, even when `--allow-keychain-prompt` is passed.
 
-Use `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` on macOS with no `.credentials.json` present.
+Use `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` on macOS with no .credentials.json present.
 The read is `/usr/bin/security find-generic-password -a <account> -w -s "Claude Code-credentials"`, where `<account>` is the current macOS username; no other secret is placed on the command line, output is bounded, and stderr is discarded.
-The Keychain item's JSON payload is the same `claudeAiOauth` shape as `.credentials.json` and is normalized identically.
+The Keychain item's JSON payload is the same `claudeAiOauth` shape as .credentials.json and is normalized identically.
 The flag authorizes a Keychain read for this invocation and may cause macOS to prompt for approval; there is no persistent consent marker.
 Help, cached-only reads, and eligible cache hits never invoke the helper, even when the flag is supplied.
 The file route and the Keychain route are bound to distinct cache-namespace source identities (`native_file_http`/`claude_credentials_json` and `native_keychain_http`/`claude_keychain`), so cache entries from one route never collide with the other.
 There is no login, refresh, or token write on either route.
 
-**Native canary status: not yet verified here.** This dev host is Linux and cannot access a macOS Keychain; the fallback above has controlled file, process, and adapter fixtures only (see `claude-keychain` below). A native canary of `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` against a real macOS Keychain with no `.credentials.json` present still needs a real Mac.
+**Native canary status: not yet verified here.** This dev host is Linux and cannot access a macOS Keychain; the fallback above has controlled file, process, and adapter fixtures only (see `claude-keychain` below). A native canary of `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` against a real macOS Keychain with no .credentials.json present still needs a real Mac.
 
 ## Scenarios
 
@@ -66,8 +66,8 @@ There is no login, refresh, or token write on either route.
 | claude-cli | Compact, JSON, scalar zero, and compiled Cobra helper output preserve native CLI behavior; absent credentials are exit 1; `--allow-keychain-prompt` is accepted for `--provider claude` and stays inert with the file absent on non-darwin hosts; `authorizeKeychainPrompt` wiring of the per-invocation flag onto the Claude and Cursor adapters is verified on every host OS, not only darwin. | automated `internal/cli/claude_test.go`, `internal/cli/claude_linux_test.go`, `internal/cli/claude_darwin_test.go`, and `internal/cli/authorize_keychain_prompt_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | claude-cache | Eligible hits avoid auth-body parsing and HTTP; 401 revokes, 403 remains transient, and 429 coalesces through existing cache policy. | automated `internal/cli/claude_test.go` | `go test -race -shuffle=on -count=1 ./internal/cli` |
 | cache-unknown-identity | Fresh and stale reuse never upgrades unknown account identity. | automated `internal/cache/identity_test.go` | `go test -race -shuffle=on -count=1 ./internal/cache` |
-| claude-native-canary | An authorized usable file must establish the actual source route before native certification. | manual source-specific canary | Verified 2026-09-10 against a real installed/authenticated Claude Code CLI: two live `--provider claude --profile default` observations (one cold, one `--refresh`) each returned exit 0, fresh complete evidence, `native_file_http`/`claude_credentials_json`, and the same verified account binding; a same-run cache hit reused the original `observed_at` and made zero `connect`/`socket`/`.credentials.json` `openat` calls under `strace`. Evidence retained at `.artifacts/claude-native-canary/` (git-ignored, not published). |
-| claude-keychain-native-canary | The macOS Keychain fallback must be exercised against a real login Keychain before native certification. | manual source-specific canary | Not yet verified here: this dev host is Linux and cannot access a macOS Keychain. A real macOS host must run `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` with no `.credentials.json` present and record the result. |
+| claude-native-canary | An authorized usable file must establish the actual source route before native certification. | manual source-specific canary | Verified 2026-09-10 against a real installed/authenticated Claude Code CLI: two live `--provider claude --profile default` observations (one cold, one `--refresh`) each returned exit 0, fresh complete evidence, `native_file_http`/`claude_credentials_json`, and the same verified account binding; a same-run cache hit reused the original `observed_at` and made zero `connect`/`socket` syscalls and no credential-file `openat` calls under `strace`. Evidence retained at `.artifacts/claude-native-canary/` (git-ignored, not published). |
+| claude-keychain-native-canary | The macOS Keychain fallback must be exercised against a real login Keychain before native certification. | manual source-specific canary | Not yet verified here: this dev host is Linux and cannot access a macOS Keychain. A real macOS host must run `remainder value --provider claude --profile default --window weekly --scope account --field remaining --allow-keychain-prompt` with no .credentials.json present and record the result. |
 
 The [source matrix](../provider-sources.md) pins the upstream research and records the authorization boundary.
 The OAuth payload contract is inferred from that pinned implementation; no published first-party schema is assumed.
