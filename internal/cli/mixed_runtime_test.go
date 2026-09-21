@@ -71,6 +71,25 @@ func TestExecuteAll_sharedDeadlineRetainsCompletedProvider(t *testing.T) {
 	}
 }
 
+func TestExecuteAll_partialAdapterReportsUnavailableWithoutPanic(t *testing.T) {
+	adapter := runtimeAdapter{codex: blockingNativeAdapter{observation: providerObservation(fixedCLINow(), "codex")}}
+	var stdout, stderr bytes.Buffer
+
+	code := executeWithAdapterAt(t.Context(), []string{"--all", "--cache=off", "--format=json"}, &stdout, &stderr, "test", fixedCLINow(), adapter)
+
+	if code != 3 || stderr.String() != "remainder: partial evidence\n" || !strings.Contains(stdout.String(), `"provider":"codex"`) || !strings.Contains(stdout.String(), `"provider":"devin","profile":"default","message":"quota is unavailable"`) || strings.Count(stdout.String(), "quota is unavailable") != len(allRequests)-1 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = executeWithAdapterAt(t.Context(), []string{"--provider=devin", "--cache=off"}, &stdout, &stderr, "test", fixedCLINow(), adapter)
+
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "quota is unavailable") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestExecuteAll_cancellationWaitsForOwnedOperationsAndWritesNoStdout(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	started := make(chan evidence.Provider, len(allRequests))
