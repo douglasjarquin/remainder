@@ -106,6 +106,7 @@ $archive_base/docs/
 $archive_base/docs/features/
 $archive_base/docs/features/claude.md
 $archive_base/docs/features/cursor.md
+$archive_base/docs/features/devin.md
 $archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
@@ -145,6 +146,7 @@ cmp "$repository_root/LICENSE" "$extract_dir/$archive_base/LICENSE"
 cmp "$repository_root/docs/features/claude.md" "$extract_dir/$archive_base/docs/features/claude.md"
 cmp "$repository_root/docs/features/grok.md" "$extract_dir/$archive_base/docs/features/grok.md"
 cmp "$repository_root/docs/features/cursor.md" "$extract_dir/$archive_base/docs/features/cursor.md"
+cmp "$repository_root/docs/features/devin.md" "$extract_dir/$archive_base/docs/features/devin.md"
 test "$("$binary" --version)" = "remainder v0.1.0 (github.com/douglasjarquin/remainder)"
 go version -m "$binary" | grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" >/dev/null
 go version -m "$binary" | grep -F "build$(printf '\t')GOOS=$native_goos" >/dev/null

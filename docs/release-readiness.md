@@ -1,5 +1,29 @@
 # Release readiness
 
+## v0.4.0 scope
+
+This release adds the Devin CLI provider (merge `ca5ac10`, PR 49): `--provider devin --profile default` and a fifth entry in the fixed `--all` set.
+On a cache miss it reads the selected Devin CLI credential file (`DEVIN_CREDENTIALS`, then `$XDG_DATA_HOME/devin/credentials.toml`, then `$HOME/.local/share/devin/credentials.toml`) and makes one bounded Connect JSON `GetUserStatus` request against the credential's `api_server_url`; it performs no login, CLI invocation, token refresh, or generative request.
+It also carries the `runtimeAdapter.provider()` nil-guard fix so an unset provider adapter reports unavailable instead of dereferencing a nil adapter.
+The release archive now also bundles `docs/features/devin.md` alongside the other linked provider source documents.
+Verified on this macOS arm64 build host: `./scripts/verify.sh` (formatting, `go vet`, race-enabled shuffled tests, dependency policy, the evidence redaction suite, and a CGO-free release-like build) and `./scripts/package-release.test.sh`, both via `mise run`.
+`scripts/package-release.sh v0.4.0 dist` produced a `darwin_arm64` archive whose 15 pre-publication asset checks all passed.
+On 2026-09-21 the Devin route passed an authorized native canary on this macOS host against the installed `devin 3000.10.31` CLI's credential file: fresh complete evidence, verified `userStatus.userId` binding, daily and weekly 100-percent windows with resets and pace, and unlimited `prompt_credits`; see the [Devin source record](features/devin.md) and the [source matrix](provider-sources.md).
+This release ships a `darwin_arm64` archive only; `linux_amd64` stays at v0.2.2 and `linux_arm64` at v0.2.1, and neither contains the Devin provider.
+`linux_amd64` and `linux_arm64` v0.4.0 archives each require a native build host because the packaging command refuses to label a cross-compiled binary as tested.
+It does not repeat the hosted CI matrix or a separate independent reviewer.
+
+## v0.3.0 scope
+
+This release adds `--format toon` (source merge `a4f283b`, PR 47 / issue 46) so a caller can render the same paced observation JSON already emits as a TOON document.
+Compact stays the default; JSON and `value` stay unchanged.
+It is also the first published archive that places the executable at `bin/remainder` (packaging change `a48b9dd`), so a GitHub-release installer such as mise's `github:` backend does not treat `docs/` and `skills/` as binaries.
+Verified on this macOS arm64 build host: `gofmt -l .` clean, `go vet ./...`, `go test -race -shuffle=on -count=1 ./...` (all packages pass), `./scripts/check-dependencies.sh`, and the evidence redaction suite, all via `./scripts/verify.sh`.
+`scripts/package-release.sh v0.3.0 dist` is the publication packaging command for the native `darwin_arm64` archive.
+This release ships a `darwin_arm64` archive only; `linux_amd64` users keep the immutable v0.2.2 asset and `linux_arm64` users keep v0.2.1, neither of which contains `--format toon` or the `bin/` layout.
+No new credential route is introduced, so this increment does not run a live provider canary.
+It does not repeat the hosted CI matrix or a separate independent reviewer.
+
 ## v0.2.3 scope
 
 This release adds the opt-in macOS Keychain fallback for Claude credentials (source commit `f2430e1f`), so a macOS host whose Claude Code CLI stores its OAuth credentials in the login Keychain rather than `$HOME/.claude/.credentials.json` can be read.

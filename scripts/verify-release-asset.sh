@@ -83,6 +83,7 @@ $archive_base/docs/
 $archive_base/docs/features/
 $archive_base/docs/features/claude.md
 $archive_base/docs/features/cursor.md
+$archive_base/docs/features/devin.md
 $archive_base/docs/features/grok.md
 $archive_base/docs/provider-sources.md
 $archive_base/docs/release.md
@@ -112,6 +113,7 @@ binary="$bundle/bin/remainder"
 cmp "docs/features/claude.md" "$bundle/docs/features/claude.md"
 cmp "docs/features/grok.md" "$bundle/docs/features/grok.md"
 cmp "docs/features/cursor.md" "$bundle/docs/features/cursor.md"
+cmp "docs/features/devin.md" "$bundle/docs/features/devin.md"
 runtime_home="$qa_root/runtime-home"
 runtime_path="$qa_root/runtime-path"
 mkdir -p "$runtime_home" "$runtime_path"
