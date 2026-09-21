@@ -221,7 +221,7 @@ func cursorCLIServer(t *testing.T, requests *atomic.Int32, override func(http.Re
 }
 
 func TestAllRequests_includeCursorLast_onLinux(t *testing.T) {
-	want := []evidence.Provider{"codex", "claude", "grok", "cursor"}
+	want := []evidence.Provider{"codex", "claude", "grok", "devin", "cursor"}
 	if len(allRequests) != len(want) {
 		t.Fatalf("allRequests=%+v", allRequests)
 	}

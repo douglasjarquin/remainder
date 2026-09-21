@@ -6,7 +6,7 @@ Remainder is a small, one-shot quota CLI written in Go with Cobra for its comman
 
 It is positioned as a personal-use tool for the maintainer's local quota evidence workflow.
 
-The source implements read-only Codex, Claude, Grok, and Cursor CLI providers, plus help, version, unavailable-provider behavior, and typed evidence output.
+The source implements read-only Codex, Claude, Grok, Cursor, and Devin CLI providers, plus help, version, unavailable-provider behavior, and typed evidence output.
 The v0.1.0 artifacts support Codex.
 The v0.2.1 release scope includes Codex, the verified macOS Cursor CLI Keychain route, and the selected macOS Grok consumer file route.
 The patch fixes omitted Grok zero values without combining shared allowance, product limits, and prepaid credits.
@@ -29,6 +29,10 @@ See [Grok file collection](docs/features/grok.md) for selectors, source limits, 
 Use `--provider cursor --profile default` on Linux for the selected CLI auth file.
 Included percentages and spend amounts in cents remain separate, with unknown account identity.
 On macOS, a new Cursor observation requires `--allow-keychain-prompt`; editor SQLite remains unsupported; see [Cursor CLI collection](docs/features/cursor.md).
+
+Use `--provider devin --profile default` for the Devin CLI credential file (`DEVIN_CREDENTIALS`, then `$XDG_DATA_HOME/devin/credentials.toml`, then `~/.local/share/devin/credentials.toml`).
+On a cache miss, Devin collection makes one bounded Connect JSON `GetUserStatus` call against the credential's API server and normalizes daily and weekly quota percentages, resets, and reported ACU or credit balances.
+Account identity is verified through `userStatus.userId`; see [Devin file collection](docs/features/devin.md) for selectors and source limits.
 
 ## Build and verify
 
@@ -131,7 +135,7 @@ Controlled HTTP/TLS and temp-home tests cover provider and cache failure cases, 
 The [published releases](https://github.com/douglasjarquin/remainder/releases) carry version-specific executable checksums and verification records.
 A native source canary does not by itself certify a packaged or downloaded executable.
 
-Use `--all` to read the fixed default Codex, Claude, and Grok contexts concurrently, followed by Cursor on Linux and macOS.
+Use `--all` to read the fixed default Codex, Claude, Grok, and Devin contexts concurrently, followed by Cursor on Linux and macOS.
 The platform controls this fixed list; it does not inspect credentials to choose providers.
 It cannot be combined with provider, profile, or account flags and does not discover profiles.
 Mixed JSON contains separate observations and provider-scoped failures; compact output remains one line.

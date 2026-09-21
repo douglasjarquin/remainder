@@ -17,6 +17,7 @@ type mixedFixtureAdapter struct {
 	requests      []evidence.Request
 	calls         int
 	cursorFailure error
+	devinFailure  error
 }
 
 func (a *mixedFixtureAdapter) Observe(context.Context, evidence.Request) (evidence.Observation, error) {
@@ -28,12 +29,18 @@ func (a *mixedFixtureAdapter) ObserveAll(_ context.Context, requests []evidence.
 	a.requests = append(a.requests, requests...)
 	results := append([]collectionResult(nil), a.results...)
 	for _, request := range requests {
-		if request.Provider != "cursor" {
+		var failure error
+		switch request.Provider {
+		case "cursor":
+			failure = a.cursorFailure
+		case "devin":
+			failure = a.devinFailure
+		default:
 			continue
 		}
-		result := collectionResult{Request: request, Result: cache.Result{Observation: providerObservation(fixedCLINow(), "cursor")}}
-		if a.cursorFailure != nil {
-			result.Err = a.cursorFailure
+		result := collectionResult{Request: request, Result: cache.Result{Observation: providerObservation(fixedCLINow(), request.Provider)}}
+		if failure != nil {
+			result.Err = failure
 		}
 		results = append(results, result)
 	}
@@ -190,15 +197,16 @@ func TestExecuteAll_noUsableObservationsUsesDeterministicScopedStderr(t *testing
 		{Request: evidence.Request{Provider: "grok", Profile: "default"}, Err: errors.New("grok secret")},
 		{Request: evidence.Request{Provider: "codex", Profile: "default"}, Err: context.DeadlineExceeded},
 		{Request: evidence.Request{Provider: "claude", Profile: "default"}, Err: cache.ErrUnavailable},
-	}, cursorFailure: errors.New("cursor unavailable")}
+	}, cursorFailure: errors.New("cursor unavailable"), devinFailure: errors.New("devin unavailable")}
 	var stdout, stderr bytes.Buffer
 
 	code := executeWithAdapterAt(t.Context(), []string{"--all", "--cache=only"}, &stdout, &stderr, "test", fixedCLINow(), adapter)
 
 	want := "remainder: codex/default: quota collection timed out\n" +
 		"remainder: claude/default: cached quota evidence is unavailable\n" +
-		"remainder: grok/default: quota is unavailable\n"
-	if len(allRequests) == 4 {
+		"remainder: grok/default: quota is unavailable\n" +
+		"remainder: devin/default: quota is unavailable\n"
+	if len(allRequests) == 5 {
 		want += "remainder: cursor/default: quota is unavailable\n"
 	}
 	if code != 1 || stdout.Len() != 0 || stderr.String() != want {

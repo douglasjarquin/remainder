@@ -10,6 +10,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/claude"
 	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/cursor"
+	"github.com/douglasjarquin/remainder/internal/devin"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 	"github.com/douglasjarquin/remainder/internal/grok"
 	"github.com/spf13/cobra"
@@ -20,12 +21,13 @@ type runtimeAdapter struct {
 	claude     nativeAdapter
 	grok       nativeAdapter
 	cursor     nativeAdapter
+	devin      nativeAdapter
 	newStore   func() (*cache.Store, error)
 	allTimeout time.Duration
 }
 
 func defaultRuntimeAdapter() runtimeAdapter {
-	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), grok: grok.Default(), cursor: cursor.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
+	return runtimeAdapter{codex: codex.Default(), claude: claude.Default(), grok: grok.Default(), cursor: cursor.Default(), devin: devin.Default(), newStore: func() (*cache.Store, error) { return cache.NewUserStore(cache.Options{}) }}
 }
 
 func authorizeKeychainPrompt(adapter Adapter, allowed bool) Adapter {
@@ -97,18 +99,25 @@ type nativeAdapter interface {
 }
 
 func (a runtimeAdapter) provider(request evidence.Request) (nativeAdapter, error) {
+	var provider nativeAdapter
 	switch request.Provider {
 	case "codex":
-		return a.codex, nil
+		provider = a.codex
 	case "claude":
-		return a.claude, nil
+		provider = a.claude
 	case "grok":
-		return a.grok, nil
+		provider = a.grok
 	case "cursor":
-		return a.cursor, nil
+		provider = a.cursor
+	case "devin":
+		provider = a.devin
 	default:
 		return nil, fmt.Errorf("%w: unsupported provider %q", evidence.ErrInvalidSelection, request.Provider)
 	}
+	if provider == nil {
+		return nil, ErrUnavailable
+	}
+	return provider, nil
 }
 
 type cacheAdapter interface {
