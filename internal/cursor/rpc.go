@@ -22,10 +22,7 @@ func (a Adapter) postRPC(ctx context.Context, token, method string) ([]byte, err
 	req.Header.Set("Connect-Protocol-Version", "1")
 	response, err := a.client.Do(req)
 	if err != nil {
-		if ctx.Err() != nil {
-			return nil, &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Cursor quota request canceled or timed out: %w", ctx.Err())}
-		}
-		return nil, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Cursor quota request failed")}
+		return nil, cache.RequestFailure(ctx, "Cursor")
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {

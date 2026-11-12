@@ -140,10 +140,7 @@ func (a Adapter) fetch(ctx context.Context, credential credentials) (evidence.Ob
 	request.Header.Set("X-User-Agent", "connect-es/2.1.1")
 	response, err := a.client.Do(request)
 	if err != nil {
-		if ctx.Err() != nil {
-			return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Grok quota request canceled or timed out: %w", ctx.Err())}
-		}
-		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Grok quota request failed")}
+		return evidence.Observation{}, cache.RequestFailure(ctx, "Grok")
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {

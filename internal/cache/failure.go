@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,14 +32,24 @@ func (e *FetchError) Unwrap() []error {
 }
 
 // FetchFailure reports err as a provider collection failure. An error that
-// already carries a FetchError keeps its declared kind; any other error is
-// classified by Classify.
+// already carries a FetchError keeps its declared kind, and an account
+// selector error stays a usage error; any other error is classified by
+// Classify.
 func FetchFailure(err error) error {
-	if _, ok := errors.AsType[*FetchError](err); ok {
+	if _, ok := errors.AsType[*FetchError](err); ok || errors.Is(err, evidence.ErrWrongAccount) {
 		return err
 	}
 	kind, _ := Classify(err)
 	return &FetchError{Kind: kind, Err: err}
+}
+
+// RequestFailure reports a provider request that returned no response as a
+// transient failure, naming a cancellation or deadline when ctx ended.
+func RequestFailure(ctx context.Context, provider string) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return &FetchError{Kind: FailureTransient, Err: fmt.Errorf("%s quota request canceled or timed out: %w", provider, ctxErr)}
+	}
+	return &FetchError{Kind: FailureTransient, Err: errors.New(provider + " quota request failed")}
 }
 
 // Classify returns the cache failure kind and provider retry time for a fetch

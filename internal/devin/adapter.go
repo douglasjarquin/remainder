@@ -129,9 +129,6 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
 	observation, err := a.fetch(ctx, endpoint, credential.apiKey, request.Account)
-	if errors.Is(err, evidence.ErrWrongAccount) {
-		return evidence.Observation{}, err
-	}
 	if err != nil {
 		return evidence.Observation{}, cache.FetchFailure(err)
 	}
@@ -166,10 +163,7 @@ func (a Adapter) fetch(ctx context.Context, endpoint, apiKey, account string) (e
 	request.Header.Set("Content-Type", "application/json")
 	response, err := a.client.Do(request)
 	if err != nil {
-		if ctx.Err() != nil {
-			return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Devin quota request canceled or timed out: %w", ctx.Err())}
-		}
-		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Devin quota request failed")}
+		return evidence.Observation{}, cache.RequestFailure(ctx, "Devin")
 	}
 	defer response.Body.Close()
 	raw, err := readBounded(response)

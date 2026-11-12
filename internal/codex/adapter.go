@@ -141,10 +141,7 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	req.Header.Set("Accept", "application/json")
 	response, err := a.client.Do(req)
 	if err != nil {
-		if ctx.Err() != nil {
-			return evidence.Observation{}, false, &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Codex quota request canceled or timed out: %w", ctx.Err())}
-		}
-		return evidence.Observation{}, true, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Codex quota request failed")}
+		return evidence.Observation{}, ctx.Err() == nil, cache.RequestFailure(ctx, "Codex")
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {

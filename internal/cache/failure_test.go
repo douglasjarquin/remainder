@@ -110,3 +110,37 @@ func TestParseRetryAfter(t *testing.T) {
 		})
 	}
 }
+
+func TestFetchFailure_passesAccountSelectorErrorsThrough(t *testing.T) {
+	err := fmt.Errorf("%w: response cannot verify an account selector", evidence.ErrWrongAccount)
+
+	got := cache.FetchFailure(err)
+
+	if got != err || errors.Is(got, evidence.ErrProviderUnavailable) {
+		t.Fatalf("FetchFailure(%v) = %v, want the selector error unchanged so it exits as a usage error", err, got)
+	}
+}
+
+func TestRequestFailure_isTransientAndNamesCancellation(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		message string
+		cause   error
+	}{
+		{"canceled", canceled, "provider evidence is unavailable: Grok quota request canceled or timed out: context canceled", context.Canceled},
+		{"network", t.Context(), "provider evidence is unavailable: Grok quota request failed", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cache.RequestFailure(tt.ctx, "Grok")
+
+			kind, retryAt := cache.Classify(err)
+			if kind != cache.FailureTransient || !retryAt.IsZero() || err.Error() != tt.message || (tt.cause != nil && !errors.Is(err, tt.cause)) {
+				t.Fatalf("RequestFailure() = %v (%q %s), want transient %q", err, kind, retryAt, tt.message)
+			}
+		})
+	}
+}

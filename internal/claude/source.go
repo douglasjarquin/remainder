@@ -139,10 +139,7 @@ func (a Adapter) fetchJSON(ctx context.Context, endpoint, token string, target a
 	req.Header.Set("Accept", "application/json")
 	response, err := a.client.Do(req)
 	if err != nil {
-		if ctx.Err() != nil {
-			return &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Claude quota request canceled or timed out: %w", ctx.Err())}
-		}
-		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota request failed")}
+		return cache.RequestFailure(ctx, "Claude")
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {
