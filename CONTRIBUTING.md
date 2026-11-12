@@ -22,12 +22,12 @@ Ordinary GitHub fork, branch, and pull-request flow is enough. There is no extra
 Canonical entrypoints already documented in `VERIFY.md` and [AGENTS.md](AGENTS.md):
 
 - `mise run verify` is the portable project check (`scripts/verify.sh`).
-- Use Go 1.27.1, selected by `mise.toml` and CI.
+- Use Go 1.27.4, selected by `mise.toml` and CI.
 - Before offline verification in a fresh checkout or empty module cache, prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`.
 - `mise run test` runs race-enabled shuffled tests. The direct equivalent is `go test -race -shuffle=on -count=1 ./...`.
 - `mise run build` produces the CGO-free `bin/remainder` with `CGO_ENABLED=0`.
 
-After that one-time module download, verification itself keeps module lookup disabled (`GOPROXY=off`). The full command list, formatting, `go vet`, dependency/import check, CGO-free release-like build, isolation rules, and scenarios live in `VERIFY.md`. CI on `main` and pull requests uses the same Go 1.27.1 pin on Ubuntu 24.04 and macOS 14.
+After that one-time module download, verification itself keeps module lookup disabled (`GOPROXY=off`). The full command list, formatting, `go vet`, dependency/import check, CGO-free release-like build, isolation rules, and scenarios live in `VERIFY.md`. CI on `main` and pull requests uses the same Go 1.27.4 pin on Ubuntu 24.04 and macOS 15.
 
 ## Repo conventions
 

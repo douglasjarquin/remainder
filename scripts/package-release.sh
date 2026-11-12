@@ -70,8 +70,8 @@ esac
 source_revision=$(git rev-parse HEAD)
 source_date=$(git show -s --format=%cI HEAD)
 go_version=$(GOTOOLCHAIN=local go version | awk '{print $3}')
-if test "$go_version" != go1.27.1; then
-	printf 'package-release: Go 1.27.1 is required; found %s\n' "$go_version" >&2
+if test "$go_version" != go1.27.4; then
+	printf 'package-release: Go 1.27.4 is required; found %s\n' "$go_version" >&2
 	exit 1
 fi
 archive_base="remainder_${version}_${target}"

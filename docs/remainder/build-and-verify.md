@@ -20,7 +20,7 @@ Homebrew requires formulae to live in a tap, so the file is not installable dire
 
 ## Build and verify
 
-Use Go 1.27.1, which is pinned in `mise.toml` and CI.
+Use Go 1.27.4, which is pinned in `mise.toml` and CI.
 
 Build a local development binary labelled `dev` with:
 
@@ -32,7 +32,7 @@ The `mise run build` task retains a fixed version label for the developer benchm
 Use the [release construction command](docs/release.md#candidate-construction) to create a versioned release package.
 
 Before offline verification in a fresh checkout, prime the pinned module graph once with `GOTOOLCHAIN=local go mod download all`.
-The setup uses the Go 1.27.1 toolchain pinned in `mise.toml` and CI; verification itself keeps module lookup disabled.
+The setup uses the Go 1.27.4 toolchain pinned in `mise.toml` and CI; verification itself keeps module lookup disabled.
 
 Run the portable verification with `./scripts/verify.sh` or `mise run verify`.
 

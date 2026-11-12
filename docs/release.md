@@ -1,6 +1,6 @@
 # Release artifacts
 
-Remainder release candidates are built from a clean source revision with Go 1.27.1, `CGO_ENABLED=0`, `GOPROXY=off`, trimmed paths, and an embedded release version.
+Remainder release candidates are built from a clean source revision with Go 1.27.4, `CGO_ENABLED=0`, `GOPROXY=off`, trimmed paths, and an embedded release version.
 The archive includes the linked Claude, Grok, Cursor, and Devin source documents, even where a native route remains unverified.
 The archive carries the executable, the MIT license, the standalone quota skill, the provider source record, release instructions, dependency attributions with verbatim required license texts, and a machine-readable source manifest.
 `SHA256SUMS` verifies archive integrity when it is obtained from a trusted approved release source.
