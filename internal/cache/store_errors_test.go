@@ -226,3 +226,31 @@ func TestStore_UnclassifiedFetchError_recordsReadablePermanentFailure(t *testing
 		t.Fatalf("cached-only result = %+v, error = %v, want the retained observation", cached, err)
 	}
 }
+
+func TestStore_FutureObservationInBackoff_isNeverServedStale(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	binding := testBinding()
+	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(time.Minute))); err != nil {
+		t.Fatal(err)
+	}
+	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: 5 * time.Second, StaleOnError: true}
+	failure := &cache.FetchError{Kind: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: errors.New("rate limited")}
+	if result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
+		return cache.FetchResult{Err: failure}
+	}); !errors.Is(err, failure) || result.FromCache {
+		t.Fatalf("failed refresh result = %+v, error = %v, want the fetch error and nothing served", result, err)
+	}
+
+	// When
+	result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
+		t.Fatal("fetch called during back-off")
+		return cache.FetchResult{}
+	})
+
+	// Then
+	if backoff, ok := errors.AsType[*cache.BackoffError](err); !ok || !backoff.RetryAt.Equal(now.Add(30*time.Second)) || result.FromCache {
+		t.Fatalf("result = %+v, error = %v, want the back-off error and nothing served", result, err)
+	}
+}
