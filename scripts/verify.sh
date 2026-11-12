@@ -4,16 +4,14 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 
-if command -v gofumpt >/dev/null 2>&1; then
-	if [ -n "$(gofumpt -l .)" ]; then
-		printf 'gofumpt reported unformatted files\n' >&2
-		exit 1
-	fi
-else
-	if [ -n "$(gofmt -l .)" ]; then
-		printf 'gofmt reported unformatted files\n' >&2
-		exit 1
-	fi
+formatter=gofmt
+if command -v gofumpt >/dev/null 2>&1 && gofumpt --version >/dev/null 2>&1; then
+	formatter=gofumpt
+fi
+unformatted=$("$formatter" -l .)
+if [ -n "$unformatted" ]; then
+	printf '%s reported unformatted files:\n%s\n' "$formatter" "$unformatted" >&2
+	exit 1
 fi
 
 GOPROXY=off go vet ./...
