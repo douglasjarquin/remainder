@@ -17,6 +17,8 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
+var sourceIdentity = evidence.SourceIdentity{Kind: "native_file_http", Name: "devin_credentials_toml"}
+
 const (
 	defaultEndpoint  = "https://server.codeium.com"
 	defaultTimeout   = 15 * time.Second
@@ -96,8 +98,8 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		Provider:              "devin",
 		Profile:               "default",
 		ResponseBoundary:      "user_status",
-		SourceKind:            "native_file_http",
-		SourceName:            "devin_credentials_toml",
+		SourceKind:            sourceIdentity.Kind,
+		SourceName:            sourceIdentity.Name,
 		CredentialFingerprint: fingerprint,
 	}, nil
 }

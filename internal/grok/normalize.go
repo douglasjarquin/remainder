@@ -122,7 +122,7 @@ func normalize(payload []byte, now time.Time) (evidence.Observation, error) {
 		Provider:      "grok",
 		Profile:       "default",
 		Account:       evidence.AccountIdentity{Binding: evidence.IdentityUnknown},
-		Source:        evidence.SourceIdentity{Kind: "native_file_http", Name: "grok_auth_json"},
+		Source:        sourceIdentity,
 		ObservedAt:    now,
 		Freshness:     evidence.FreshFresh,
 		Outcome:       outcome,

@@ -87,7 +87,7 @@ func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evid
 	if partial {
 		outcome = evidence.OutcomePartial
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "devin", Profile: "default", Account: evidence.AccountIdentity{LastObserved: user.UserID, Binding: binding}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "devin_credentials_toml"}, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "devin", Profile: "default", Account: evidence.AccountIdentity{LastObserved: user.UserID, Binding: binding}, Source: sourceIdentity, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, fmt.Errorf("Devin normalized evidence is invalid: %w", err)
 	}

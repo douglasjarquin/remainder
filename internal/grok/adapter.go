@@ -15,6 +15,8 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
+var sourceIdentity = evidence.SourceIdentity{Kind: "native_file_http", Name: "grok_auth_json"}
+
 const (
 	defaultEndpoint  = "https://grok.com/grok_api_v2.GrokBuildBilling/GetGrokCreditsConfig"
 	defaultTimeout   = 15 * time.Second
@@ -84,8 +86,8 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		Provider:              "grok",
 		Profile:               "default",
 		ResponseBoundary:      "grok_credits_config",
-		SourceKind:            "native_file_http",
-		SourceName:            "grok_auth_json",
+		SourceKind:            sourceIdentity.Kind,
+		SourceName:            sourceIdentity.Name,
 		CredentialFingerprint: fingerprint,
 	}, nil
 }

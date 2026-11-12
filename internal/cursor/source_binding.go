@@ -21,13 +21,13 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		if err != nil {
 			return cache.Binding{}, cache.FetchFailure(err)
 		}
-		return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_keychain_http", SourceName: "cursor_cli_keychain", CredentialFingerprint: snapshot.fingerprint}, nil
+		return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: keychainSourceIdentity.Kind, SourceName: keychainSourceIdentity.Name, CredentialFingerprint: snapshot.fingerprint}, nil
 	}
 	info, err := inspectAuthFile(a.authFile)
 	if err != nil {
 		return cache.Binding{}, cache.FetchFailure(err)
 	}
-	return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_file_http", SourceName: "cursor_cli_auth_json", CredentialFingerprint: fileFingerprint(a.authFile, info, "")}, nil
+	return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: fileSourceIdentity.Kind, SourceName: fileSourceIdentity.Name, CredentialFingerprint: fileFingerprint(a.authFile, info, "")}, nil
 }
 
 func fileFingerprint(path string, info os.FileInfo, identity string) string {

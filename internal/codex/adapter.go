@@ -22,6 +22,8 @@ const (
 	defaultTimeout   = 15 * time.Second
 )
 
+var sourceIdentity = evidence.SourceIdentity{Kind: "native_file_http", Name: "codex_auth_json"}
+
 var defaultEndpoints = []string{
 	"https://chatgpt.com/backend-api/wham/usage",
 }
@@ -96,7 +98,7 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		identity += fmt.Sprintf("\x00%d\x00%d", stat.Dev, stat.Ino)
 	}
 	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(identity)))
-	return cache.Binding{Provider: "codex", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_file_http", SourceName: "codex_auth_json", CredentialFingerprint: fingerprint}, nil
+	return cache.Binding{Provider: "codex", Profile: "default", ResponseBoundary: "usage", SourceKind: sourceIdentity.Kind, SourceName: sourceIdentity.Name, CredentialFingerprint: fingerprint}, nil
 }
 
 func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidence.Observation, error) {

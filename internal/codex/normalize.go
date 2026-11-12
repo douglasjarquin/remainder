@@ -67,7 +67,7 @@ func normalize(raw usageResponse, selectedAccount string, now time.Time) (eviden
 	if accountID == selectedAccount {
 		binding = evidence.IdentityVerified
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "codex", Profile: "default", Account: evidence.AccountIdentity{LastObserved: selectedAccount, Binding: binding}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "codex_auth_json"}, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "codex", Profile: "default", Account: evidence.AccountIdentity{LastObserved: selectedAccount, Binding: binding}, Source: sourceIdentity, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, fmt.Errorf("Codex normalized evidence is invalid: %w", err)
 	}

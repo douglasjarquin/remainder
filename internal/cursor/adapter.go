@@ -14,6 +14,11 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
+var (
+	fileSourceIdentity     = evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}
+	keychainSourceIdentity = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "cursor_cli_keychain"}
+)
+
 const (
 	defaultEndpoint  = "https://api2.cursor.sh"
 	defaultTimeout   = 15 * time.Second
@@ -120,10 +125,10 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 			return evidence.Observation{}, cache.FetchFailure(ErrKeychainPromptRequired)
 		}
 		token, err = a.readMacAccessToken(ctx)
-		source = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "cursor_cli_keychain"}
+		source = keychainSourceIdentity
 	} else {
 		token, err = readAccessToken(a.authFile, a.now())
-		source = evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}
+		source = fileSourceIdentity
 	}
 	if err != nil {
 		if callerErr := callerCtx.Err(); callerErr != nil {
