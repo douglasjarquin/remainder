@@ -30,7 +30,7 @@ Version scope and release evidence are in [docs/remainder/releases.md](docs/rema
 
 ### Requirements
 
-Use Go 1.27.1, which is pinned in `mise.toml` and CI, when building from source.
+Use Go 1.27.4, which is pinned in `mise.toml` and CI, when building from source.
 
 The install script detects `darwin_arm64`, `linux_arm64`, and `linux_amd64` hosts.
 

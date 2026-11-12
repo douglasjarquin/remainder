@@ -155,7 +155,7 @@ build_metadata="$qa_root/build-metadata.txt"
 go version -m "$binary" >"$build_metadata"
 grep -F "vcs.revision=$source_revision" "$build_metadata" >/dev/null
 grep -F "path$(printf '\t')github.com/douglasjarquin/remainder/cmd/remainder" "$build_metadata" >/dev/null
-grep -F ': go1.27.1' "$build_metadata" >/dev/null
+grep -F ': go1.27.4' "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')CGO_ENABLED=0" "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')GOOS=$expected_goos" "$build_metadata" >/dev/null
 grep -F "build$(printf '\t')GOARCH=$expected_goarch" "$build_metadata" >/dev/null
@@ -163,7 +163,7 @@ grep -F "build$(printf '\t')vcs.modified=false" "$build_metadata" >/dev/null
 grep -F "\"source_revision\": \"$source_revision\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F "\"version\": \"$version\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F "\"target\": \"$target\"" "$bundle/ASSET_MANIFEST.json" >/dev/null
-grep -F '"go_version": "go1.27.1"' "$bundle/ASSET_MANIFEST.json" >/dev/null
+grep -F '"go_version": "go1.27.4"' "$bundle/ASSET_MANIFEST.json" >/dev/null
 grep -F '"cgo_enabled": false' "$bundle/ASSET_MANIFEST.json" >/dev/null
 
 readiness_status=pending

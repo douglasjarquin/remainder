@@ -22,7 +22,7 @@ outputs = []
 
 ## Setup
 
-Use Go 1.27.1 selected by `mise.toml`.
+Use Go 1.27.4 selected by `mise.toml`.
 
 Before offline verification in a fresh checkout or empty module cache, prime the exact versions already recorded in `go.mod` and `go.sum` once with `GOTOOLCHAIN=local go mod download all`.
 
