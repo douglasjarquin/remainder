@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -227,37 +229,64 @@ func TestExecuteAll_userCancellationReturns130WithoutStdout(t *testing.T) {
 	}
 }
 
-func TestExecuteAll_excludesCachedObservationThatExpiresDuringCollection(t *testing.T) {
+func TestExecuteAll_reportsCacheHitThatAgesPastMaxAgeDuringCollection(t *testing.T) {
 	start := fixedCLINow()
-	assembly := start.Add(2 * time.Second)
-	adapter := &mixedFixtureAdapter{results: []collectionResult{
-		{Request: evidence.Request{Provider: "codex", Profile: "default"}, Result: cache.Result{Observation: providerObservation(start.Add(-9*time.Second), "codex"), FromCache: true}},
-		{Request: evidence.Request{Provider: "claude", Profile: "default"}, Result: cache.Result{Observation: providerObservation(start, "claude")}},
-		{Request: evidence.Request{Provider: "grok", Profile: "default"}, Err: cache.ErrUnavailable},
-	}}
-	var stdout, stderr bytes.Buffer
+	assembly := start.Add(6 * time.Second)
+	hitObservedAt := start.Add(-3 * time.Second)
+	for _, test := range []struct {
+		name        string
+		grokFailure error
+		wantCode    int
+	}{
+		{name: "every provider succeeds", wantCode: 0},
+		{name: "one provider fails", grokFailure: cache.ErrUnavailable, wantCode: 3},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			grok := collectionResult{Request: evidence.Request{Provider: "grok", Profile: "default"}, Result: cache.Result{Observation: providerObservation(start, "grok")}}
+			if test.grokFailure != nil {
+				grok = collectionResult{Request: grok.Request, Err: test.grokFailure}
+			}
+			adapter := &mixedFixtureAdapter{results: []collectionResult{
+				{Request: evidence.Request{Provider: "codex", Profile: "default"}, Result: cache.Result{Observation: providerObservation(hitObservedAt, "codex"), FromCache: true}},
+				{Request: evidence.Request{Provider: "claude", Profile: "default"}, Result: cache.Result{Observation: providerObservation(start, "claude")}},
+				grok,
+			}}
+			var stdout, stderr bytes.Buffer
 
-	code := executeWithAdapterClock(t.Context(), []string{"--all", "--max-age=10s", "--format=json"}, &stdout, &stderr, "test", func() time.Time { return assembly }, adapter)
+			code := executeWithAdapterClock(t.Context(), []string{"--all", "--max-age=5s", "--format=json"}, &stdout, &stderr, "test", func() time.Time { return assembly }, adapter)
 
-	if code != 3 || stderr.String() != "remainder: partial evidence\n" || strings.Contains(stdout.String(), `"observations":[{"schema_version":"v1","provider":"codex"`) || !strings.Contains(stdout.String(), `"provider":"claude"`) || !strings.Contains(stdout.String(), `"message":"cached quota evidence exceeded max-age"`) {
-		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			if code != test.wantCode || !strings.Contains(stdout.String(), `"observations":[{"schema_version":"v1","provider":"codex"`) || !strings.Contains(stdout.String(), `"observed_at":"`+hitObservedAt.Format(time.RFC3339)+`"`) || strings.Contains(stdout.String(), "max-age") {
+				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+		})
 	}
 }
 
-func TestExecuteAll_excludesCachedObservationFromFutureAssemblyClock(t *testing.T) {
+func TestExecuteAll_futureDatedCacheRecordIsNeverReported(t *testing.T) {
 	now := fixedCLINow()
-	future := providerObservation(now.Add(time.Second), "codex")
-	future.Freshness = evidence.FreshStale
-	adapter := &mixedFixtureAdapter{results: []collectionResult{
-		{Request: evidence.Request{Provider: "codex", Profile: "default"}, Result: cache.Result{Observation: future, FromCache: true}},
-		{Request: evidence.Request{Provider: "claude", Profile: "default"}, Result: cache.Result{Observation: providerObservation(now, "claude")}},
-		{Request: evidence.Request{Provider: "grok", Profile: "default"}, Result: cache.Result{Observation: providerObservation(now, "grok")}},
-	}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	t.Cleanup(server.Close)
+	adapter := failureRuntimeAdapter(t, server, now)
+	request := evidence.Request{Provider: "codex", Profile: "default"}
+	binding, err := adapter.codex.CacheBinding(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := adapter.newStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Put(t.Context(), binding, cacheObservation(now.Add(time.Minute))); err != nil {
+		t.Fatal(err)
+	}
 	var stdout, stderr bytes.Buffer
 
 	code := executeWithAdapterAt(t.Context(), []string{"--all", "--max-age=1m", "--stale-on-error", "--format=json"}, &stdout, &stderr, "test", now, adapter)
 
-	if code != 3 || strings.Contains(stdout.String(), `"observations":[{"schema_version":"v1","provider":"codex"`) || !strings.Contains(stdout.String(), `"message":"cached quota evidence exceeded max-age"`) {
+	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "remainder: codex/default: quota is unavailable\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

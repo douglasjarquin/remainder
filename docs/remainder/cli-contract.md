@@ -29,4 +29,4 @@ The platform controls this fixed list; it does not inspect credentials to choose
 It cannot be combined with provider, profile, or account flags and does not discover profiles.
 Mixed JSON contains separate observations and provider-scoped failures; compact output remains one line.
 A provider failure preserves other usable observations with exit 3; no usable observations produces exit 1 and empty stdout.
-Fresh cached observations that exceed max-age while waiting for another provider are excluded at assembly without changing their timestamps or requesting a second refresh.
+Max-age is judged once, when the cache serves a hit, so a cached observation stays in the report with its original timestamp however long another provider takes.

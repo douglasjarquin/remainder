@@ -166,13 +166,6 @@ func assembleMixed(results []collectionResult, requests []evidence.Request, opts
 			failures = append(failures, failureFor(request, ErrUnavailable))
 			continue
 		}
-		if result.Result.FromCache {
-			age := evaluatedAt.Sub(observation.ObservedAt)
-			if age < 0 || (observation.Freshness == evidence.FreshFresh && age > opts.cachePolicy.MaxAge) {
-				failures = append(failures, mixedFailure{Provider: request.Provider, Profile: request.Profile, Message: "cached quota evidence exceeded max-age"})
-				continue
-			}
-		}
 		if opts.freshness == evidence.FreshOnly && observation.Freshness != evidence.FreshFresh {
 			failures = append(failures, failureFor(request, evidence.ErrStale))
 			continue
