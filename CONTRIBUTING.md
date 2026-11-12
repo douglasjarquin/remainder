@@ -27,7 +27,7 @@ Canonical entrypoints already documented in `VERIFY.md` and [AGENTS.md](AGENTS.m
 - `mise run test` runs race-enabled shuffled tests. The direct equivalent is `go test -race -shuffle=on -count=1 ./...`.
 - `mise run build` produces the CGO-free `bin/remainder` with `CGO_ENABLED=0`.
 
-After that one-time module download, verification itself keeps module lookup disabled (`GOPROXY=off`). The full command list, formatting, `go vet`, dependency/import check, CGO-free release-like build, isolation rules, and scenarios live in `VERIFY.md`. CI on `main` and pull requests uses the same Go 1.27.4 pin on Ubuntu 24.04 and macOS 14.
+After that one-time module download, verification itself keeps module lookup disabled (`GOPROXY=off`). The full command list, formatting, `go vet`, dependency/import check, CGO-free release-like build, isolation rules, and scenarios live in `VERIFY.md`. CI on `main` and pull requests uses the same Go 1.27.4 pin on Ubuntu 24.04 and macOS 15.
 
 ## Repo conventions
 
