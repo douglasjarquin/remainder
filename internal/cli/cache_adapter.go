@@ -87,15 +87,13 @@ func (a runtimeAdapter) ObserveWithCache(ctx context.Context, request evidence.R
 	}
 	return store.Resolve(ctx, binding, request.Account, policy, func(fetchContext context.Context) cache.FetchResult {
 		observation, fetchErr := provider.Observe(fetchContext, request)
-		failure, retryAt := provider.Failure(fetchErr)
-		return cache.FetchResult{Observation: observation, Failure: failure, RetryAt: retryAt, Err: fetchErr}
+		return cache.FetchResult{Observation: observation, Err: fetchErr}
 	})
 }
 
 type nativeAdapter interface {
 	Observe(context.Context, evidence.Request) (evidence.Observation, error)
 	CacheBinding(context.Context, evidence.Request) (cache.Binding, error)
-	Failure(error) (cache.FailureKind, time.Time)
 }
 
 func (a runtimeAdapter) provider(request evidence.Request) (nativeAdapter, error) {

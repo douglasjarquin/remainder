@@ -140,7 +140,7 @@ func TestAdapterMacKeychainFailures_areBoundedAndRedacted(t *testing.T) {
 			adapter := New(Options{AuthFile: missing, Now: fixedNow, KeychainReader: test.reader, goos: "darwin"}).WithKeychainPrompt()
 
 			_, err := adapter.Observe(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
-			kind, _ := adapter.Failure(err)
+			kind, _ := cache.Classify(err)
 
 			if err == nil || kind != cache.FailurePermanent || !strings.Contains(err.Error(), test.wantPhrase) || strings.Contains(err.Error(), "synthetic-secret") {
 				t.Fatalf("Observe() error/kind = %v/%s", err, kind)

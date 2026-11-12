@@ -106,7 +106,7 @@ func TestAdapterMacKeychainFailures_areBoundedCanceledAndRedacted(t *testing.T) 
 			adapter := New(Options{ConfigFile: configFile, KeychainReader: test.reader, Client: &http.Client{Transport: &countingTransport{}}, Timeout: 10 * time.Millisecond, Now: func() time.Time { return fixtureNow }, goos: "darwin"}).WithKeychainPrompt()
 
 			_, err := adapter.Observe(t.Context(), cursorRequest())
-			kind, _ := adapter.Failure(err)
+			kind, _ := cache.Classify(err)
 
 			if err == nil || kind != test.wantKind || !strings.Contains(err.Error(), test.wantPhrase) || strings.Contains(err.Error(), "synthetic-secret") {
 				t.Fatalf("Observe() error/kind = %v/%s", err, kind)

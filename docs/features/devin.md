@@ -16,7 +16,8 @@ There is no login, CLI invocation, token refresh, or Keychain fallback.
 A cache miss sends one bounded Connect JSON `POST` to `<api server>/exa.seat_management_pb.SeatManagementService/GetUserStatus`, the same read-only status call the installed Devin CLI uses for `devin auth status`.
 The request carries `metadata.apiKey` plus fixed client-identifying fields, `Content-Type: application/json`, and `Connect-Protocol-Version: 1`.
 The response `userStatus.userId` becomes the observation account identity with a verified binding.
-An explicit `--account` mismatch fails the observation; a missing `userId` keeps identity unknown and cannot satisfy an account selector.
+An explicit `--account` mismatch fails the observation with exit 2, as on the other providers.
+A missing `userId` keeps identity unknown and cannot satisfy an account selector, which also exits 2.
 Eligible cache hits retain the original observation timestamp and label previously verified identity as historical.
 
 ## Windows and units

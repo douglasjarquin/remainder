@@ -31,7 +31,7 @@ func TestStore_UnknownIdentityRemainsUnknownOnReuse(t *testing.T) {
 			fetches := 0
 			fetch := func(context.Context) cache.FetchResult {
 				fetches++
-				return cache.FetchResult{Err: errors.New("temporary failure"), Failure: cache.FailureTransient}
+				return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("temporary failure")}}
 			}
 			policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute, StaleOnError: stale}
 			for range 2 {

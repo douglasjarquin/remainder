@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -105,29 +104,6 @@ func TestAdapter_Observe_rejects_expected_account_before_usage(t *testing.T) {
 	}
 }
 
-func TestAdapter_Failure_classifies_HTTP_statuses(t *testing.T) {
-	for _, tt := range []struct {
-		status int
-		kind   cache.FailureKind
-	}{
-		{http.StatusUnauthorized, cache.FailureRevoked},
-		{http.StatusForbidden, cache.FailureTransient},
-		{http.StatusTooManyRequests, cache.FailureTransient},
-	} {
-		t.Run(http.StatusText(tt.status), func(t *testing.T) {
-			adapter := testAdapter(t, `{"account":{"uuid":"account-1"}}`, `{}`, tt.status)
-			_, err := adapter.Observe(t.Context(), evidence.Request{Provider: "claude", Profile: "default"})
-			kind, retryAt := adapter.Failure(err)
-			if kind != tt.kind {
-				t.Fatalf("kind = %q, want %q; error = %v", kind, tt.kind, err)
-			}
-			if tt.status == http.StatusTooManyRequests && retryAt.IsZero() {
-				t.Fatal("Retry-After was not preserved")
-			}
-		})
-	}
-}
-
 func TestAdapter_rejects_redirect_without_body_leak(t *testing.T) {
 	secret := "synthetic-secret-that-must-not-appear"
 	authFile := writeAuth(t, `{"claudeAiOauth":{"accessToken":"synthetic-access","expiresAt":1788973200000}}`)
@@ -195,10 +171,6 @@ func TestAdapter_selection_cancellation_binding_and_account_failure(t *testing.T
 	_, err = adapter.Observe(ctx, evidence.Request{Provider: "claude", Profile: "default"})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancel error = %v", err)
-	}
-	kind, retry := adapter.Failure(evidence.ErrWrongAccount)
-	if kind != cache.FailureAccountMismatch || !retry.IsZero() {
-		t.Fatalf("failure = %q %s", kind, retry)
 	}
 }
 

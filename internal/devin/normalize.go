@@ -10,8 +10,6 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-var ErrAccountMismatch = errors.New("Devin quota account mismatch")
-
 func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evidence.Observation, error) {
 	if raw == nil || raw.UserStatus == nil {
 		return evidence.Observation{}, errors.New("Devin quota response has no user status")
@@ -26,7 +24,7 @@ func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evid
 			return evidence.Observation{}, fmt.Errorf("%w: response cannot verify an account selector", evidence.ErrWrongAccount)
 		}
 		if user.UserID != selectedAccount {
-			return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", ErrAccountMismatch)
+			return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", evidence.ErrWrongAccount)
 		}
 	}
 	windows := make([]evidence.Window, 0, 6)

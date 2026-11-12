@@ -19,13 +19,13 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 	if a.goos == "darwin" {
 		snapshot, err := readMacConfig(a.configFile)
 		if err != nil {
-			return cache.Binding{}, collectionError(err)
+			return cache.Binding{}, cache.FetchFailure(err)
 		}
 		return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_keychain_http", SourceName: "cursor_cli_keychain", CredentialFingerprint: snapshot.fingerprint}, nil
 	}
 	info, err := inspectAuthFile(a.authFile)
 	if err != nil {
-		return cache.Binding{}, collectionError(err)
+		return cache.Binding{}, cache.FetchFailure(err)
 	}
 	return cache.Binding{Provider: "cursor", Profile: "default", ResponseBoundary: "usage", SourceKind: "native_file_http", SourceName: "cursor_cli_auth_json", CredentialFingerprint: fileFingerprint(a.authFile, info, "")}, nil
 }

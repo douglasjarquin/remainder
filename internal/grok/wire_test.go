@@ -1,9 +1,10 @@
 package grok
 
 import (
-	"errors"
 	"math"
 	"testing"
+
+	"github.com/douglasjarquin/remainder/internal/cache"
 )
 
 func TestWireBoundaries(t *testing.T) {
@@ -86,28 +87,33 @@ func TestGRPCWebBoundaries(t *testing.T) {
 	})
 	t.Run("auth_status", func(t *testing.T) {
 		body := append(frame(0, payload), frame(0x80, []byte("grpc-status: 16\r\n"))...)
-		if _, err := decodeGRPCWeb(body); !errors.Is(err, ErrAuthorizationRejected) {
+		if _, err := decodeGRPCWeb(body); kindOf(err) != cache.FailureRevoked {
 			t.Fatalf("error = %v", err)
 		}
 	})
 	t.Run("permission_status_is_not_assumed_revoked", func(t *testing.T) {
 		body := append(frame(0, payload), frame(0x80, []byte("grpc-status: 7\r\ngrpc-message: quota%20permission\r\n"))...)
-		if _, err := decodeGRPCWeb(body); !errors.Is(err, ErrTransient) || errors.Is(err, ErrAuthorizationRejected) {
+		if _, err := decodeGRPCWeb(body); kindOf(err) != cache.FailureTransient {
 			t.Fatalf("error = %v", err)
 		}
 	})
 	t.Run("permission_auth_message_is_revoked", func(t *testing.T) {
 		for _, message := range []string{"token%20expired", "access%20token%20could%20not%20be%20validated"} {
 			body := append(frame(0, payload), frame(0x80, []byte("grpc-status: 7\r\ngrpc-message: "+message+"\r\n"))...)
-			if _, err := decodeGRPCWeb(body); !errors.Is(err, ErrAuthorizationRejected) {
+			if _, err := decodeGRPCWeb(body); kindOf(err) != cache.FailureRevoked {
 				t.Fatalf("message = %q, error = %v", message, err)
 			}
 		}
 	})
 	t.Run("rate_status", func(t *testing.T) {
 		body := append(frame(0, payload), frame(0x80, []byte("grpc-status: 8\r\n"))...)
-		if _, err := decodeGRPCWeb(body); !errors.Is(err, ErrTransient) {
+		if _, err := decodeGRPCWeb(body); kindOf(err) != cache.FailureTransient {
 			t.Fatalf("error = %v", err)
 		}
 	})
+}
+
+func kindOf(err error) cache.FailureKind {
+	kind, _ := cache.Classify(err)
+	return kind
 }

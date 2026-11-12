@@ -20,7 +20,7 @@ func TestStore_EmptyCacheRetryBackoff_coalescesFailedRefreshes(t *testing.T) {
 	retryAt := now.Add(30 * time.Second)
 	fetch := func(context.Context) cache.FetchResult {
 		fetches++
-		return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: retryAt, Err: errors.New("rate limited")}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: retryAt, Err: errors.New("rate limited")}}
 	}
 	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute}
 
@@ -51,7 +51,7 @@ func TestStore_RetryBackoff_preservesLastValidObservation(t *testing.T) {
 	fetches := 0
 	fetch := func(context.Context) cache.FetchResult {
 		fetches++
-		return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: errors.New("rate limited")}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: errors.New("rate limited")}}
 	}
 	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second, StaleOnError: true}
 
@@ -74,7 +74,7 @@ func TestStore_RetryBackoff_isBoundedLocally(t *testing.T) {
 
 	// When
 	_, _ = store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: now.Add(24 * time.Hour), Err: errors.New("rate limited")}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: now.Add(24 * time.Hour), Err: errors.New("rate limited")}}
 	})
 	_, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 		t.Fatal("fetch called during bounded backoff")
@@ -97,7 +97,7 @@ func TestStore_TransientFailureWithoutDeadline_usesLocalBackoff(t *testing.T) {
 
 	// When
 	_, _ = store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureTransient, Err: errors.New("temporary failure")}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("temporary failure")}}
 	})
 	_, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 		t.Fatal("fetch called during local backoff")

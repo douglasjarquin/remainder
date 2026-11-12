@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -17,7 +18,7 @@ func normalize(raw usageResponse, selectedAccount string, now time.Time) (eviden
 		accountID = raw.AccountIDCamel
 	}
 	if accountID != "" && accountID != selectedAccount {
-		return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", ErrAccountMismatch)
+		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureAccountMismatch, Err: errors.New("Codex quota response account does not match the credential")}
 	}
 	base := raw.RateLimit
 	if base == nil {

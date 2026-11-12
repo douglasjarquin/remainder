@@ -3,11 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
-	"github.com/douglasjarquin/remainder/internal/cursor"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -25,11 +25,7 @@ func (s canceledRefreshSource) Observe(context.Context, evidence.Request) (evide
 		s.cancel()
 		return evidence.Observation{}, context.Canceled
 	}
-	return evidence.Observation{}, cursor.ErrTransient
-}
-
-func (s canceledRefreshSource) Failure(err error) (cache.FailureKind, time.Time) {
-	return (cursor.Adapter{}).Failure(err)
+	return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Cursor quota request failed")}
 }
 
 func TestCachedFallbackCancellationSuppressesEveryOutputFormat(t *testing.T) {

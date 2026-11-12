@@ -48,7 +48,7 @@ func TestStore_Revoked(t *testing.T) {
 
 	// When
 	_, err := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: 5 * time.Second, StaleOnError: true}, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureRevoked, Err: wantErr}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureRevoked, Err: wantErr}}
 	})
 
 	// Then
@@ -124,7 +124,7 @@ func TestStore_TransientFailure_preservesOriginalObservationAge(t *testing.T) {
 
 	// When
 	result, err := store.Resolve(t.Context(), testBinding(), "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second, StaleOnError: true}, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureTransient, Err: errors.New("temporary failure")}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("temporary failure")}}
 	})
 
 	// Then
@@ -192,5 +192,37 @@ func TestStore_RecordOmitsSecretsAndRawAuthPath(t *testing.T) {
 		if info.Mode().Perm() != wantMode {
 			t.Fatalf("%s mode = %v, want %v", path, info.Mode().Perm(), wantMode)
 		}
+	}
+}
+
+func TestStore_UnclassifiedFetchError_recordsReadablePermanentFailure(t *testing.T) {
+	// Given
+	now := time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC)
+	store := cache.New(filepath.Join(t.TempDir(), "remainder", "v1"), cache.Options{Now: func() time.Time { return now }})
+	binding := testBinding()
+	if _, err := store.Put(t.Context(), binding, testObservation(now.Add(-time.Minute))); err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("provider failed without a declared kind")
+
+	// When
+	_, err := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second}, func(context.Context) cache.FetchResult {
+		return cache.FetchResult{Err: wantErr}
+	})
+
+	// Then
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+	data, readErr := os.ReadFile(store.SnapshotPath(binding))
+	if readErr != nil || !strings.Contains(string(data), `"last_failure":"permanent"`) {
+		t.Fatalf("record = %s, error = %v, want a permanent failure", data, readErr)
+	}
+	cached, err := store.Resolve(t.Context(), binding, "", cache.Policy{Mode: cache.ModeOnly, MaxAge: time.Hour}, func(context.Context) cache.FetchResult {
+		t.Fatal("cached-only fetch called")
+		return cache.FetchResult{}
+	})
+	if err != nil || !cached.FromCache {
+		t.Fatalf("cached-only result = %+v, error = %v, want the retained observation", cached, err)
 	}
 }

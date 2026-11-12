@@ -56,6 +56,10 @@ func TestFetchError_matchesProviderUnavailableAndCause(t *testing.T) {
 	if got, want := (&cache.FetchError{Err: errors.New("Codex quota response is too large")}).Error(), "provider evidence is unavailable: Codex quota response is too large"; got != want {
 		t.Fatalf("Error() = %q, want %q", got, want)
 	}
+	rateLimited := &cache.FetchError{Kind: cache.FailureTransient, RetryAt: time.Date(2026, time.November, 12, 16, 0, 30, 0, time.UTC), Err: errors.New("Codex quota endpoint is rate limited")}
+	if got, want := rateLimited.Error(), "provider evidence is unavailable: Codex quota endpoint is rate limited until 2026-11-12T16:00:30Z"; got != want {
+		t.Fatalf("Error() = %q, want %q", got, want)
+	}
 }
 
 func TestFetchFailure_keepsDeclaredKindAndClassifiesTheRest(t *testing.T) {

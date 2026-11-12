@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/douglasjarquin/remainder/internal/cache"
 )
 
 type sourceNumber string
@@ -138,31 +140,32 @@ func (a Adapter) fetchJSON(ctx context.Context, endpoint, token string, target a
 	response, err := a.client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return fmt.Errorf("%w: Claude quota request canceled or timed out: %w", ErrTransient, ctx.Err())
+			return &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Claude quota request canceled or timed out: %w", ctx.Err())}
 		}
-		return fmt.Errorf("%w: Claude quota request failed", ErrTransient)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota request failed")}
 	}
 	defer response.Body.Close()
 	switch response.StatusCode {
 	case http.StatusUnauthorized:
-		return ErrAuthorizationRejected
+		return &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Claude authentication was rejected")}
 	case http.StatusTooManyRequests:
-		return &RetryError{RetryAt: parseRetryAfter(response.Header.Get("Retry-After"), a.now())}
+		return &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Claude quota endpoint is rate limited")}
 	case http.StatusForbidden:
-		return fmt.Errorf("%w: Claude quota endpoint returned HTTP 403", ErrTransient)
+		// A forbidden response does not revoke the Claude credential; it is retried.
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota endpoint returned HTTP 403")}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("%w: Claude quota endpoint returned HTTP %d", ErrTransient, response.StatusCode)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Claude quota endpoint returned HTTP %d", response.StatusCode)}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return fmt.Errorf("%w: Claude quota response could not be read", ErrTransient)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota response could not be read")}
 	}
 	if len(body) > maxResponseBytes {
 		return errors.New("Claude quota response is too large")
 	}
 	if err := json.UnmarshalRead(bytes.NewReader(body), target); err != nil {
-		return fmt.Errorf("%w: Claude quota response is malformed JSON", ErrTransient)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota response is malformed JSON")}
 	}
 	return nil
 }

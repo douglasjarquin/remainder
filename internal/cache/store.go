@@ -216,16 +216,17 @@ func (s *Store) handleFailure(binding Binding, current loadedRecord, expectedAcc
 		return Result{}, fetched.Err
 	}
 	now := s.options.Now()
+	failure, providerRetryAt := Classify(fetched.Err)
 	value := record{SchemaVersion: recordVersion, BindingHash: bindingHash(binding)}
 	if current.state == recordSupported {
 		value = current.record
 	}
 	value.LastAttemptAt = &now
-	value.LastFailure = fetched.Failure
-	value.Revoked = value.Revoked || fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
+	value.LastFailure = failure
+	value.Revoked = value.Revoked || failure == FailureRevoked || failure == FailureAccountMismatch
 	value.RetryAt = nil
-	if fetched.Failure == FailureTransient {
-		retryAt := s.retryDeadline(now, fetched.RetryAt)
+	if failure == FailureTransient {
+		retryAt := s.retryDeadline(now, providerRetryAt)
 		value.RetryAt = &retryAt
 	}
 	if err := writeRecord(s.SnapshotPath(binding), value); err != nil {

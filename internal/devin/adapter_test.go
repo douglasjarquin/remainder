@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -176,7 +175,7 @@ func TestObserve_accountSelection(t *testing.T) {
 	}{
 		{name: "matching account is verified", userID: "user-test", account: "user-test", wantBinding: evidence.IdentityVerified},
 		{name: "no selector keeps verified identity", userID: "user-test", wantBinding: evidence.IdentityVerified},
-		{name: "mismatched account fails", userID: "user-test", account: "user-other", wantErr: ErrAccountMismatch},
+		{name: "mismatched account fails", userID: "user-test", account: "user-other", wantErr: evidence.ErrWrongAccount},
 		{name: "unverifiable account selector fails", account: "user-test", wantErr: evidence.ErrWrongAccount},
 		{name: "absent identity stays unknown", wantBinding: evidence.IdentityUnknown},
 	} {
@@ -198,45 +197,6 @@ func TestObserve_accountSelection(t *testing.T) {
 			}
 			if test.wantErr == nil && observation.Account.Binding != test.wantBinding {
 				t.Fatalf("binding=%q", observation.Account.Binding)
-			}
-		})
-	}
-}
-
-func TestObserve_statusAndConnectFailures(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		status  int
-		body    string
-		want    error
-		retryAt bool
-	}{
-		{name: "401 revokes", status: http.StatusUnauthorized, want: ErrAuthorizationRejected},
-		{name: "403 revokes", status: http.StatusForbidden, want: ErrAuthorizationRejected},
-		{name: "unauthenticated revokes", status: http.StatusBadRequest, body: `{"code":"unauthenticated","message":"bad key"}`, want: ErrAuthorizationRejected},
-		{name: "invalid_argument revokes", status: http.StatusBadRequest, body: `{"code":"invalid_argument","message":"metadata rejected"}`, want: ErrAuthorizationRejected},
-		{name: "429 backs off", status: http.StatusTooManyRequests, want: ErrTransient, retryAt: true},
-		{name: "resource_exhausted backs off", status: http.StatusBadRequest, body: `{"code":"resource_exhausted"}`, want: ErrTransient},
-		{name: "unavailable is transient", status: http.StatusBadRequest, body: `{"code":"unavailable"}`, want: ErrTransient},
-		{name: "500 is transient", status: http.StatusInternalServerError, want: ErrTransient},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Retry-After", "30")
-				w.WriteHeader(test.status)
-				fmt.Fprint(w, test.body)
-			}))
-			defer server.Close()
-			authFile := writeCredentials(t, `windsurf_api_key = "synthetic-devin-key"`+"\n")
-			_, err := testAdapter(t, authFile, server).Observe(t.Context(), testRequest())
-			if !errors.Is(err, test.want) {
-				t.Fatalf("err=%v want %v", err, test.want)
-			}
-			if test.retryAt {
-				var retry *RetryError
-				if !errors.As(err, &retry) || retry.RetryAt.IsZero() {
-					t.Fatalf("err=%v has no retry-at", err)
-				}
 			}
 		})
 	}
@@ -406,31 +366,6 @@ bare = plain
 	} {
 		if _, err := parseCredentials([]byte(body)); err == nil {
 			t.Fatalf("body=%q accepted", body)
-		}
-	}
-}
-
-func TestFailure_classification(t *testing.T) {
-	adapter := Adapter{}
-	for _, test := range []struct {
-		err  error
-		want cache.FailureKind
-	}{
-		{nil, cache.FailureNone},
-		{ErrAuthorizationRejected, cache.FailureRevoked},
-		{fmt.Errorf("%w: wrap", ErrAuthorizationRejected), cache.FailureRevoked},
-		{ErrAccountMismatch, cache.FailureAccountMismatch},
-		{evidence.ErrWrongAccount, cache.FailureAccountMismatch},
-		{ErrTransient, cache.FailureTransient},
-		{&RetryError{RetryAt: testNow}, cache.FailureTransient},
-		{errors.New("other"), cache.FailurePermanent},
-	} {
-		kind, retryAt := adapter.Failure(test.err)
-		if kind != test.want {
-			t.Fatalf("err=%v kind=%v want %v", test.err, kind, test.want)
-		}
-		if _, ok := test.err.(*RetryError); ok && !retryAt.Equal(testNow) {
-			t.Fatalf("retryAt=%v", retryAt)
 		}
 	}
 }

@@ -75,7 +75,7 @@ func TestRuntimeAdapter_Claude_failure_metadata_drives_revocation_stale_and_back
 		stale  bool
 		want   error
 	}{
-		{"401 revokes", http.StatusUnauthorized, false, claude.ErrAuthorizationRejected},
+		{"401 revokes", http.StatusUnauthorized, false, evidence.ErrProviderUnavailable},
 		{"403 permits stale", http.StatusForbidden, true, nil},
 		{"429 backs off", http.StatusTooManyRequests, false, cache.ErrBackoff},
 	} {
@@ -96,7 +96,7 @@ func TestRuntimeAdapter_Claude_failure_metadata_drives_revocation_stale_and_back
 				return
 			}
 			if tt.status == http.StatusTooManyRequests {
-				if !errors.Is(err, claude.ErrTransient) {
+				if kind, retryAt := cache.Classify(err); kind != cache.FailureTransient || retryAt.IsZero() {
 					t.Fatalf("initial error = %v", err)
 				}
 				_, err = adapter.ObserveWithCache(t.Context(), request, cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Minute})
@@ -105,6 +105,9 @@ func TestRuntimeAdapter_Claude_failure_metadata_drives_revocation_stale_and_back
 				t.Fatalf("error = %v, want %v", err, tt.want)
 			}
 			if tt.status == http.StatusUnauthorized {
+				if kind, _ := cache.Classify(err); kind != cache.FailureRevoked {
+					t.Fatalf("error kind = %q, want revoked", kind)
+				}
 				_, cachedErr := adapter.ObserveWithCache(t.Context(), request, cache.Policy{Mode: cache.ModeOnly, MaxAge: time.Minute})
 				if !errors.Is(cachedErr, cache.ErrUnavailable) {
 					t.Fatalf("cached-only error = %v", cachedErr)

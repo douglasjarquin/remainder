@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/cursor"
 )
 
@@ -26,13 +25,9 @@ func TestOptions_exposesOnlyFixtureDependencies(t *testing.T) {
 	}
 
 	// When
-	adapter := cursor.New(options)
-	kind, retryAt := adapter.Failure(nil)
+	_ = cursor.New(options)
 
 	// Then
-	if kind != cache.FailureNone || !retryAt.IsZero() {
-		t.Fatalf("Adapter.Failure(nil) = %s/%s", kind, retryAt)
-	}
 	typeOfOptions := reflect.TypeFor[cursor.Options]()
 	if _, exposed := typeOfOptions.FieldByName("GOOS"); exposed {
 		t.Fatal("Options exposes an operating-system override")

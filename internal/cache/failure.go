@@ -20,7 +20,11 @@ type FetchError struct {
 }
 
 func (e *FetchError) Error() string {
-	return evidence.ErrProviderUnavailable.Error() + ": " + e.Err.Error()
+	message := evidence.ErrProviderUnavailable.Error() + ": " + e.Err.Error()
+	if !e.RetryAt.IsZero() {
+		message += " until " + e.RetryAt.UTC().Format(time.RFC3339)
+	}
+	return message
 }
 
 func (e *FetchError) Unwrap() []error {

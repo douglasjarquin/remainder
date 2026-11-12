@@ -31,7 +31,7 @@ func TestStore_RevocationRemainsStickyUntilSuccessfulRefresh(t *testing.T) {
 				policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second, StaleOnError: true}
 				firstErr := errors.New("confirmed source invalidation")
 				if _, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-					return cache.FetchResult{Failure: invalidation, Err: firstErr}
+					return cache.FetchResult{Err: &cache.FetchError{Kind: invalidation, Err: firstErr}}
 				}); !errors.Is(err, firstErr) {
 					t.Fatalf("invalidation error = %v, want %v", err, firstErr)
 				}
@@ -39,7 +39,7 @@ func TestStore_RevocationRemainsStickyUntilSuccessfulRefresh(t *testing.T) {
 				// When
 				followUpErr := errors.New("later refresh failure")
 				_, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-					return cache.FetchResult{Failure: followUp, Err: followUpErr}
+					return cache.FetchResult{Err: &cache.FetchError{Kind: followUp, Err: followUpErr}}
 				})
 
 				// Then
