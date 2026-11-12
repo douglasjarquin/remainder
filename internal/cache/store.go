@@ -88,9 +88,8 @@ func (s *Store) Resolve(ctx context.Context, binding Binding, expectedAccount st
 	}
 	defer lock.Close()
 	current := readRecord(s.SnapshotPath(binding), wantBinding)
-	// Under --refresh, a record counts as a hit only when another process
-	// refreshed it while this one waited for the lock.
-	hitAllowed := !policy.Refresh || current.record.Generation != initial.record.Generation
+	refreshedByPeer := current.record.Generation != initial.record.Generation
+	hitAllowed := !policy.Refresh || refreshedByPeer
 	if result, err, done := served(current, decide(current, expectedAccount, policy, s.options.Now(), hitAllowed)); done {
 		return result, err
 	}
@@ -168,7 +167,6 @@ func resolveLive(ctx context.Context, expectedAccount string, fetch func(context
 	return Result{Observation: result.Observation}, nil
 }
 
-// decision names what the store does with a loaded record.
 type decision uint8
 
 const (
@@ -179,9 +177,6 @@ const (
 	decisionCacheOnlyMiss
 )
 
-// decide chooses between serving the record, refusing it, backing off, and
-// refetching. A hit is considered only when hitAllowed; an observation dated
-// after now is never served.
 func decide(loaded loadedRecord, expectedAccount string, policy Policy, now time.Time, hitAllowed bool) decision {
 	if loaded.state != recordSupported {
 		if policy.Mode == ModeOnly {
@@ -206,8 +201,6 @@ func decide(loaded loadedRecord, expectedAccount string, policy Policy, now time
 	return decisionBackedOff
 }
 
-// served returns the outcome of a decision made before a fetch, and false when
-// the store must fetch.
 func served(loaded loadedRecord, outcome decision) (Result, error, bool) {
 	switch outcome {
 	case decisionServeCached:

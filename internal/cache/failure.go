@@ -11,8 +11,7 @@ import (
 )
 
 // FetchError is a provider collection failure tagged with how the cache
-// treats it. Providers build it where they detect the failure, so the kind is
-// declared once at the source instead of being inferred from sentinels later.
+// treats it. Providers build it where they detect the failure.
 type FetchError struct {
 	Kind    FailureKind
 	RetryAt time.Time

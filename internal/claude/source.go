@@ -151,7 +151,6 @@ func (a Adapter) fetchJSON(ctx context.Context, endpoint, token string, target a
 	case http.StatusTooManyRequests:
 		return &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Claude quota endpoint is rate limited")}
 	case http.StatusForbidden:
-		// A forbidden response does not revoke the Claude credential; it is retried.
 		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Claude quota endpoint returned HTTP 403")}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {

@@ -149,7 +149,6 @@ func (a Adapter) fetch(ctx context.Context, endpoint string, credentials credent
 	defer response.Body.Close()
 	switch response.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		// Codex treats a forbidden response as a revoked credential.
 		return evidence.Observation{}, true, &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Codex authentication was rejected")}
 	case http.StatusTooManyRequests:
 		return evidence.Observation{}, false, &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Codex quota endpoint is rate limited")}

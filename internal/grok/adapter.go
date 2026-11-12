@@ -148,7 +148,6 @@ func (a Adapter) fetch(ctx context.Context, credential credentials) (evidence.Ob
 	defer response.Body.Close()
 	switch response.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		// Grok treats a forbidden response as a revoked credential.
 		return evidence.Observation{}, errAuthorizationRejected()
 	case http.StatusTooManyRequests:
 		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Grok quota endpoint is rate limited")}

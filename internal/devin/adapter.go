@@ -202,7 +202,6 @@ func (a Adapter) statusFailure(response *http.Response, body []byte) error {
 	}
 	switch response.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		// Devin treats a forbidden response as a revoked credential.
 		return &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Devin authentication was rejected")}
 	case http.StatusTooManyRequests:
 		return &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Devin quota endpoint is rate limited")}

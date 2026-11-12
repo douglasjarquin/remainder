@@ -32,7 +32,6 @@ func (a Adapter) postRPC(ctx context.Context, token, method string) ([]byte, err
 	case http.StatusUnauthorized:
 		return nil, &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Cursor CLI authentication was rejected")}
 	case http.StatusForbidden:
-		// A forbidden Cursor response has an unknown cause, so it neither revokes nor backs off.
 		return nil, &cache.FetchError{Kind: cache.FailurePermanent, Err: errForbidden}
 	case http.StatusTooManyRequests:
 		return nil, &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Cursor quota endpoint is rate limited")}
