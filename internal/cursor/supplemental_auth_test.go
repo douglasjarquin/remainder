@@ -1,7 +1,6 @@
 package cursor
 
 import (
-	"errors"
 	"net/http"
 	"testing"
 
@@ -21,8 +20,8 @@ func TestSupplementalUnauthorizedRevokesSource(t *testing.T) {
 			defer server.Close()
 			adapter := testAdapter(t, server)
 			observation, err := adapter.Observe(t.Context(), cursorRequest())
-			kind, _ := adapter.Failure(err)
-			if !errors.Is(err, ErrRevoked) || len(observation.Windows) != 0 || kind != cache.FailureRevoked {
+			kind, _ := cache.Classify(err)
+			if len(observation.Windows) != 0 || kind != cache.FailureRevoked {
 				t.Fatalf("401 at %s returned outcome=%q windows=%d err=%v kind=%q, want revoked source with no quota", method, observation.Outcome, len(observation.Windows), err, kind)
 			}
 		})

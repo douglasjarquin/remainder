@@ -1,9 +1,7 @@
 package cursor
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,9 +9,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/douglasjarquin/remainder/internal/cache"
-	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
 func TestDefault_resolvesLinuxAuthFilePrecedence(t *testing.T) {
@@ -159,27 +154,6 @@ func TestAdapterCacheBinding_usesMetadataOnly(t *testing.T) {
 	}
 }
 
-func TestAdapterFailure_classifiesSelectionAndCancellation(t *testing.T) {
-	adapter := Adapter{}
-	tests := []struct {
-		name string
-		err  error
-		want cache.FailureKind
-	}{
-		{name: "wrong account", err: evidence.ErrWrongAccount, want: cache.FailureAccountMismatch},
-		{name: "canceled", err: contextCanceled(), want: cache.FailureTransient},
-		{name: "invalid auth", err: ErrInvalidAuth, want: cache.FailurePermanent},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			kind, _ := adapter.Failure(test.err)
-			if kind != test.want {
-				t.Fatalf("Adapter.Failure() = %s, want %s", kind, test.want)
-			}
-		})
-	}
-}
-
 func TestAuthFileMetadata_rejectsUnownedAndUnstableFiles(t *testing.T) {
 	// Given
 	uid := os.Getuid()
@@ -213,10 +187,6 @@ func writeRawAuth(t *testing.T, body string) string {
 		t.Fatal(err)
 	}
 	return path
-}
-
-func contextCanceled() error {
-	return fmt.Errorf("wrapped: %w", context.Canceled)
 }
 
 type syntheticAuthFileInfo struct {

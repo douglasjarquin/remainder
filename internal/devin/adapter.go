@@ -17,16 +17,13 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
+var sourceIdentity = evidence.SourceIdentity{Kind: "native_file_http", Name: "devin_credentials_toml"}
+
 const (
 	defaultEndpoint  = "https://server.codeium.com"
 	defaultTimeout   = 15 * time.Second
 	maxResponseBytes = 1 << 20
 	statusPath       = "/exa.seat_management_pb.SeatManagementService/GetUserStatus"
-)
-
-var (
-	ErrAuthorizationRejected = errors.New("Devin authentication was rejected")
-	ErrTransient             = errors.New("transient Devin quota failure")
 )
 
 type Options struct {
@@ -43,21 +40,6 @@ type Adapter struct {
 	endpoint string
 	timeout  time.Duration
 	now      func() time.Time
-}
-
-type RetryError struct {
-	RetryAt time.Time
-}
-
-func (e *RetryError) Error() string {
-	if e.RetryAt.IsZero() {
-		return "Devin quota endpoint is rate limited"
-	}
-	return "Devin quota endpoint is rate limited until " + e.RetryAt.UTC().Format(time.RFC3339)
-}
-
-func (e *RetryError) Unwrap() error {
-	return ErrTransient
 }
 
 type statusRequest struct {
@@ -104,11 +86,11 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 	}
 	path, err := resolveAuthFile(a.authFile)
 	if err != nil {
-		return cache.Binding{}, collectionError(err)
+		return cache.Binding{}, cache.FetchFailure(err)
 	}
 	file, info, err := openAuthFile(path)
 	if err != nil {
-		return cache.Binding{}, collectionError(err)
+		return cache.Binding{}, cache.FetchFailure(err)
 	}
 	defer file.Close()
 	fingerprint := fmt.Sprintf("%x", sha256.Sum256([]byte(authIdentity(path, info))))
@@ -116,8 +98,8 @@ func (a Adapter) CacheBinding(ctx context.Context, request evidence.Request) (ca
 		Provider:              "devin",
 		Profile:               "default",
 		ResponseBoundary:      "user_status",
-		SourceKind:            "native_file_http",
-		SourceName:            "devin_credentials_toml",
+		SourceKind:            sourceIdentity.Kind,
+		SourceName:            sourceIdentity.Name,
 		CredentialFingerprint: fingerprint,
 	}, nil
 }
@@ -131,11 +113,11 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	}
 	path, err := resolveAuthFile(a.authFile)
 	if err != nil {
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	credential, err := readCredentials(path)
 	if err != nil {
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	endpoint := a.endpoint
 	if endpoint == "" {
@@ -148,7 +130,7 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	defer cancel()
 	observation, err := a.fetch(ctx, endpoint, credential.apiKey, request.Account)
 	if err != nil {
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	return observation, nil
 }
@@ -158,10 +140,6 @@ func validateRequest(request evidence.Request) error {
 		return fmt.Errorf("%w: Devin native source requires --provider devin --profile default", evidence.ErrInvalidSelection)
 	}
 	return nil
-}
-
-func collectionError(err error) error {
-	return fmt.Errorf("%w: %w", evidence.ErrProviderUnavailable, err)
 }
 
 func (a Adapter) fetch(ctx context.Context, endpoint, apiKey, account string) (evidence.Observation, error) {
@@ -185,10 +163,7 @@ func (a Adapter) fetch(ctx context.Context, endpoint, apiKey, account string) (e
 	request.Header.Set("Content-Type", "application/json")
 	response, err := a.client.Do(request)
 	if err != nil {
-		if ctx.Err() != nil {
-			return evidence.Observation{}, fmt.Errorf("%w: Devin quota request canceled or timed out: %w", ErrTransient, ctx.Err())
-		}
-		return evidence.Observation{}, fmt.Errorf("%w: Devin quota request failed", ErrTransient)
+		return evidence.Observation{}, cache.RequestFailure(ctx, "Devin")
 	}
 	defer response.Body.Close()
 	raw, err := readBounded(response)
@@ -200,16 +175,9 @@ func (a Adapter) fetch(ctx context.Context, endpoint, apiKey, account string) (e
 	}
 	var payload statusResponse
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return evidence.Observation{}, fmt.Errorf("%w: Devin quota response is malformed", ErrTransient)
+		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Devin quota response is malformed")}
 	}
-	observation, err := normalize(&payload, account, a.now())
-	if err != nil {
-		if errors.Is(err, ErrAccountMismatch) || errors.Is(err, evidence.ErrWrongAccount) {
-			return evidence.Observation{}, err
-		}
-		return evidence.Observation{}, err
-	}
-	return observation, nil
+	return normalize(&payload, account, a.now())
 }
 
 func (a Adapter) statusFailure(response *http.Response, body []byte) error {
@@ -220,19 +188,19 @@ func (a Adapter) statusFailure(response *http.Response, body []byte) error {
 	}
 	switch code {
 	case "unauthenticated", "permission_denied", "invalid_argument":
-		return ErrAuthorizationRejected
+		return &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Devin authentication was rejected")}
 	case "resource_exhausted":
-		return &RetryError{RetryAt: parseRetryAfter(response.Header.Get("Retry-After"), a.now())}
+		return &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Devin quota endpoint is rate limited")}
 	case "unavailable", "deadline_exceeded", "internal", "aborted", "data_loss", "unknown":
-		return fmt.Errorf("%w: Devin quota endpoint returned %s", ErrTransient, code)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Devin quota endpoint returned %s", code)}
 	}
 	switch response.StatusCode {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return ErrAuthorizationRejected
+		return &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Devin authentication was rejected")}
 	case http.StatusTooManyRequests:
-		return &RetryError{RetryAt: parseRetryAfter(response.Header.Get("Retry-After"), a.now())}
+		return &cache.FetchError{Kind: cache.FailureTransient, RetryAt: cache.ParseRetryAfter(response.Header.Get("Retry-After"), a.now()), Err: errors.New("Devin quota endpoint is rate limited")}
 	default:
-		return fmt.Errorf("%w: Devin quota endpoint returned HTTP %d", ErrTransient, response.StatusCode)
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: fmt.Errorf("Devin quota endpoint returned HTTP %d", response.StatusCode)}
 	}
 }
 
@@ -245,38 +213,10 @@ func readBounded(response *http.Response) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("%w: Devin quota response could not be read", ErrTransient)
+		return nil, &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Devin quota response could not be read")}
 	}
 	if len(body) > maxResponseBytes {
 		return nil, errors.New("Devin quota response is too large")
 	}
 	return body, nil
-}
-
-func parseRetryAfter(value string, now time.Time) time.Time {
-	if seconds, err := strconv.ParseUint(value, 10, 32); err == nil {
-		return now.Add(time.Duration(seconds) * time.Second)
-	}
-	if date, err := http.ParseTime(value); err == nil {
-		return date.UTC()
-	}
-	return time.Time{}
-}
-
-func (a Adapter) Failure(err error) (cache.FailureKind, time.Time) {
-	switch {
-	case err == nil:
-		return cache.FailureNone, time.Time{}
-	case errors.Is(err, ErrAuthorizationRejected):
-		return cache.FailureRevoked, time.Time{}
-	case errors.Is(err, ErrAccountMismatch), errors.Is(err, evidence.ErrWrongAccount):
-		return cache.FailureAccountMismatch, time.Time{}
-	case errors.Is(err, ErrTransient):
-		if retry, ok := errors.AsType[*RetryError](err); ok {
-			return cache.FailureTransient, retry.RetryAt
-		}
-		return cache.FailureTransient, time.Time{}
-	default:
-		return cache.FailurePermanent, time.Time{}
-	}
 }

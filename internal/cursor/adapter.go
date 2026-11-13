@@ -8,11 +8,15 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
+)
+
+var (
+	fileSourceIdentity     = evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}
+	keychainSourceIdentity = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "cursor_cli_keychain"}
 )
 
 const (
@@ -24,10 +28,9 @@ const (
 var (
 	ErrUnsupported     = errors.New("Cursor CLI file source is unsupported on this operating system")
 	ErrInvalidAuth     = errors.New("Cursor CLI authentication is invalid")
-	ErrRevoked         = errors.New("Cursor CLI authentication was rejected")
-	ErrForbidden       = errors.New("Cursor quota request was forbidden")
-	ErrTransient       = errors.New("transient Cursor quota failure")
 	ErrInvalidResponse = errors.New("Cursor quota response is invalid")
+
+	errForbidden = errors.New("Cursor quota request was forbidden")
 )
 
 type Options struct {
@@ -54,17 +57,6 @@ type Adapter struct {
 	now                 func() time.Time
 	goos                string
 }
-
-type RetryError struct{ RetryAt time.Time }
-
-func (e *RetryError) Error() string {
-	if e.RetryAt.IsZero() {
-		return "Cursor quota endpoint is rate limited"
-	}
-	return "Cursor quota endpoint is rate limited until " + e.RetryAt.UTC().Format(time.RFC3339)
-}
-
-func (e *RetryError) Unwrap() error { return ErrTransient }
 
 func Default() Adapter {
 	return defaultWithRuntime(runtime.GOOS, os.LookupEnv)
@@ -130,27 +122,27 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	var err error
 	if a.goos == "darwin" {
 		if !a.allowKeychainPrompt {
-			return evidence.Observation{}, collectionError(ErrKeychainPromptRequired)
+			return evidence.Observation{}, cache.FetchFailure(ErrKeychainPromptRequired)
 		}
 		token, err = a.readMacAccessToken(ctx)
-		source = evidence.SourceIdentity{Kind: "native_keychain_http", Name: "cursor_cli_keychain"}
+		source = keychainSourceIdentity
 	} else {
 		token, err = readAccessToken(a.authFile, a.now())
-		source = evidence.SourceIdentity{Kind: "native_file_http", Name: "cursor_cli_auth_json"}
+		source = fileSourceIdentity
 	}
 	if err != nil {
 		if callerErr := callerCtx.Err(); callerErr != nil {
 			return evidence.Observation{}, callerErr
 		}
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	usageBody, err := a.postRPC(ctx, token, "GetCurrentPeriodUsage")
 	if err != nil {
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	usage, err := decodeUsage(usageBody)
 	if err != nil {
-		return evidence.Observation{}, collectionError(err)
+		return evidence.Observation{}, cache.FetchFailure(err)
 	}
 	observedAt := a.now()
 
@@ -159,8 +151,8 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	failures := make([]evidence.Failure, 0, 2)
 	if body, rpcErr := a.postRPC(ctx, token, "GetPlanInfo"); callerCtx.Err() != nil {
 		return evidence.Observation{}, callerCtx.Err()
-	} else if errors.Is(rpcErr, ErrRevoked) {
-		return evidence.Observation{}, collectionError(rpcErr)
+	} else if revoked(rpcErr) {
+		return evidence.Observation{}, cache.FetchFailure(rpcErr)
 	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "plan", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &plan); decodeErr != nil {
@@ -168,8 +160,8 @@ func (a Adapter) Observe(ctx context.Context, request evidence.Request) (evidenc
 	}
 	if body, rpcErr := a.postRPC(ctx, token, "GetSandUsageStatus"); callerCtx.Err() != nil {
 		return evidence.Observation{}, callerCtx.Err()
-	} else if errors.Is(rpcErr, ErrRevoked) {
-		return evidence.Observation{}, collectionError(rpcErr)
+	} else if revoked(rpcErr) {
+		return evidence.Observation{}, cache.FetchFailure(rpcErr)
 	} else if rpcErr != nil {
 		failures = append(failures, evidence.Failure{Scope: "grok_bot", Message: safeFailure(rpcErr)})
 	} else if decodeErr := json.Unmarshal(body, &sand); decodeErr != nil {
@@ -192,64 +184,37 @@ func (a Adapter) validateRequest(ctx context.Context, request evidence.Request) 
 		return evidence.ErrWrongAccount
 	}
 	if a.goos != "linux" && a.goos != "darwin" {
-		return collectionError(ErrUnsupported)
+		return cache.FetchFailure(ErrUnsupported)
 	}
 	if a.pathErr != nil {
-		return collectionError(a.pathErr)
+		return cache.FetchFailure(a.pathErr)
 	}
 	if a.goos == "darwin" && a.configFile == "" {
-		return collectionError(fmt.Errorf("%w: configuration file path is empty", ErrInvalidAuth))
+		return cache.FetchFailure(fmt.Errorf("%w: configuration file path is empty", ErrInvalidAuth))
 	}
 	if a.goos == "linux" && a.authFile == "" {
-		return collectionError(fmt.Errorf("%w: authentication file path is empty", ErrInvalidAuth))
+		return cache.FetchFailure(fmt.Errorf("%w: authentication file path is empty", ErrInvalidAuth))
 	}
 	return nil
 }
 
-func (Adapter) Failure(err error) (cache.FailureKind, time.Time) {
-	if err == nil {
-		return cache.FailureNone, time.Time{}
-	}
-	if retry, ok := errors.AsType[*RetryError](err); ok {
-		return cache.FailureTransient, retry.RetryAt
-	}
-	switch {
-	case errors.Is(err, evidence.ErrWrongAccount):
-		return cache.FailureAccountMismatch, time.Time{}
-	case errors.Is(err, ErrRevoked):
-		return cache.FailureRevoked, time.Time{}
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, ErrTransient):
-		return cache.FailureTransient, time.Time{}
-	default:
-		return cache.FailurePermanent, time.Time{}
-	}
-}
-
 func rpcPath(method string) string { return "/aiserver.v1.DashboardService/" + method }
 
-func collectionError(err error) error {
-	return fmt.Errorf("%w: %w", evidence.ErrProviderUnavailable, err)
+func revoked(err error) bool {
+	kind, _ := cache.Classify(err)
+	return kind == cache.FailureRevoked
 }
 
 func safeFailure(err error) string {
+	kind, _ := cache.Classify(err)
 	switch {
-	case errors.Is(err, ErrRevoked):
+	case kind == cache.FailureRevoked:
 		return "Cursor CLI authentication was rejected"
-	case errors.Is(err, ErrForbidden):
+	case errors.Is(err, errForbidden):
 		return "Cursor quota request was forbidden; the cause is unknown"
-	case errors.Is(err, ErrTransient):
+	case kind == cache.FailureTransient:
 		return "Cursor quota request failed transiently"
 	default:
 		return "Cursor supplemental quota response is invalid"
 	}
-}
-
-func parseRetryAfter(value string, now time.Time) time.Time {
-	if seconds, err := strconv.ParseUint(value, 10, 32); err == nil {
-		return now.Add(time.Duration(seconds) * time.Second)
-	}
-	if date, err := http.ParseTime(value); err == nil {
-		return date.UTC()
-	}
-	return time.Time{}
 }

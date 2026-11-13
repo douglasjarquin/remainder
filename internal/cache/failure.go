@@ -1,0 +1,85 @@
+package cache
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/douglasjarquin/remainder/internal/evidence"
+)
+
+// FetchError is a provider collection failure tagged with how the cache
+// treats it. Providers build it where they detect the failure.
+type FetchError struct {
+	Kind    FailureKind
+	RetryAt time.Time
+	Err     error
+}
+
+func (e *FetchError) Error() string {
+	message := evidence.ErrProviderUnavailable.Error() + ": " + e.Err.Error()
+	if !e.RetryAt.IsZero() {
+		message += " until " + e.RetryAt.UTC().Format(time.RFC3339)
+	}
+	return message
+}
+
+func (e *FetchError) Unwrap() []error {
+	return []error{evidence.ErrProviderUnavailable, e.Err}
+}
+
+// FetchFailure reports err as a provider collection failure. An error that
+// already carries a FetchError keeps its declared kind, and an account
+// selector error stays a usage error; any other error is classified by
+// Classify.
+func FetchFailure(err error) error {
+	if _, ok := errors.AsType[*FetchError](err); ok || errors.Is(err, evidence.ErrWrongAccount) {
+		return err
+	}
+	kind, _ := Classify(err)
+	return &FetchError{Kind: kind, Err: err}
+}
+
+// RequestFailure reports a provider request that returned no response as a
+// transient failure, naming a cancellation or deadline when ctx ended.
+func RequestFailure(ctx context.Context, provider string) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return &FetchError{Kind: FailureTransient, Err: fmt.Errorf("%s quota request canceled or timed out: %w", provider, ctxErr)}
+	}
+	return &FetchError{Kind: FailureTransient, Err: errors.New(provider + " quota request failed")}
+}
+
+// Classify returns the cache failure kind and provider retry time for a fetch
+// error. Every non-nil error yields a failure kind, so a failed fetch can never
+// be recorded as a success.
+func Classify(err error) (FailureKind, time.Time) {
+	if err == nil {
+		return FailureNone, time.Time{}
+	}
+	if fetchErr, ok := errors.AsType[*FetchError](err); ok && fetchErr.Kind != FailureNone {
+		return fetchErr.Kind, fetchErr.RetryAt
+	}
+	switch {
+	case errors.Is(err, evidence.ErrWrongAccount):
+		return FailureAccountMismatch, time.Time{}
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return FailureTransient, time.Time{}
+	default:
+		return FailurePermanent, time.Time{}
+	}
+}
+
+// ParseRetryAfter returns the time an HTTP Retry-After value names, given in
+// delay seconds or as an HTTP date, or the zero time when it names none.
+func ParseRetryAfter(value string, now time.Time) time.Time {
+	if seconds, err := strconv.ParseUint(value, 10, 32); err == nil {
+		return now.Add(time.Duration(seconds) * time.Second)
+	}
+	if date, err := http.ParseTime(value); err == nil {
+		return date.UTC()
+	}
+	return time.Time{}
+}

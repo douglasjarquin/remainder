@@ -87,8 +87,6 @@ const (
 
 type FetchResult struct {
 	Observation evidence.Observation
-	Failure     FailureKind
-	RetryAt     time.Time
 	Err         error
 }
 

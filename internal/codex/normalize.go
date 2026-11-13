@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -17,7 +18,7 @@ func normalize(raw usageResponse, selectedAccount string, now time.Time) (eviden
 		accountID = raw.AccountIDCamel
 	}
 	if accountID != "" && accountID != selectedAccount {
-		return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", ErrAccountMismatch)
+		return evidence.Observation{}, &cache.FetchError{Kind: cache.FailureAccountMismatch, Err: errors.New("Codex quota response account does not match the credential")}
 	}
 	base := raw.RateLimit
 	if base == nil {
@@ -66,7 +67,7 @@ func normalize(raw usageResponse, selectedAccount string, now time.Time) (eviden
 	if accountID == selectedAccount {
 		binding = evidence.IdentityVerified
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "codex", Profile: "default", Account: evidence.AccountIdentity{LastObserved: selectedAccount, Binding: binding}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "codex_auth_json"}, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "codex", Profile: "default", Account: evidence.AccountIdentity{LastObserved: selectedAccount, Binding: binding}, Source: sourceIdentity, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: evidence.OutcomeComplete, Windows: windows}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, fmt.Errorf("Codex normalized evidence is invalid: %w", err)
 	}

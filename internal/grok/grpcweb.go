@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/douglasjarquin/remainder/internal/cache"
 )
 
 func decodeGRPCWeb(body []byte) ([]byte, error) {
@@ -99,16 +101,16 @@ func grpcStatusError(value, message string) error {
 	}
 	switch status {
 	case 16:
-		return ErrAuthorizationRejected
+		return errAuthorizationRejected()
 	case 7:
 		if grpcMessageIsAuthFailure(message) {
-			return ErrAuthorizationRejected
+			return errAuthorizationRejected()
 		}
-		return fmtTransientProtocol()
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Grok quota RPC failed")}
 	case 8:
-		return &RetryError{}
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Grok quota endpoint is rate limited")}
 	default:
-		return fmtTransientProtocol()
+		return &cache.FetchError{Kind: cache.FailureTransient, Err: errors.New("Grok quota RPC failed")}
 	}
 }
 
@@ -138,6 +140,6 @@ func grpcMessageIsAuthFailure(message string) bool {
 		strings.Contains(lowered, "oauth2 could not be validated")
 }
 
-func fmtTransientProtocol() error {
-	return errors.Join(ErrTransient, errors.New("Grok quota RPC failed"))
+func errAuthorizationRejected() error {
+	return &cache.FetchError{Kind: cache.FailureRevoked, Err: errors.New("Grok authentication was rejected")}
 }

@@ -10,8 +10,6 @@ import (
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
-var ErrAccountMismatch = errors.New("Devin quota account mismatch")
-
 func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evidence.Observation, error) {
 	if raw == nil || raw.UserStatus == nil {
 		return evidence.Observation{}, errors.New("Devin quota response has no user status")
@@ -26,7 +24,7 @@ func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evid
 			return evidence.Observation{}, fmt.Errorf("%w: response cannot verify an account selector", evidence.ErrWrongAccount)
 		}
 		if user.UserID != selectedAccount {
-			return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", ErrAccountMismatch)
+			return evidence.Observation{}, fmt.Errorf("%w: response does not match selected profile", evidence.ErrWrongAccount)
 		}
 	}
 	windows := make([]evidence.Window, 0, 6)
@@ -89,7 +87,7 @@ func normalize(raw *statusResponse, selectedAccount string, now time.Time) (evid
 	if partial {
 		outcome = evidence.OutcomePartial
 	}
-	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "devin", Profile: "default", Account: evidence.AccountIdentity{LastObserved: user.UserID, Binding: binding}, Source: evidence.SourceIdentity{Kind: "native_file_http", Name: "devin_credentials_toml"}, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows}
+	observation := evidence.Observation{SchemaVersion: evidence.SchemaV1, Provider: "devin", Profile: "default", Account: evidence.AccountIdentity{LastObserved: user.UserID, Binding: binding}, Source: sourceIdentity, ObservedAt: now, Freshness: evidence.FreshFresh, Outcome: outcome, Windows: windows}
 	if err := observation.Validate(); err != nil {
 		return evidence.Observation{}, fmt.Errorf("Devin normalized evidence is invalid: %w", err)
 	}

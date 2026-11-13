@@ -52,8 +52,7 @@ One failed provider preserves the other observations and returns exit 3; no usab
 A partially defined provider observation also makes the mixed result partial.
 
 Cache policy is applied independently to each provider.
-A fresh cache hit that exceeds `--max-age` while another provider is still running is excluded at report assembly rather than re-dated.
-This does not trigger a second provider request.
+Max-age is judged once, when the cache serves a hit, so a hit stays in the report with its original timestamp while another provider is still running.
 Explicit stale-on-error evidence remains subject to the selected freshness policy.
 
 ## Implementation

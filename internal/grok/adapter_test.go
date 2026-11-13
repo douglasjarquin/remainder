@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
@@ -147,9 +148,9 @@ func TestAdapterObserve(t *testing.T) {
 		}
 	})
 
-	t.Run("status_401", statusCase(now, http.StatusUnauthorized, ErrAuthorizationRejected))
-	t.Run("status_403", statusCase(now, http.StatusForbidden, ErrAuthorizationRejected))
-	t.Run("status_429", statusCase(now, http.StatusTooManyRequests, ErrTransient))
+	t.Run("status_401", statusCase(now, http.StatusUnauthorized, cache.FailureRevoked))
+	t.Run("status_403", statusCase(now, http.StatusForbidden, cache.FailureRevoked))
+	t.Run("status_429", statusCase(now, http.StatusTooManyRequests, cache.FailureTransient))
 	t.Run("redirect_refused", func(t *testing.T) {
 		var followed atomic.Int32
 		target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { followed.Add(1) }))
@@ -188,7 +189,7 @@ func TestAdapterObserve(t *testing.T) {
 		defer close(release)
 		adapter := New(Options{AuthFile: path, Client: server.Client(), Endpoint: server.URL, Timeout: 10 * time.Millisecond, Now: func() time.Time { return now }})
 		_, err := adapter.Observe(t.Context(), request())
-		if !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, ErrTransient) {
+		if kind, _ := cache.Classify(err); !errors.Is(err, context.DeadlineExceeded) || kind != cache.FailureTransient {
 			t.Fatalf("error = %v", err)
 		}
 	})
@@ -210,8 +211,7 @@ func TestAdapterObserve(t *testing.T) {
 			w.WriteHeader(http.StatusTooManyRequests)
 		}, path, now)
 		_, err := adapter.Observe(t.Context(), request())
-		retry, ok := errors.AsType[*RetryError](err)
-		if !ok || !retry.RetryAt.Equal(now.Add(30*time.Second)) {
+		if kind, retryAt := cache.Classify(err); kind != cache.FailureTransient || !retryAt.Equal(now.Add(30*time.Second)) {
 			t.Fatalf("error = %v", err)
 		}
 	})
@@ -236,12 +236,12 @@ func multipleAccountsPath(t *testing.T) string {
 	return path
 }
 
-func statusCase(now time.Time, status int, target error) func(*testing.T) {
+func statusCase(now time.Time, status int, target cache.FailureKind) func(*testing.T) {
 	return func(t *testing.T) {
 		path := authPath(t, "grok.com", "status-secret", "", "", "")
 		adapter, _ := testAdapter(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }, path, now)
 		_, err := adapter.Observe(t.Context(), request())
-		if !errors.Is(err, target) || strings.Contains(err.Error(), "status-secret") {
+		if kind, _ := cache.Classify(err); kind != target || strings.Contains(err.Error(), "status-secret") {
 			t.Fatalf("error = %v", err)
 		}
 	}

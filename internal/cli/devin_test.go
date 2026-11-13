@@ -15,6 +15,7 @@ import (
 	"github.com/douglasjarquin/remainder/internal/cache"
 	"github.com/douglasjarquin/remainder/internal/codex"
 	"github.com/douglasjarquin/remainder/internal/devin"
+	"github.com/douglasjarquin/remainder/internal/evidence"
 )
 
 func TestExecute_native_Devin_supportsCompactJSONAndScalar(t *testing.T) {
@@ -84,19 +85,35 @@ func TestRuntimeAdapter_Devin_cacheHitPreservesTimestampAndVerifiedIdentity(t *t
 	}
 }
 
-func TestRuntimeAdapter_Devin_accountMismatchFails(t *testing.T) {
-	now := fixedCLINow()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		writeDevinCLIStatus(w)
-	}))
-	defer server.Close()
-	adapter := devinRuntimeAdapter(t, server, now)
-	var stdout, stderr bytes.Buffer
+func TestRuntimeAdapter_Devin_accountSelectorFailureIsUsageError(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		response func(http.ResponseWriter)
+		cache    string
+	}{
+		{name: "mismatched user", response: writeDevinCLIStatus, cache: "--cache=off"},
+		{name: "mismatched user through cache", response: writeDevinCLIStatus, cache: "--cache=auto"},
+		{name: "response without user id", response: func(w http.ResponseWriter) {
+			fmt.Fprint(w, `{"userStatus":{"planStatus":{"dailyQuotaRemainingPercent":80,"dailyQuotaResetAtUnix":"1790064000"}}}`)
+		}, cache: "--cache=off"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			now := fixedCLINow()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				test.response(w)
+			}))
+			defer server.Close()
+			adapter := devinRuntimeAdapter(t, server, now)
+			store := cache.New(filepath.Join(t.TempDir(), "cache"), cache.Options{Now: func() time.Time { return now }})
+			adapter.newStore = func() (*cache.Store, error) { return store, nil }
+			var stdout, stderr bytes.Buffer
 
-	code := executeWithAdapterAt(t.Context(), []string{"--provider=devin", "--profile=default", "--account=user-other", "--cache=off"}, &stdout, &stderr, "test", now, adapter)
+			code := executeWithAdapterAt(t.Context(), []string{"--provider=devin", "--profile=default", "--account=user-other", test.cache}, &stdout, &stderr, "test", now, adapter)
 
-	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), devin.ErrAccountMismatch.Error()) {
-		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			if code != 2 || stdout.Len() != 0 || !strings.Contains(stderr.String(), evidence.ErrWrongAccount.Error()) {
+				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+			}
+		})
 	}
 }
 

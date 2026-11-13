@@ -66,13 +66,7 @@ func (s *Store) Resolve(ctx context.Context, binding Binding, expectedAccount st
 	}
 	wantBinding := bindingHash(binding)
 	initial := readRecord(s.SnapshotPath(binding), wantBinding)
-	if result, ok := eligible(initial, expectedAccount, policy.MaxAge, s.options.Now()); ok && !policy.Refresh {
-		return result, nil
-	}
-	if policy.Mode == ModeOnly {
-		return Result{}, cachedOnlyError(initial)
-	}
-	if result, err, ok := s.backoffResult(initial, expectedAccount, policy); ok {
+	if result, err, done := served(initial, decide(initial, expectedAccount, policy, s.options.Now(), !policy.Refresh)); done {
 		return result, err
 	}
 	directory, err := s.prepare(binding)
@@ -94,11 +88,10 @@ func (s *Store) Resolve(ctx context.Context, binding Binding, expectedAccount st
 	}
 	defer lock.Close()
 	current := readRecord(s.SnapshotPath(binding), wantBinding)
-	if result, err, ok := s.backoffResult(current, expectedAccount, policy); ok {
+	refreshedByPeer := current.record.Generation != initial.record.Generation
+	hitAllowed := !policy.Refresh || refreshedByPeer
+	if result, err, done := served(current, decide(current, expectedAccount, policy, s.options.Now(), hitAllowed)); done {
 		return result, err
-	}
-	if result, ok := reuseAfterLock(initial, current, expectedAccount, policy, s.options.Now()); ok {
-		return result, nil
 	}
 	fetched := fetch(ctx)
 	if fetched.Err != nil {
@@ -174,30 +167,64 @@ func resolveLive(ctx context.Context, expectedAccount string, fetch func(context
 	return Result{Observation: result.Observation}, nil
 }
 
-func eligible(loaded loadedRecord, expectedAccount string, maxAge time.Duration, now time.Time) (Result, bool) {
-	if loaded.state != recordSupported || loaded.record.Observation == nil || loaded.record.Revoked || (expectedAccount != "" && loaded.record.Observation.Account.LastObserved != expectedAccount) {
-		return Result{}, false
+type decision uint8
+
+const (
+	decisionRefetch decision = iota
+	decisionServeCached
+	decisionServeStale
+	decisionBackedOff
+	decisionCacheOnlyMiss
+)
+
+func decide(loaded loadedRecord, expectedAccount string, policy Policy, now time.Time, hitAllowed bool) decision {
+	if loaded.state != recordSupported {
+		if policy.Mode == ModeOnly {
+			return decisionCacheOnlyMiss
+		}
+		return decisionRefetch
 	}
-	age := now.Sub(loaded.record.Observation.ObservedAt)
-	if age < 0 || age > maxAge {
-		return Result{}, false
+	value := loaded.record
+	servable := value.Observation != nil && !value.Revoked && (expectedAccount == "" || value.Observation.Account.LastObserved == expectedAccount) && !value.Observation.ObservedAt.After(now)
+	if hitAllowed && servable && now.Sub(value.Observation.ObservedAt) <= policy.MaxAge {
+		return decisionServeCached
 	}
-	observation := *loaded.record.Observation
+	if policy.Mode == ModeOnly {
+		return decisionCacheOnlyMiss
+	}
+	if value.LastFailure != FailureTransient || value.RetryAt == nil || !now.Before(*value.RetryAt) {
+		return decisionRefetch
+	}
+	if servable && policy.StaleOnError {
+		return decisionServeStale
+	}
+	return decisionBackedOff
+}
+
+func served(loaded loadedRecord, outcome decision) (Result, error, bool) {
+	switch outcome {
+	case decisionServeCached:
+		return cachedResult(loaded.record, false), nil, true
+	case decisionServeStale:
+		return cachedResult(loaded.record, true), nil, true
+	case decisionBackedOff:
+		return Result{}, &BackoffError{RetryAt: *loaded.record.RetryAt}, true
+	case decisionCacheOnlyMiss:
+		return Result{}, cachedOnlyError(loaded), true
+	default:
+		return Result{}, nil, false
+	}
+}
+
+func cachedResult(value record, stale bool) Result {
+	observation := *value.Observation
 	if observation.Account.Binding == evidence.IdentityVerified {
 		observation.Account.Binding = evidence.IdentityHistorical
 	}
-	return Result{Observation: observation, Generation: loaded.record.Generation, FromCache: true}, true
-}
-
-func reuseAfterLock(initial, current loadedRecord, expectedAccount string, policy Policy, now time.Time) (Result, bool) {
-	result, ok := eligible(current, expectedAccount, policy.MaxAge, now)
-	if !ok {
-		return Result{}, false
+	if stale {
+		observation.Freshness = evidence.FreshStale
 	}
-	if !policy.Refresh {
-		return result, true
-	}
-	return result, current.record.Generation != initial.record.Generation
+	return Result{Observation: observation, Generation: value.Generation, FromCache: true}
 }
 
 func cachedOnlyError(loaded loadedRecord) error {
@@ -216,23 +243,24 @@ func (s *Store) handleFailure(binding Binding, current loadedRecord, expectedAcc
 		return Result{}, fetched.Err
 	}
 	now := s.options.Now()
+	failure, providerRetryAt := Classify(fetched.Err)
 	value := record{SchemaVersion: recordVersion, BindingHash: bindingHash(binding)}
 	if current.state == recordSupported {
 		value = current.record
 	}
 	value.LastAttemptAt = &now
-	value.LastFailure = fetched.Failure
-	value.Revoked = value.Revoked || fetched.Failure == FailureRevoked || fetched.Failure == FailureAccountMismatch
+	value.LastFailure = failure
+	value.Revoked = value.Revoked || failure == FailureRevoked || failure == FailureAccountMismatch
 	value.RetryAt = nil
-	if fetched.Failure == FailureTransient {
-		retryAt := s.retryDeadline(now, fetched.RetryAt)
+	if failure == FailureTransient {
+		retryAt := s.retryDeadline(now, providerRetryAt)
 		value.RetryAt = &retryAt
 	}
 	if err := writeRecord(s.SnapshotPath(binding), value); err != nil {
 		return Result{}, fetched.Err
 	}
-	if result, _, ok := s.backoffResult(loadedRecord{state: recordSupported, record: value}, expectedAccount, policy); ok && result.Observation.Provider != "" {
-		return result, nil
+	if decide(loadedRecord{state: recordSupported, record: value}, expectedAccount, policy, now, false) == decisionServeStale {
+		return cachedResult(value, true), nil
 	}
 	return Result{}, fetched.Err
 }

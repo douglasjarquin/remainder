@@ -178,7 +178,7 @@ func TestAdapterObserve_boundsAndClassifiesFailures(t *testing.T) {
 
 			// When
 			_, err := testAdapter(t, server).Observe(t.Context(), cursorRequest())
-			kind, retryAt := testAdapter(t, server).Failure(err)
+			kind, retryAt := cache.Classify(err)
 
 			// Then
 			if err == nil || kind != test.wantKind || !retryAt.Equal(test.wantRetry) || !strings.Contains(err.Error(), test.wantPhrase) || strings.Contains(err.Error(), "synthetic-secret") {
@@ -230,7 +230,7 @@ func TestAdapterObserve_refusesRedirectAndHonorsCancellation(t *testing.T) {
 		close(release)
 
 		// Then
-		kind, _ := adapter.Failure(err)
+		kind, _ := cache.Classify(err)
 		if !errors.Is(err, context.DeadlineExceeded) || kind != cache.FailureTransient {
 			t.Fatalf("error/kind = %v/%s, want bounded transient deadline", err, kind)
 		}

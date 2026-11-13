@@ -20,16 +20,16 @@ func TestRootRevokedSourceRespectsBackoff(t *testing.T) {
 	policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second, StaleOnError: true}
 	failure := errors.New("synthetic rejected")
 	store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureRevoked, Err: failure}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureRevoked, Err: failure}}
 	})
 	store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-		return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: failure}
+		return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: failure}}
 	})
 	calls := 0
 	for range 12 {
 		result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
 			calls++
-			return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: failure}
+			return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: now.Add(30 * time.Second), Err: failure}}
 		})
 		if err == nil || result.FromCache {
 			t.Fatal("revoked evidence reused")
@@ -57,13 +57,13 @@ func TestStore_RevokedBackoff_blocksRefreshUntilDeadline(t *testing.T) {
 				policy := cache.Policy{Mode: cache.ModeAuto, MaxAge: time.Second, StaleOnError: staleOnError}
 				invalidationErr := errors.New("confirmed source invalidation")
 				if _, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-					return cache.FetchResult{Failure: invalidation, Err: invalidationErr}
+					return cache.FetchResult{Err: &cache.FetchError{Kind: invalidation, Err: invalidationErr}}
 				}); !errors.Is(err, invalidationErr) {
 					t.Fatalf("invalidation error = %v, want %v", err, invalidationErr)
 				}
 				transientErr := errors.New("transient failure")
 				result, err := store.Resolve(t.Context(), binding, "", policy, func(context.Context) cache.FetchResult {
-					return cache.FetchResult{Failure: cache.FailureTransient, RetryAt: retryAt, Err: transientErr}
+					return cache.FetchResult{Err: &cache.FetchError{Kind: cache.FailureTransient, RetryAt: retryAt, Err: transientErr}}
 				})
 				if !errors.Is(err, transientErr) || result.FromCache {
 					t.Fatalf("recorded result = %+v, error = %v", result, err)
