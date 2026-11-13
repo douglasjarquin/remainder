@@ -1,0 +1,38 @@
+# remainder
+
+> Remainder is a small, one-shot Go CLI that reports provider quota windows and pace from a local, read-only observation.
+
+## Product
+
+- [README.md](README.md): install, first report, output formats, cache and pace behavior, and exit codes.
+- [docs/remainder/cli-contract.md](docs/remainder/cli-contract.md): help, version, flags, `--all`, and exit codes.
+- [docs/remainder/providers.md](docs/remainder/providers.md): provider selection, source limits, and output formats.
+- [docs/remainder/cache-and-pace.md](docs/remainder/cache-and-pace.md): freshness, cache policy, and pace calculation.
+- [docs/provider-sources.md](docs/provider-sources.md): provider source matrix and authorization boundary.
+
+## Build and verify
+
+- [docs/remainder/build-and-verify.md](docs/remainder/build-and-verify.md): install details, build, tests, and benchmarks.
+- [docs/remainder/releases.md](docs/remainder/releases.md): version scope and release evidence.
+- [docs/release.md](docs/release.md): release artifacts and the manual release procedure.
+- [docs/release-readiness.md](docs/release-readiness.md): cross-process, correctness, and performance gates.
+- [VERIFY.md](VERIFY.md): the canonical verification command and evidence rules.
+- [CONTRIBUTING.md](CONTRIBUTING.md): the pull-request workflow and checks.
+
+## Feature maps
+
+- [docs/features/README.md](docs/features/README.md): the feature-map index.
+- [docs/features/claude.md](docs/features/claude.md), [docs/features/grok.md](docs/features/grok.md), [docs/features/cursor.md](docs/features/cursor.md), and [docs/features/devin.md](docs/features/devin.md): provider collection evidence.
+- [docs/features/quota-evidence.md](docs/features/quota-evidence.md): the normalized observation schema.
+- [docs/features/performance-baseline.md](docs/features/performance-baseline.md): the performance baseline.
+
+## Agent surfaces
+
+- [AGENTS.md](AGENTS.md): architecture, constraints, and commands for coding agents.
+- [skills/remainder/SKILL.md](skills/remainder/SKILL.md): the packaged agent skill for invoking and interpreting Remainder.
+
+## Optional
+
+- [docs/remainder/ownership.md](docs/remainder/ownership.md): roadmap ownership and independent consumers.
+- [ATTRIBUTIONS.md](ATTRIBUTIONS.md): upstream research credit and licenses.
+- [LICENSE](LICENSE): MIT.
