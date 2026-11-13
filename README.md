@@ -1,6 +1,6 @@
 # remainder
 
-<img width="1280" height="640" alt="3Iwlc" src="https://github.com/user-attachments/assets/dda68c4e-e28f-45dd-a9c6-bf5148179c18" />
+<img width="2560" height="1280" alt="remainder banner@2x" src="https://github.com/user-attachments/assets/641d120e-ebff-4361-8aab-27d311234da5" />
 
 ## What it is
 
