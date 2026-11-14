@@ -1,8 +1,12 @@
 bin/
-artifacts/
+/artifacts/
 /dist/
 *.test
 *.prof
 
 # Verification run records written by .agents/skills/verify (see VERIFY.md).
 .artifacts/
+
+# Compound Engineering per-checkout overrides and scratch space.
+.compound-engineering/*.local.yaml
+.context/compound-engineering/

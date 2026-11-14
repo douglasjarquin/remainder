@@ -1,0 +1,20 @@
+# Compound Engineering -- repo config (team defaults).
+# Optional per-checkout override: .compound-engineering/config.local.yaml (gitignored).
+# Only deliberately chosen keys live here; see config.example.yaml for every available key.
+
+# Artifact root. docs/ holds this project's product documentation, so CE
+# artifacts (solutions, plans, ideation, and the other CE-owned trees) resolve
+# under this root instead.
+docs_root: .compound-engineering/artifacts
+
+# Diffs and documents never leave this checkout for a second provider.
+cross_model_review_mode: off
+
+# Implementation stays on the session's native engine; no standing reroute.
+work_engine_mode: off
+
+# No standing CI/review watch after a full-workflow PR is opened.
+auto_babysit: false
+
+packs:
+  - source: compound-packs/house-rules
