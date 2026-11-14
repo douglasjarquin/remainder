@@ -56,7 +56,7 @@ An invocation without a provider selection or `--all` writes an honest unavailab
 
 ## How it works
 
-```
+```text
 you
  │  --provider NAME --profile default, or --all
  ▼
@@ -100,6 +100,10 @@ Flags, `--all`, and the undefined-pace error are in [docs/remainder/cli-contract
 * [VERIFY.md](VERIFY.md) — verification.
 
 * [ATTRIBUTIONS.md](ATTRIBUTIONS.md) — attributions.
+
+* [llms.txt](llms.txt) - described index of the key pages for agents.
+
+* [AGENTS.md](AGENTS.md) - agent instructions and architecture summary.
 
 ## Contributing
 
